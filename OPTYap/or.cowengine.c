@@ -25,7 +25,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include "Yatom.h"
-#include "YapHeap.h"
+#include "Heap.h"
 #include "or.macros.h"
 
 
@@ -79,7 +79,7 @@ void make_root_choice_point(void) {
 
 void free_root_choice_point(void) {
   B = LOCAL_top_cp->cp_b;
-  LOCAL_top_cp = (choiceptr) Yap_LocalBase;
+  LOCAL_top_cp = B_BASE;
   return;
 }
 
@@ -120,7 +120,7 @@ int p_share_work(void) {
 
 int q_share_work(int worker_p) {
   LOCK_OR_FRAME(LOCAL_top_or_fr);
-  if (Get_REMOTE_prune_request(worker_p)) {
+  if (REMOTE_prune_request(worker_p)) {
     /* worker p with prune request */
     UNLOCK_OR_FRAME(LOCAL_top_or_fr);
     return FALSE;
@@ -178,7 +178,7 @@ void share_private_nodes(int worker_q) {
     depth++;
     ALLOC_OR_FRAME(or_frame);
     INIT_LOCK(OrFr_lock(or_frame));
-    SetOrFr_node(or_frame, AuxB);
+    OrFr_node(or_frame) = AuxB;
     OrFr_alternative(or_frame) = AuxB->cp_ap;
     OrFr_pend_prune_cp(or_frame) = NULL;
     OrFr_nearest_leftnode(or_frame) = LOCAL_top_or_fr;

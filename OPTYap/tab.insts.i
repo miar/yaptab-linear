@@ -61,15 +61,15 @@
           gcp->cp_cp = CPREG;                                         \
 	  if (IsMode_Local(TabEnt_mode(TAB_ENT))) {                   \
             /* go local */                                            \
-            register dep_fr_ptr new_dep_fr;                           \
+            /*register dep_fr_ptr new_dep_fr;*/			      \
             /* adjust freeze registers */                             \
             H_FZ = H;                                                 \
             B_FZ = gcp;                                               \
             TR_FZ = TR;                                               \
             /* store dependency frame */                              \
-            new_dependency_frame(new_dep_fr, TRUE, LOCAL_top_or_fr,   \
-                                 gcp, gcp, SG_FR, LOCAL_top_dep_fr);  \
-            LOCAL_top_dep_fr = new_dep_fr;                            \
+            /* new_dependency_frame(new_dep_fr, TRUE, LOCAL_top_or_fr, */ \
+               /*                  gcp, gcp, SG_FR, LOCAL_top_dep_fr); */ \
+            /*LOCAL_top_dep_fr = new_dep_fr;	*/		      \
             GEN_CP(gcp)->cp_dep_fr = LOCAL_top_dep_fr;                \
           } else {                                                    \
             /* go batched */                                          \
@@ -210,12 +210,11 @@
 	  } else {                                        \
             subs_ptr = (CELL *) (CONS_CP(B) + 1);         \
 	  }                                               \
-          load_answer(ANSWER, subs_ptr);                  \
+          load_answer_trie(ANSWER, subs_ptr);             \
           /* procceed */                                  \
           YENV = ENV;                                     \
           GONext();                                       \
         }
-
 
 #define store_loader_node(TAB_ENT, ANSWER)                    \
         { register choiceptr lcp;                             \
@@ -238,7 +237,6 @@
           SET_BB(B);                                          \
           TABLING_ERRORS_check_stack;                         \
         }
-
 
 #define restore_loader_node(ANSWER)           \
         H = HBREG = PROTECT_FROZEN_H(B);      \
@@ -276,6 +274,275 @@
 #endif /* DEPTH_LIMIT */
 
 
+#ifdef LINEAR_TABLING
+
+#ifdef DUMMY_PRINT
+#define consume_answers(tab_ent,sg_fr)                        \
+      ans_node_ptr ans_node;                                  \
+      LOCAL_nr_consumers++;                                   \
+      ans_node = SgFr_first_answer(sg_fr);                    \
+      if (ans_node == NULL) {                                 \
+	/* no answers --> fail */                             \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	goto fail;                                            \
+      } else if (ans_node == SgFr_answer_trie(sg_fr)) {       \
+	/* yes answer --> procceed */                         \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	PREG = (yamop *) CPREG;                               \
+	PREFETCH_OP(PREG);                                    \
+	YENV = ENV;                                           \
+	GONext();                                             \
+      } else {                                                \
+	/* answers -> get first answer */                     \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	store_loader_node(tab_ent, ans_node);                 \
+	PREG = (yamop *) CPREG;                               \
+	PREFETCH_OP(PREG);                                    \
+	load_answer_trie(ans_node, YENV);                     \
+	YENV = ENV;                                           \
+	GONext();                                             \
+      }
+
+#else /*! DUMMY_PRINT */
+
+#define consume_answers(tab_ent,sg_fr)                        \
+      ans_node_ptr ans_node;                                  \
+      ans_node = SgFr_first_answer(sg_fr);                    \
+      if (ans_node == NULL) {                                 \
+	/* no answers --> fail */                             \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	goto fail;                                            \
+      } else if (ans_node == SgFr_answer_trie(sg_fr)) {       \
+	/* yes answer --> procceed */                         \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	PREG = (yamop *) CPREG;                               \
+	PREFETCH_OP(PREG);                                    \
+	YENV = ENV;                                           \
+	GONext();                                             \
+      } else {                                                \
+	/* answers -> get first answer */                     \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	store_loader_node(tab_ent, ans_node);                 \
+	PREG = (yamop *) CPREG;                               \
+	PREFETCH_OP(PREG);                                    \
+	load_answer_trie(ans_node, YENV);                     \
+	YENV = ENV;                                           \
+	GONext();                                             \
+      }
+
+#endif /*DUMMY_PRINT*/
+
+
+
+
+#define add_max_scc(SG_FR){						                    \
+        SgFr_next_on_scc(SG_FR)=LOCAL_max_scc;                                              \
+        LOCAL_max_scc = SG_FR;                                                              \
+}
+
+
+#define add_next(SG_FR){                                           \
+       if(SG_FR!=LOCAL_top_sg_fr){                                 \
+	 SgFr_next(SG_FR) = LOCAL_top_sg_fr;   		           \
+         LOCAL_top_sg_fr = SG_FR;				   \
+       }                                                           \
+   }
+
+
+
+#define add_next_follower(SG_FR){                                  \
+        sg_fr_ptr sgfr_aux=NULL;                                   \
+        new_subgoal_frame(sgfr_aux, PREG);                         \
+	/*init_subgoal_frame(sgfr_aux);*/			   \
+        SgFr_stop_loop_ans(sgfr_aux) = NULL;                       \
+        SgFr_current_loop_ans(sgfr_aux) = NULL;			   \
+        SgFr_stop_loop_alt(sgfr_aux) = NULL;                       \
+	SgFr_current_loop_alt(sgfr_aux) = NULL;                    \
+        SgFr_consuming_answers(sgfr_aux)=0;	                   \
+        SgFr_new_answer_trie(sgfr_aux) = NULL;                     \
+        SgFr_next_alt(sgfr_aux) = NULL; 			   \
+	SgFr_pioneer(sgfr_aux)=NULL;                               \
+        SgFr_gen_cp(sgfr_aux)=SgFr_gen_cp(SG_FR);                  \
+        SgFr_next(sgfr_aux) = LOCAL_top_sg_fr;   		   \
+        LOCAL_top_sg_fr = sgfr_aux;				   \
+   }
+
+
+
+
+
+#define remove_next(SG_FR){                                        \
+    if(B !=SgFr_gen_cp(LOCAL_top_sg_fr)){	                   \
+        printf("nao devia acontecer\n");                           \
+    }                                                              \
+    LOCAL_top_sg_fr= SgFr_next(LOCAL_top_sg_fr);		   \
+   }
+
+
+
+
+
+
+#define add_branch(SG_FR){			                 			\
+    SgFr_next_on_branch(SG_FR) = LOCAL_top_sg_fr_on_branch;                             \
+    LOCAL_top_sg_fr_on_branch =SG_FR;                                                   \
+    }
+
+#define remove_branch(SG_FR){					                            \
+        LOCAL_top_sg_fr_on_branch = SgFr_next_on_branch(SG_FR);		                    \
+  }
+
+
+
+#define add_alternative(SG_FR,pc)						              \
+        if (SgFr_state(SG_FR) == evaluating) {                                                \
+          if (SgFr_current_loop_alt(SG_FR)==NULL) {	  		       	              \
+	    SgFr_current_loop_alt(SG_FR)= SgFr_loop_alts(SG_FR);	                      \
+	    SET_CELL_VALUE(SgFr_current_loop_alt(SG_FR),pc);                                  \
+          } else if (GET_CELL_VALUE(SgFr_current_loop_alt(SG_FR))!= pc) {                     \
+            SgFr_current_loop_alt(SG_FR)++;                                                   \
+   	    if (IS_JUMP_CELL(SgFr_current_loop_alt(SG_FR))){                                  \
+	      yamop *nb;                                                                      \
+              ALLOC_ALTERNATIVES_BUCKET(nb);				                      \
+   	      ALT_TAG_AS_JUMP_CELL(SgFr_current_loop_alt(SG_FR),nb);                          \
+              SgFr_current_loop_alt(SG_FR)=nb;					              \
+	    }                                                                                 \
+	    SET_CELL_VALUE(SgFr_current_loop_alt(SG_FR),pc);	                              \
+          }                                                                                   \
+	}
+
+
+
+#ifdef DUMMY_PRINT
+
+#define add_answer(SG_FR,ans)   						                           \
+        INFO_LINEAR_TABLING("add answer %p",ans);                                                          \
+          if (SgFr_first_loop_ans(SG_FR)==NULL) {	  		       	                           \
+            loop_answers_ptr t=malloc(sizeof(struct loop_answers));		                           \
+            Loop_ans(t)=ans;                                                                               \
+            Loop_next(t) = NULL;						                           \
+	    SgFr_first_loop_ans(SG_FR) = t;                                                                \
+            SgFr_current_loop_ans(SG_FR)=t;                                                                \
+	    SgFr_stop_loop_ans(SG_FR)=t;                                                                   \
+	    SgFr_nr_looping_answers(SG_FR)++;				                                   \
+          } else if (Loop_ans(SgFr_stop_loop_ans(SG_FR))!=ans){  /*new answer found */                     \
+            loop_answers_ptr t=malloc(sizeof(struct loop_answers));		                           \
+            Loop_ans(t)= ans;                       	                                                   \
+	    Loop_next(t)=NULL;                                                                             \
+            Loop_next(SgFr_stop_loop_ans(SG_FR)) = t;                                                      \
+	    SgFr_nr_looping_answers(SG_FR)++;                                                              \
+       	    SgFr_stop_loop_ans(SG_FR)=t;                                                                   \
+          }
+
+#else /*! DUMMY_PRINT */
+#define add_answer(SG_FR,ans)              					                        \
+          if (SgFr_stop_loop_ans(SG_FR)==NULL) {	  		       	                        \
+  	     SgFr_stop_loop_ans(SG_FR)= SgFr_loop_ans(SG_FR);                                           \
+             SET_CELL_VALUE(SgFr_stop_loop_ans(SG_FR),ans);                                             \
+          } else if (GET_CELL_VALUE(SgFr_stop_loop_ans(SG_FR))!= ans) {                                 \
+             SgFr_stop_loop_ans(SG_FR)++;                                                               \
+	     if (IS_JUMP_CELL(SgFr_stop_loop_ans(SG_FR))){		                                \
+	       struct answer_trie_node * nb;                                                            \
+	       ALLOC_ANSWERS_BUCKET(nb);	                                                        \
+	       ANS_TAG_AS_JUMP_CELL(SgFr_stop_loop_ans(SG_FR),nb);                                      \
+	       SgFr_stop_loop_ans(SG_FR)=nb;                                                            \
+	    }                                                                                           \
+            SET_CELL_VALUE(SgFr_stop_loop_ans(SG_FR),ans);                                              \
+         }
+
+#endif
+
+
+
+
+
+#ifdef LINEAR_TABLING_DRA
+
+#ifdef LINEAR_TABLING_DRS
+
+#define propagate_dependencies(SG_FR)					                     \
+	{ sg_fr_ptr sf_aux=LOCAL_top_sg_fr_on_branch;                                        \
+    	  int dfn=GET_SGFR_DFN(SG_FR);                                                       \
+          while(sf_aux && (GET_SGFR_DFN(sf_aux) >dfn ||SgFr_consuming_answers(sf_aux)==2)) { \
+            TAG_AS_NO_LEADER(sf_aux);					                     \
+	    if(SgFr_consuming_answers(sf_aux)==2){                                           \
+                add_answer(sf_aux,SgFr_new_answer_trie(sf_aux));                             \
+             }else{                                                                          \
+		add_alternative(sf_aux, SgFr_current_alt(sf_aux));			     \
+	     }                                                                               \
+            sf_aux = SgFr_next_on_branch(sf_aux);		        	             \
+          }	                                                                             \
+	  if (sf_aux) {				                                             \
+	    if(SgFr_consuming_answers(sf_aux)==2){                                           \
+                add_answer(sf_aux,SgFr_new_answer_trie(sf_aux));                             \
+             }else{                                                                          \
+		add_alternative(sf_aux, SgFr_current_alt(sf_aux));			     \
+	     }                                                                               \
+          }							                             \
+      }
+
+
+
+#else /*! LINEAR_TABLING_DRS */
+
+
+
+#define propagate_dependencies(SG_FR)					                     \
+	{ sg_fr_ptr sf_aux=LOCAL_top_sg_fr_on_branch;                                        \
+    	  int dfn=GET_SGFR_DFN(SG_FR);                                                       \
+          while(sf_aux && (GET_SGFR_DFN(sf_aux) >dfn)) {                                     \
+	    TAG_AS_NO_LEADER(sf_aux);                                                        \
+    	    add_alternative(sf_aux, SgFr_current_alt(sf_aux));			             \
+            sf_aux = SgFr_next_on_branch(sf_aux);		        	             \
+          }	                                                                             \
+	  if (sf_aux) {				                                             \
+		add_alternative(sf_aux, SgFr_current_alt(sf_aux));			     \
+	     }                                                                               \
+	}
+
+
+#endif /*LINEAR_TABLING_DRS */
+
+
+#else /*LINEAR_TABLING_BASIC */
+
+#ifdef LINEAR_TABLING_DRS
+
+#define propagate_dependencies(SG_FR)                                                          \
+	{ sg_fr_ptr sf_aux=LOCAL_top_sg_fr_on_branch;                                          \
+    	  int dfn=GET_SGFR_DFN(SG_FR);                                                         \
+          while(sf_aux && (GET_SGFR_DFN(sf_aux) > dfn ||SgFr_consuming_answers(sf_aux)==2)) { \
+	    TAG_AS_NO_LEADER(sf_aux);                                                          \
+            if(SgFr_consuming_answers(sf_aux)==2){					       \
+                add_answer(sf_aux,SgFr_new_answer_trie(sf_aux));                               \
+            }                                                                                  \
+            sf_aux = SgFr_next_on_branch(sf_aux);                                              \
+          }	                                                                               \
+	  if (sf_aux && SgFr_consuming_answers(sf_aux)==2){                                    \
+                add_answer(sf_aux,SgFr_new_answer_trie(sf_aux));                               \
+	  }                                                                                    \
+      }
+
+
+#else /*! LINEAR_TABLING_DRS */
+
+#define propagate_dependencies(SG_FR)                                                       \
+	{ sg_fr_ptr sf_aux=LOCAL_top_sg_fr_on_branch;                                       \
+    	  int dfn=GET_SGFR_DFN(SG_FR);                                                      \
+          while(sf_aux && GET_SGFR_DFN(sf_aux) > dfn) {	 		                    \
+	    TAG_AS_NO_LEADER(sf_aux);                                                       \
+            sf_aux = SgFr_next_on_branch(sf_aux);                                           \
+          }	                                                                            \
+      }
+
+#endif /* LINEAR_TABLING_DRS */
+
+#endif  /*LINEAR_TABLING_DRA*/
+
+
+#endif  /* LINEAR_TABLING */
+
+
 
 /* ------------------------------ **
 **      Tabling instructions      **
@@ -298,31 +565,36 @@
 
 
   PBOp(table_load_answer, Otapl)
+  // INFO_LINEAR_TABLING("-------------------------table_load_answer ---------------");
     CELL *subs_ptr;
     ans_node_ptr ans_node;
-
 #ifdef YAPOR
     if (SCH_top_shared_cp(B)) {
-#if 0
       PROBLEM: cp_last_answer field is local to the cp!
                -> we need a shared data structure to avoid redundant computations!
       UNLOCK_OR_FRAME(LOCAL_top_or_fr);
-#else
-      fprintf(stderr,"PROBLEM: cp_last_answer field is local to the cp!\n");
-      exit(1);
-#endif
     }
 #endif /* YAPOR */
     subs_ptr = (CELL *) (LOAD_CP(B) + 1);
     ans_node = TrNode_child(LOAD_CP(B)->cp_last_answer);
+#ifdef LINEAR_TABLING
+    if (ans_node != NULL) {
+      restore_loader_node(ans_node);
+    } else {
+      B = B->cp_b;
+      //  INFO_LINEAR_TABLING("-------------------------no answers ----fail");
+      goto fail; 
+    } 
+#else  
     if(TrNode_child(ans_node) != NULL) {
       restore_loader_node(ans_node);
     } else {
       pop_loader_node();
     }
+#endif /* LINEAR_TABLING */
     PREG = (yamop *) CPREG;
     PREFETCH_OP(PREG);
-    load_answer(ans_node, subs_ptr);
+    load_answer_trie(ans_node, subs_ptr);
     YENV = ENV;
     GONext();
   ENDPBOp();
@@ -330,6 +602,7 @@
 
 
   PBOp(table_try_answer, Otapl)
+  // INFO_LINEAR_TABLING("-------------------------table_try_answer ---------------");
 #ifdef INCOMPLETE_TABLING
     sg_fr_ptr sg_fr;
     ans_node_ptr ans_node;
@@ -352,7 +625,7 @@
 
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
-      load_answer(ans_node, subs_ptr);
+      load_answer_trie(ans_node, subs_ptr);
       YENV = ENV;
       GONext();
     } else {
@@ -389,19 +662,37 @@
 
 
   PBOp(table_try_single, Otapl)
+    INFO_LINEAR_TABLING("-------------------------table_try_single ---------------");
     tab_ent_ptr tab_ent;
     sg_fr_ptr sg_fr;
-
+  
     check_trail(TR);
     tab_ent = PREG->u.Otapl.te;
     YENV2MEM;
     sg_fr = subgoal_search(PREG, YENV_ADDRESS);
+    INFO_LINEAR_TABLING("sg_fr= %p   state=%d",sg_fr,SgFr_state(sg_fr));
+  
     MEM2YENV;
     LOCK(SgFr_lock(sg_fr));
     if (SgFr_state(sg_fr) == ready) {
       /* subgoal new */
       init_subgoal_frame(sg_fr);
       UNLOCK(SgFr_lock(sg_fr));
+#ifdef LINEAR_TABLING
+      add_max_scc(sg_fr);
+      add_next(sg_fr);
+      store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+#ifdef LINEAR_TABLING_FOLLOWER
+      SgFr_pioneer(sg_fr)=B;
+      SgFr_next_alt(sg_fr)= NULL;
+#endif /*LINEAR_TABLING_FOLLOWER */
+#ifdef LINEAR_TABLING_DRA
+      SgFr_current_alt(sg_fr) = PREG->u.Otapl.d;
+#else 
+      add_alternative(sg_fr,PREG->u.Otapl.d);
+#endif  /*LINEAR_TABLING_DRA */
+#else  /*!LINEAR_TABLING */
+
 #ifdef DETERMINISTIC_TABLING
       if (IsMode_Batched(TabEnt_mode(tab_ent))) {
 	store_deterministic_generator_node(tab_ent, sg_fr);
@@ -410,6 +701,7 @@
       {
 	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
       }
+#endif /* LINEAR_TABLING */
       PREG = PREG->u.Otapl.d;  /* should work also with PREG = NEXTOP(PREG,Otapl); */
       PREFETCH_OP(PREG);
       allocate_environment();
@@ -425,10 +717,30 @@
       store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, TRY_ANSWER);
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
-      load_answer(ans_node, subs_ptr);
+      load_answer_trie(ans_node, subs_ptr);
       YENV = ENV;
       GONext();
 #endif /* INCOMPLETE_TABLING */
+#ifdef LINEAR_TABLING
+    } else if (SgFr_state(sg_fr) == looping_ready) {
+      add_max_scc(sg_fr)
+      add_next(sg_fr);
+      store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+#ifdef LINEAR_TABLING_FOLLOWER
+      SgFr_pioneer(sg_fr)=B;
+#endif  /*LINEAR_TABLING_FOLLOWER*/
+      SgFr_state(sg_fr) = looping_evaluating; 
+      SgFr_stop_loop_alt(LOCAL_max_scc)=SgFr_current_loop_alt(LOCAL_max_scc);
+      PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+      PREFETCH_OP(PREG);
+      allocate_environment();
+      GONext();
+    } else if (SgFr_state(sg_fr) == evaluating || 
+               SgFr_state(sg_fr) == looping_evaluating) { 
+
+      propagate_dependencies(sg_fr);
+      consume_answers(tab_ent,sg_fr);
+#else /*!LINEAR_TABLING */
     } else if (SgFr_state(sg_fr) == evaluating) {
       /* subgoal in evaluation */
       choiceptr leader_cp;
@@ -441,7 +753,7 @@
       if (PARALLEL_EXECUTION_MODE) {
 	choiceptr aux_cp;
 	aux_cp = B;
-	while (YOUNGER_CP(aux_cp, Get_LOCAL_top_cp_on_stack()))
+	while (YOUNGER_CP(aux_cp, LOCAL_top_cp_on_stack))
 	  aux_cp = aux_cp->cp_b;
 	if (aux_cp->cp_or_fr != DepFr_top_or_fr(LOCAL_top_dep_fr))
 	  OPTYAP_ERROR_MESSAGE("Error on DepFr_top_or_fr (table_try_single)");
@@ -453,6 +765,7 @@
       }
 #endif /* OPTYAP_ERRORS */
       goto answer_resolution;
+#endif /* LINEAR_TABLING */
     } else {
       /* subgoal completed */
       ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
@@ -484,7 +797,7 @@
 	  }
           PREG = (yamop *) CPREG;
           PREFETCH_OP(PREG);
-          load_answer(ans_node, YENV);
+          load_answer_trie(ans_node, YENV);
 	  YENV = ENV;
           GONext();
 	} else {
@@ -495,9 +808,7 @@
 	  PREG = (yamop *) TrNode_child(SgFr_answer_trie(sg_fr));
 	  PREFETCH_OP(PREG);
 	  *--YENV = 0;  /* vars_arity */
-#ifndef GLOBAL_TRIE
 	  *--YENV = 0;  /* heap_arity */
-#endif /* GLOBAL_TRIE */
 	  GONext();
 	}
       }
@@ -507,6 +818,8 @@
 
 
   PBOp(table_try_me, Otapl)
+  //    INFO_LINEAR_TABLING("-------------------------table_try_me ---------------");
+
     tab_ent_ptr tab_ent;
     sg_fr_ptr sg_fr;
 
@@ -520,7 +833,26 @@
       /* subgoal new */
       init_subgoal_frame(sg_fr);
       UNLOCK(SgFr_lock(sg_fr));
+#ifdef LINEAR_TABLING
+      add_max_scc(sg_fr);
+      add_next(sg_fr);
+#ifdef LINEAR_TABLING_FOLLOWER
+      store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+      SgFr_pioneer(sg_fr)=B;
+      SgFr_next_alt(sg_fr)= PREG->u.Otapl.d;
+#else
       store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, PREG->u.Otapl.d);
+#endif /* LINEAR_TABLING_FOLLOWER */
+
+#ifdef LINEAR_TABLING_DRA
+      SgFr_current_alt(sg_fr) = NEXTOP(PREG,Otapl);
+#else
+      add_alternative(sg_fr,NEXTOP(PREG, Otapl));
+#endif /*LINEAR_TABLING_DRA*/
+
+#else  /*!LINEAR_TABLING */
+      store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, PREG->u.Otapl.d);
+#endif /* LINEAR_TABLING */
       PREG = NEXTOP(PREG, Otapl);
       PREFETCH_OP(PREG);
       allocate_environment();
@@ -536,11 +868,63 @@
       store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, TRY_ANSWER);
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
-      load_answer(ans_node, subs_ptr);
+      load_answer_trie(ans_node, subs_ptr);
       YENV = ENV;
       GONext();
 #endif /* INCOMPLETE_TABLING */
+
+#ifdef LINEAR_TABLING
+    } else if (SgFr_state(sg_fr) == looping_ready) {
+      add_max_scc(sg_fr)
+      add_next(sg_fr);
+      store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+#ifdef LINEAR_TABLING_FOLLOWER
+      SgFr_pioneer(sg_fr)=B;
+#endif /*LINEAR_TABLING_FOLLOWER */
+      SgFr_state(sg_fr) = looping_evaluating; 
+      SgFr_stop_loop_alt(LOCAL_max_scc)=SgFr_current_loop_alt(LOCAL_max_scc);
+      PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+      PREFETCH_OP(PREG);
+      allocate_environment();
+      GONext();
+    } else if (SgFr_state(sg_fr) == looping_evaluating) {
+      propagate_dependencies(sg_fr);
+#ifdef LINEAR_TABLING_FOLLOWER
+      yamop **follower_alt=SgFr_current_loop_alt(sg_fr)+1;
+      if (IS_JUMP_CELL(follower_alt))
+	ALT_JUMP_NEXT_CELL(follower_alt);
+      if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
+	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
+	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);	
+	add_next_follower(sg_fr);
+	SgFr_gen_cp(sg_fr)=gcp_temp;
+	SgFr_current_loop_alt(sg_fr)=follower_alt;
+	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+	PREFETCH_OP(PREG);
+	allocate_environment();
+	GONext();
+      }       
+#endif  /*LINEAR_TABLING_FOLLOWER*/
+     consume_answers(tab_ent,sg_fr);  
+
+#endif /* LINEAR TABLING */
     } else if (SgFr_state(sg_fr) == evaluating) {
+#ifdef LINEAR_TABLING
+      propagate_dependencies(sg_fr);
+#ifdef LINEAR_TABLING_FOLLOWER
+      if (SgFr_next_alt(sg_fr)!=NULL){
+	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
+	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+	add_next_follower(sg_fr);
+	SgFr_gen_cp(sg_fr)=gcp_temp;
+	PREG = SgFr_next_alt(sg_fr);
+	PREFETCH_OP(PREG);
+	allocate_environment();
+	GONext();
+      }            
+#endif /*LINEAR_TABLING_FOLLOWER */
+     consume_answers(tab_ent,sg_fr);  
+#else  /* !LINEAR_TABLING */
       /* subgoal in evaluation */
       choiceptr leader_cp;
       int leader_dep_on_stack;
@@ -552,7 +936,7 @@
       if (PARALLEL_EXECUTION_MODE) {
 	choiceptr aux_cp;
 	aux_cp = B;
-	while (YOUNGER_CP(aux_cp, Get_LOCAL_top_cp_on_stack()))
+	while (YOUNGER_CP(aux_cp, LOCAL_top_cp_on_stack))
 	  aux_cp = aux_cp->cp_b;
 	if (aux_cp->cp_or_fr != DepFr_top_or_fr(LOCAL_top_dep_fr))
 	  OPTYAP_ERROR_MESSAGE("Error on DepFr_top_or_fr (table_try_me)");
@@ -564,8 +948,9 @@
       }
 #endif /* OPTYAP_ERRORS */
       goto answer_resolution;
+#endif /* LINEAR_TABLING */
     } else {
-      /* subgoal completed */
+      /* subgoal's state = completed- all answers will be consumed */
       ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
       if (ans_node == NULL) {
 	/* no answers --> fail */
@@ -591,11 +976,11 @@
           /* load answers from the trie */
 	  UNLOCK(SgFr_lock(sg_fr));
 	  if(TrNode_child(ans_node) != NULL) {
-	    store_loader_node(tab_ent, ans_node);
-	  }
-          PREG = (yamop *) CPREG;
+     	    store_loader_node(tab_ent, ans_node);
+     	  }
+	  PREG = (yamop *) CPREG;
           PREFETCH_OP(PREG);
-          load_answer(ans_node, YENV);
+          load_answer_trie(ans_node, YENV);
 	  YENV = ENV;
           GONext();
 	} else {
@@ -606,9 +991,7 @@
 	  PREG = (yamop *) TrNode_child(SgFr_answer_trie(sg_fr));
 	  PREFETCH_OP(PREG);
 	  *--YENV = 0;  /* vars_arity */
-#ifndef GLOBAL_TRIE
 	  *--YENV = 0;  /* heap_arity */
-#endif /* GLOBAL_TRIE */
 	  GONext();
 	}
       }
@@ -620,18 +1003,38 @@
   PBOp(table_try, Otapl)
     tab_ent_ptr tab_ent;
     sg_fr_ptr sg_fr;
-
     check_trail(TR);
     tab_ent = PREG->u.Otapl.te;
     YENV2MEM;
     sg_fr = subgoal_search(PREG, YENV_ADDRESS);
+    INFO_LINEAR_TABLING("-------------------------table_try ---------------\n");
+    INFO_LINEAR_TABLING("sg_fr= %p  state=%d \n",sg_fr,SgFr_state(sg_fr));
     MEM2YENV;
     LOCK(SgFr_lock(sg_fr));
     if (SgFr_state(sg_fr) == ready) {
       /* subgoal new */
       init_subgoal_frame(sg_fr);
       UNLOCK(SgFr_lock(sg_fr));
+#ifdef LINEAR_TABLING
+      add_max_scc(sg_fr);
+      add_next(sg_fr);
+#ifdef LINEAR_TABLING_FOLLOWER
+      store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+      SgFr_pioneer(sg_fr)=B;
+      SgFr_next_alt(sg_fr)= NEXTOP(PREG,Otapl);
+#else
       store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, NEXTOP(PREG,Otapl));
+#endif /* LINEAR_TABLING_FOLLOWER */
+
+#ifdef LINEAR_TABLING_DRA
+      SgFr_current_alt(sg_fr) = PREG->u.Otapl.d;
+#else
+      add_alternative(sg_fr,PREG->u.Otapl.d);
+#endif /* LINEAR_TABLING_DRA */
+
+#else  /*!LINEAR_TABLING */
+      store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, NEXTOP(PREG,Otapl));
+#endif /* LINEAR_TABLING */
       PREG = PREG->u.Otapl.d;
       PREFETCH_OP(PREG);
       allocate_environment();
@@ -647,11 +1050,61 @@
       store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, TRY_ANSWER);
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
-      load_answer(ans_node, subs_ptr);
+      load_answer_trie(ans_node, subs_ptr);
       YENV = ENV;
       GONext();
 #endif /* INCOMPLETE_TABLING */
+#ifdef LINEAR_TABLING
+    } else if (SgFr_state(sg_fr) == looping_ready) {
+      add_max_scc(sg_fr)
+      add_next(sg_fr);
+      store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+#ifdef LINEAR_TABLING_FOLLOWER
+      SgFr_pioneer(sg_fr)=B;
+#endif /*LINEAR_TABLING_FOLLOWER */
+      SgFr_state(sg_fr) = looping_evaluating; 
+      SgFr_stop_loop_alt(LOCAL_max_scc)=SgFr_current_loop_alt(LOCAL_max_scc);
+      PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+      PREFETCH_OP(PREG);
+      allocate_environment();
+      GONext();
+    } else if (SgFr_state(sg_fr) == looping_evaluating) {
+      propagate_dependencies(sg_fr);
+#ifdef LINEAR_TABLING_FOLLOWER
+      yamop **follower_alt=SgFr_current_loop_alt(sg_fr)+1;
+      if (IS_JUMP_CELL(follower_alt))
+	ALT_JUMP_NEXT_CELL(follower_alt);	  
+      if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
+	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
+	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+	add_next_follower(sg_fr);
+	SgFr_gen_cp(sg_fr)=gcp_temp;
+	SgFr_current_loop_alt(sg_fr)=follower_alt;
+	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+	PREFETCH_OP(PREG);
+	allocate_environment();
+	GONext();
+      }
+#endif  /*LINEAR_TABLING_FOLLOWER*/
+      consume_answers(tab_ent,sg_fr);
+#endif /* LINEAR TABLING */
     } else if (SgFr_state(sg_fr) == evaluating) {
+#ifdef LINEAR_TABLING
+      propagate_dependencies(sg_fr);
+#ifdef LINEAR_TABLING_FOLLOWER
+      if (SgFr_next_alt(sg_fr)!=NULL){
+	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
+	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+	add_next_follower(sg_fr);
+	SgFr_gen_cp(sg_fr)=gcp_temp;
+	PREG = SgFr_next_alt(sg_fr);
+	PREFETCH_OP(PREG);
+	allocate_environment();
+	GONext();
+      }            
+#endif /*LINEAR_TABLING_FOLLOWER */
+      consume_answers(tab_ent,sg_fr);
+#else  /* !LINEAR_TABLING */
       /* subgoal in evaluation */
       choiceptr leader_cp;
       int leader_dep_on_stack;
@@ -663,7 +1116,7 @@
       if (PARALLEL_EXECUTION_MODE) {
 	choiceptr aux_cp;
 	aux_cp = B;
-	while (YOUNGER_CP(aux_cp, Get_LOCAL_top_cp_on_stack()))
+	while (YOUNGER_CP(aux_cp, LOCAL_top_cp_on_stack))
 	  aux_cp = aux_cp->cp_b;
 	if (aux_cp->cp_or_fr != DepFr_top_or_fr(LOCAL_top_dep_fr))
 	  OPTYAP_ERROR_MESSAGE("Error on DepFr_top_or_fr (table_try)");
@@ -675,6 +1128,7 @@
       }
 #endif /* OPTYAP_ERRORS */
       goto answer_resolution;
+#endif /* LINEAR_TABLING */
     } else {
       /* subgoal completed */
       ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
@@ -706,7 +1160,7 @@
 	  }
           PREG = (yamop *) CPREG;
           PREFETCH_OP(PREG);
-          load_answer(ans_node, YENV);
+          load_answer_trie(ans_node, YENV);
 	  YENV = ENV;
           GONext();
 	} else {
@@ -717,9 +1171,7 @@
 	  PREG = (yamop *) TrNode_child(SgFr_answer_trie(sg_fr));
 	  PREFETCH_OP(PREG);
 	  *--YENV = 0;  /* vars_arity */
-#ifndef GLOBAL_TRIE
 	  *--YENV = 0;  /* heap_arity */
-#endif /* GLOBAL_TRIE */
 	  GONext();
 	}
       }
@@ -729,7 +1181,24 @@
 
 
   Op(table_retry_me, Otapl)
+    INFO_LINEAR_TABLING("-------------------------table_retry_me ---------------\n");
+#ifdef LINEAR_TABLING
+    sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;
+#ifdef LINEAR_TABLING_FOLLOWER
+    restore_generator_node(PREG->u.Otapl.s, COMPLETION);
+    SgFr_next_alt(sg_fr)=PREG->u.Otapl.d;
+#else
     restore_generator_node(PREG->u.Otapl.s, PREG->u.Otapl.d);
+#endif  /*LINEAR_TABLING_FOLLOWER */
+
+#ifdef LINEAR_TABLING_DRA
+     SgFr_current_alt(sg_fr) = NEXTOP(PREG,Otapl); 
+#else
+     add_alternative(sg_fr,NEXTOP(PREG,Otapl)); 
+#endif /*LINEAR_TABLING_DRA*/
+#else  /* ! LINEAR_TABLING  */
+    restore_generator_node(PREG->u.Otapl.s, PREG->u.Otapl.d);
+#endif   /*LINEAR_TABLING */
     YENV = (CELL *) PROTECT_FROZEN_B(B);
     set_cut(YENV, B->cp_b);
     SET_BB(NORM_CP(YENV));
@@ -740,8 +1209,26 @@
 
 
 
-  Op(table_retry, Otapl)
+ Op(table_retry, Otapl)
+     INFO_LINEAR_TABLING("-------------------------table_retry ---------------\n");
+#ifdef LINEAR_TABLING
+    sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;
+#ifdef LINEAR_TABLING_FOLLOWER
+   restore_generator_node(PREG->u.Otapl.s, COMPLETION);
+   SgFr_next_alt(sg_fr)= NEXTOP(PREG,Otapl);
+#else
     restore_generator_node(PREG->u.Otapl.s, NEXTOP(PREG,Otapl));
+#endif /*LINEAR_TABLING_FOLLOWER */
+
+#ifdef LINEAR_TABLING_DRA
+      SgFr_current_alt(sg_fr) = PREG->u.Otapl.d;
+#else
+      add_alternative(sg_fr,PREG->u.Otapl.d);
+#endif /* LINEAR_TABLING_DRA */
+
+#else /*!LINEAR_TABLING */
+    restore_generator_node(PREG->u.Otapl.s, NEXTOP(PREG,Otapl));
+#endif /*LINEAR_TABLING */
     YENV = (CELL *) PROTECT_FROZEN_B(B);
     set_cut(YENV, B->cp_b);
     SET_BB(NORM_CP(YENV));
@@ -753,6 +1240,19 @@
 
 
   Op(table_trust_me, Otapl)
+    INFO_LINEAR_TABLING("-------------------------table_trust_me ---------------\n");
+#ifdef LINEAR_TABLING
+    sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr; 
+#ifdef LINEAR_TABLING_FOLLOWER
+    SgFr_next_alt(sg_fr)= NULL;
+#endif /* LINEAR_TABLING_FOLLOWER */
+#ifdef LINEAR_TABLING_DRA
+    SgFr_current_alt(sg_fr) = NEXTOP(PREG,Otapl);
+#else 
+    add_alternative(sg_fr,NEXTOP(PREG,Otapl));
+#endif /*LINEAR_TABLING_DRA */ 
+
+#endif /*LINEAR_TABLING */
     restore_generator_node(PREG->u.Otapl.s, COMPLETION);
 #ifdef DETERMINISTIC_TABLING
     if (B_FZ > B && IS_BATCHED_NORM_GEN_CP(B)) {   
@@ -781,7 +1281,19 @@
 
 
   Op(table_trust, Otapl)
-    restore_generator_node(PREG->u.Otapl.s, COMPLETION);
+   INFO_LINEAR_TABLING("-------------------------table_trust ---------------\n");
+#ifdef LINEAR_TABLING
+   sg_fr_ptr sgfr = GEN_CP(B)->cp_sg_fr; 
+#ifdef LINEAR_TABLING_FOLLOWER
+   SgFr_next_alt(sgfr)= NULL;
+#endif /* LINEAR_TABLING_FOLLOWER */
+#ifdef LINEAR_TABLING_DRA
+   SgFr_current_alt(sgfr) =PREG->u.Otapl.d;
+#else 
+    add_alternative(sgfr,PREG->u.Otapl.d);
+#endif /* LINEAR_TABLING_DRA*/
+#endif /* LINEAR_TABLING */
+   restore_generator_node(PREG->u.Otapl.s, COMPLETION);
 #ifdef DETERMINISTIC_TABLING
   if (B_FZ > B && IS_BATCHED_NORM_GEN_CP(B)) {    
       CELL *subs_ptr = (CELL *)(GEN_CP(B) + 1) + PREG->u.Otapl.s;
@@ -877,7 +1389,7 @@
             for (i = 0; i < number_workers; i++) {
               if (BITMAP_member(members, i) && 
                   BRANCH_LTT(i, depth) > ltt && 
-                  EQUAL_OR_YOUNGER_CP(Get_LOCAL_top_cp(), REMOTE_pruning_scope(i))) {
+                  EQUAL_OR_YOUNGER_CP(LOCAL_top_cp, REMOTE_pruning_scope(i))) {
                 leftmost_or_fr = LOCAL_top_or_fr;
   pending_table_new_answer:
 #if defined(TABLE_LOCK_AT_ENTRY_LEVEL)
@@ -888,7 +1400,7 @@
                 UNLOCK_TABLE(ans_node);
 #endif /* TABLE_LOCK_LEVEL */
                 LOCK_OR_FRAME(leftmost_or_fr);
-                if (Get_LOCAL_prune_request()) {
+                if (LOCAL_prune_request) {
                   UNLOCK_OR_FRAME(leftmost_or_fr);
                   SCHEDULER_GET_WORK();
                 } else {
@@ -923,7 +1435,7 @@
               for (i = 0; i < number_workers; i++) {
                 if (BITMAP_member(members, i) &&
                     BRANCH_LTT(i, depth) > ltt &&
-                    EQUAL_OR_YOUNGER_CP(GetOrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i)))
+                    EQUAL_OR_YOUNGER_CP(OrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i)))
                   goto pending_table_new_answer;
 	      }
               BITMAP_minus(prune_members, members);
@@ -938,7 +1450,7 @@
                 for (i = 0; i < number_workers; i++) {
                   if (BITMAP_member(members, i) &&
                       BRANCH_LTT(i, depth) > ltt &&
-                      EQUAL_OR_YOUNGER_CP(GetOrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i))) {
+                      EQUAL_OR_YOUNGER_CP(OrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i))) {
                     /* update nearest leftnode data */
                     or_fr = LOCAL_top_or_fr;
                     nearest_or_fr = OrFr_nearest_leftnode(or_fr);
@@ -972,7 +1484,7 @@
       }
 
       /* check for prune requests */
-      if (Get_LOCAL_prune_request()) {
+      if (LOCAL_prune_request) {
 #if defined(TABLE_LOCK_AT_ENTRY_LEVEL)
         UNLOCK(SgFr_lock(sg_fr));
 #elif defined(TABLE_LOCK_AT_NODE_LEVEL)
@@ -996,6 +1508,18 @@
       else
         TrNode_child(SgFr_last_answer(sg_fr)) = ans_node;
       SgFr_last_answer(sg_fr) = ans_node;
+#ifdef LINEAR_TABLING
+      //add_answer(sg_fr,ans_node);
+      if (SgFr_new_answer_trie(sg_fr)==NULL){
+	SgFr_new_answer_trie(sg_fr)=ans_node;
+      }
+#ifdef DUMMY_PRINT
+      LOCAL_total_trie_answers++;
+#endif /*DUMMY_PRINT */
+      INFO_LINEAR_TABLING("nova resposta");
+      TAG_NEW_ANSWERS(sg_fr);      
+#endif /* LINEAR_TABLING */
+
 #ifdef TABLING_ERRORS
       { 
         ans_node_ptr aux_ans_node = SgFr_first_answer(sg_fr);
@@ -1007,8 +1531,10 @@
       }
 #endif /* TABLING_ERRORS */
       UNLOCK(SgFr_lock(sg_fr));
-      if (IS_BATCHED_GEN_CP(gcp)) {
-#ifdef TABLING_EARLY_COMPLETION
+      if (0 && IS_BATCHED_GEN_CP(gcp)) {
+
+
+#if defined(TABLING_EARLY_COMPLETION) && !defined(LINEAR_TABLING) 
 	if (gcp == PROTECT_FROZEN_B(B) && (*subs_ptr == 0 || gcp->cp_ap == COMPLETION)) {
 	  /* if the current generator choice point is the topmost choice point and the current */
 	  /* call is deterministic (i.e., the number of substitution variables is zero or      */
@@ -1025,6 +1551,7 @@
 	    gcp->cp_ap = COMPLETION;
 	}
 #endif /* TABLING_EARLY_COMPLETION */
+
         /* deallocate and procceed */
         PREG = (yamop *) YENV[E_CP];
         PREFETCH_OP(PREG);
@@ -1036,7 +1563,7 @@
 #endif /* DEPTH_LIMIT */
         GONext();
       } else {
-#ifdef TABLING_EARLY_COMPLETION
+#if defined(TABLING_EARLY_COMPLETION)  && !defined(LINEAR_TABLING) 
 	if (*subs_ptr == 0) {
 	  /* if the number of substitution variables is zero, an answer is sufficient to perform */
           /* an early completion, but the current generator choice point cannot be removed       */
@@ -1158,9 +1685,9 @@
           end_or_fr = DepFr_top_or_fr(dep_fr);
           if (start_or_fr != end_or_fr) {
             LOCAL_top_or_fr = end_or_fr;
-            Set_LOCAL_top_cp(GetOrFr_node(end_or_fr));
+            LOCAL_top_cp = OrFr_node(end_or_fr);
             do {
-              while (YOUNGER_CP(GetOrFr_node(start_or_fr), GetOrFr_node(end_or_fr))) {
+              while (YOUNGER_CP(OrFr_node(start_or_fr), OrFr_node(end_or_fr))) {
                 LOCK_OR_FRAME(start_or_fr);
                 BITMAP_delete(OrFr_members(start_or_fr), worker_id);
                 if (BITMAP_empty(OrFr_members(start_or_fr))) {
@@ -1192,7 +1719,7 @@
 #endif /* TABLING_INNER_CUTS */
                 start_or_fr = OrFr_next(start_or_fr);
   	      }
-              while (YOUNGER_CP(GetOrFr_node(end_or_fr), GetOrFr_node(start_or_fr))) {
+              while (YOUNGER_CP(OrFr_node(end_or_fr), OrFr_node(start_or_fr))) {
                 LOCK_OR_FRAME(end_or_fr);
                 BITMAP_insert(OrFr_members(end_or_fr), worker_id);
                 BRANCH(worker_id, OrFr_depth(end_or_fr)) = 1;
@@ -1200,23 +1727,23 @@
                 end_or_fr = OrFr_next(end_or_fr);
 	      }
     	    } while (start_or_fr != end_or_fr);
-            if (Get_LOCAL_prune_request())
+            if (LOCAL_prune_request)
               pruning_over_tabling_data_structures(); 	
           }
 #endif /* YAPOR */
 #ifdef OPTYAP_ERRORS
           if (PARALLEL_EXECUTION_MODE) {
-            if (YOUNGER_CP(Get_LOCAL_top_cp(), Get_LOCAL_top_cp_on_stack())) {
-              OPTYAP_ERROR_MESSAGE("YOUNGER_CP(Get_LOCAL_top_cp(), LOCAL_top_cp_on_stack) (answer_resolution)");
+            if (YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack)) {
+              OPTYAP_ERROR_MESSAGE("YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack) (answer_resolution)");
     	    } else {
               choiceptr aux_cp;
               aux_cp = chain_cp;
-              while (aux_cp != Get_LOCAL_top_cp()) {
-                if (YOUNGER_CP(Get_LOCAL_top_cp(), aux_cp)) {
+              while (aux_cp != LOCAL_top_cp) {
+                if (YOUNGER_CP(LOCAL_top_cp, aux_cp)) {
                   OPTYAP_ERROR_MESSAGE("LOCAL_top_cp not in branch (answer_resolution)");
                   break;
                 }
-                if (EQUAL_OR_YOUNGER_CP(Get_LOCAL_top_cp_on_stack(), aux_cp)) {
+                if (EQUAL_OR_YOUNGER_CP(LOCAL_top_cp_on_stack, aux_cp)) {
                   OPTYAP_ERROR_MESSAGE("shared frozen segments in branch (answer_resolution)");
                   break;
                 }
@@ -1247,12 +1774,12 @@
       /* no dependency frames with unconsumed answers found */
 #ifdef YAPOR
       /* update shared nodes */
-      if (EQUAL_OR_YOUNGER_CP(Get_LOCAL_top_cp_on_stack(), chain_cp)) {
+      if (EQUAL_OR_YOUNGER_CP(LOCAL_top_cp_on_stack, chain_cp)) {
         end_or_fr = chain_cp->cp_or_fr;
         start_or_fr = LOCAL_top_or_fr;
         if (start_or_fr != end_or_fr) {
           LOCAL_top_or_fr = end_or_fr;
-          Set_LOCAL_top_cp(GetOrFr_node(end_or_fr));
+          LOCAL_top_cp = OrFr_node(end_or_fr);
           while (start_or_fr != end_or_fr) {
             LOCK_OR_FRAME(start_or_fr);
             BITMAP_delete(OrFr_members(start_or_fr), worker_id);
@@ -1285,24 +1812,24 @@
 #endif /* TABLING_INNER_CUTS */
             start_or_fr = OrFr_next(start_or_fr);
   	  }
-          if (Get_LOCAL_prune_request())
+          if (LOCAL_prune_request)
             pruning_over_tabling_data_structures(); 
         }
       }
 #endif /* YAPOR */
 #ifdef OPTYAP_ERRORS
       if (PARALLEL_EXECUTION_MODE) {
-        if (YOUNGER_CP(Get_LOCAL_top_cp(), Get_LOCAL_top_cp_on_stack())) {
-          OPTYAP_ERROR_MESSAGE("YOUNGER_CP(Get_LOCAL_top_cp(), Get_LOCAL_top_cp_on_stack()) (answer_resolution)");
+        if (YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack)) {
+          OPTYAP_ERROR_MESSAGE("YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack) (answer_resolution)");
 	} else {
           choiceptr aux_cp;
           aux_cp = chain_cp;
-          while (aux_cp != Get_LOCAL_top_cp()) {
-            if (YOUNGER_CP(Get_LOCAL_top_cp(), aux_cp)) {
+          while (aux_cp != LOCAL_top_cp) {
+            if (YOUNGER_CP(LOCAL_top_cp, aux_cp)) {
               OPTYAP_ERROR_MESSAGE("LOCAL_top_cp not in branch (answer_resolution)");
               break;
             }
-            if (EQUAL_OR_YOUNGER_CP(Get_LOCAL_top_cp_on_stack(), aux_cp)) {
+            if (EQUAL_OR_YOUNGER_CP(LOCAL_top_cp_on_stack, aux_cp)) {
               OPTYAP_ERROR_MESSAGE("shared frozen segments in branch (answer_resolution)");
               break;
             }
@@ -1349,7 +1876,221 @@
 
 
 
+
   BOp(table_completion, Otapl)
+
+ INFO_LINEAR_TABLING("-------------------------table_completion ---------------");
+#ifdef LINEAR_TABLING
+{ 
+  sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;       
+
+#if defined(LINEAR_TABLING_FOLLOWER)
+  if (SgFr_next_alt(sg_fr)!=NULL){
+    PREG = SgFr_next_alt(sg_fr);
+    INFO_LINEAR_TABLING("next alt != null");
+    PREFETCH_OP(PREG);
+    GONext();    
+  }
+  if (SgFr_pioneer(sg_fr) != B){
+    INFO_LINEAR_TABLING("follower");
+    /* pop generator node and store loader to consume all answers*/
+    ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
+    if (ans_node == NULL) {
+      /* no answers --> fail */
+      remove_next(sg_fr);
+      B = B->cp_b;
+      SET_BB(PROTECT_FROZEN_B(B));
+      goto fail;
+    }
+    remove_next(sg_fr);
+    pop_generator_node(SgFr_arity(sg_fr));
+    if (ans_node == SgFr_answer_trie(sg_fr)) {
+      /* yes answer --> procceed */
+      PREG = (yamop *) CPREG;
+      PREFETCH_OP(PREG);
+      YENV = ENV;
+      GONext();
+    } else  {
+      /* answers -> get first answer */
+#ifdef LIMIT_TABLING
+      SgFr_state(sg_fr)++;  /* complete --> complete_in_use */
+      remove_from_global_sg_fr_list(sg_fr);
+      TRAIL_FRAME(sg_fr);
+#endif /* LIMIT_TABLING */
+      /* load answers from the trie */
+      store_loader_node(tab_ent, ans_node);
+      PREG = (yamop *) CPREG;
+      PREFETCH_OP(PREG);
+      load_answer_trie(ans_node, YENV);
+      YENV = ENV;
+      GONext();
+    }   
+
+
+  }
+#endif  /*LINEAR_TABLING_FOLLOWER */
+
+
+
+#ifdef LINEAR_TABLING_DRS 
+  if (SgFr_consuming_answers(sg_fr)==1){
+    /*continue loading looping answers */    
+    if (SgFr_current_loop_ans(sg_fr)!=SgFr_stop_loop_ans(sg_fr)){
+      SgFr_current_loop_ans(sg_fr)++;
+      if (IS_JUMP_CELL(SgFr_current_loop_ans(sg_fr)))
+	ANS_JUMP_NEXT_CELL(SgFr_current_loop_ans(sg_fr));
+      restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+      PREG = (yamop *) CPREG;
+      PREFETCH_OP(PREG);
+      CELL *subs_ptr;
+      subs_ptr = (CELL *) (GEN_CP(B) + 1);          
+      subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);      
+      load_answer_trie(GET_CELL_VALUE(SgFr_current_loop_ans(sg_fr)), subs_ptr);
+      YENV = ENV;
+      GONext();
+      /*first time that direct trie answers are loaded */    
+    }else if (SgFr_new_answer_trie(sg_fr)!=NULL){
+      if(sg_fr!=LOCAL_top_sg_fr_on_branch)
+	add_branch(sg_fr);
+      SgFr_consuming_answers(sg_fr)=2;
+#ifdef DUMMY_PRINT
+      SgFr_nr_trie_answers(sg_fr)++;
+#endif /*DUMMY_PRINT */
+      restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+      PREG = (yamop *) CPREG;
+      PREFETCH_OP(PREG);
+      CELL *subs_ptr;
+      subs_ptr = (CELL *) (GEN_CP(B) + 1);          
+      subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);      
+      load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);
+      YENV = ENV;
+      GONext();
+    }    
+  }
+  
+  /*continue loading answers from trie */
+
+  if (SgFr_consuming_answers(sg_fr)==2){
+    if (SgFr_new_answer_trie(sg_fr)!=SgFr_last_answer(sg_fr)){
+      SgFr_new_answer_trie(sg_fr)=TrNode_child(SgFr_new_answer_trie(sg_fr));
+#ifdef DUMMY_PRINT
+      SgFr_nr_trie_answers(sg_fr)++;
+#endif /*DUMMY_PRINT */
+      restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+      PREG = (yamop *) CPREG;
+      PREFETCH_OP(PREG);
+      CELL *subs_ptr;
+      subs_ptr = (CELL *) (GEN_CP(B) + 1);          
+      subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
+      load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);    
+      YENV = ENV;
+      GONext();
+    }
+  }
+  /*no more answers to explore. */
+  if(SgFr_consuming_answers(sg_fr)==1 || SgFr_consuming_answers(sg_fr)==2){
+    if(sg_fr==LOCAL_top_sg_fr_on_branch){
+      remove_branch(sg_fr);
+    }
+    if(HAS_NEW_ANSWERS(sg_fr)){
+      TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
+      UNTAG_NEW_ANSWERS(sg_fr);
+    }
+    
+    SgFr_consuming_answers(sg_fr)=0;      
+    B = B->cp_b;
+    SET_BB(PROTECT_FROZEN_B(B));
+    goto fail;  
+}
+   
+#endif /*LINEAR_TABLING_DRS */
+
+
+#ifdef LINEAR_TABLING_DRA
+    if (SgFr_current_loop_alt(sg_fr) != NULL) 
+#endif /*LINEAR_TABLING_DRA*/
+      {
+      if (SgFr_state(sg_fr) == evaluating){	   
+	SgFr_state(sg_fr) = looping_evaluating;  
+	if (!IS_LEADER(sg_fr))	  
+	  remove_branch(sg_fr);
+	SgFr_stop_loop_alt(sg_fr)=sg_fr->loop_alts;
+	SgFr_current_loop_alt(sg_fr)++;
+	ALT_TAG_AS_JUMP_CELL(SgFr_current_loop_alt(sg_fr),SgFr_stop_loop_alt(sg_fr));
+	SgFr_current_loop_alt(sg_fr)=SgFr_stop_loop_alt(sg_fr);
+	//	SgFr_current_loop_alt(sg_fr) = SgFr_stop_loop_alt(sg_fr) = Alt_next(SgFr_current_loop_alt(sg_fr));
+      } else {   
+	SgFr_current_loop_alt(sg_fr)++;
+	if (IS_JUMP_CELL(SgFr_current_loop_alt(sg_fr))){
+	  ALT_JUMP_NEXT_CELL(SgFr_current_loop_alt(sg_fr));	  
+	}
+	//SgFr_current_loop_alt(sg_fr) = Alt_next(SgFr_current_loop_alt(sg_fr));
+      }
+      
+      if (IS_LEADER(sg_fr) && HAS_NEW_ANSWERS(sg_fr) ) {  
+	INFO_LINEAR_TABLING("is_leader and has new answers");
+	UNTAG_NEW_ANSWERS(sg_fr);
+	SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr);
+	while(LOCAL_max_scc !=sg_fr) {                        
+	  SgFr_state(LOCAL_max_scc) = looping_ready;
+	  LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);	 
+	}
+	restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+	YENV = (CELL *) PROTECT_FROZEN_B(B);
+	set_cut(YENV, B->cp_b);
+	SET_BB(NORM_CP(YENV));
+	allocate_environment();
+	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+
+	PREFETCH_OP(PREG);
+	GONext();    
+      }
+      
+      if (SgFr_current_loop_alt(sg_fr) != SgFr_stop_loop_alt(sg_fr) ) {  
+	INFO_LINEAR_TABLING("next loop alt");
+	restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+	YENV = (CELL *) PROTECT_FROZEN_B(B);
+	set_cut(YENV, B->cp_b);
+	SET_BB(NORM_CP(YENV));
+	allocate_environment();
+	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+	PREFETCH_OP(PREG);
+	GONext();    
+      }
+    }
+    
+
+#ifdef LINEAR_TABLING_DRS
+    if (IS_LEADER(sg_fr)){
+      INFO_LINEAR_TABLING("is leader");
+      if(sg_fr==LOCAL_top_sg_fr_on_branch)
+	remove_branch(sg_fr);
+      goto complete_all;      
+    }
+    goto consume_all;
+}
+#else /*!LINEAR_TABLING_DRS */
+
+     if(sg_fr==LOCAL_top_sg_fr_on_branch)
+       remove_branch(sg_fr);
+     if (IS_LEADER(sg_fr)){
+       INFO_LINEAR_TABLING("is leader");
+       goto complete_all;
+    } else {
+       if (HAS_NEW_ANSWERS(sg_fr)) {
+	 UNTAG_NEW_ANSWERS(sg_fr);
+	 TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
+       }
+     goto consume_all;   
+  }
+}
+
+
+#endif /*LINEAR_TABLING_DRS */
+
+
+#endif /*LINEAR_TABLING */
+
 #ifdef YAPOR
     if (SCH_top_shared_cp(B)) {
       if (IS_BATCHED_GEN_CP(B)) {
@@ -1379,8 +2120,9 @@
         B->cp_ap = ANSWER_RESOLUTION;
         if (B != DepFr_leader_cp(LOCAL_top_dep_fr)) {
           /* not leader on that node */
-          B = B->cp_b;
-          goto fail;
+	  goto answer_resolution; 
+	  /* B = B->cp_b;
+	     goto fail; */
         }
       }
     }
@@ -1428,12 +2170,12 @@
 
 #ifdef OPTYAP_ERRORS
         if (PARALLEL_EXECUTION_MODE) {
-          if (YOUNGER_CP(Get_LOCAL_top_cp(), Get_LOCAL_top_cp_on_stack())) {
+          if (YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack)) {
             OPTYAP_ERROR_MESSAGE("YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack) (completion)");
           } else {
             choiceptr aux_cp;
             aux_cp = DepFr_cons_cp(dep_fr);
-            while (YOUNGER_CP(aux_cp, Get_LOCAL_top_cp_on_stack()))
+            while (YOUNGER_CP(aux_cp, LOCAL_top_cp_on_stack))
               aux_cp = aux_cp->cp_b;
             if (aux_cp->cp_or_fr != DepFr_top_or_fr(dep_fr))
               OPTYAP_ERROR_MESSAGE("Error on DepFr_top_or_fr (completion)");
@@ -1442,7 +2184,7 @@
 #endif /* OPTYAP_ERRORS */
 #ifdef YAPOR
         /* update shared nodes */
-        if (YOUNGER_CP(Get_LOCAL_top_cp_on_stack(), Get_LOCAL_top_cp())) {
+        if (YOUNGER_CP(LOCAL_top_cp_on_stack, LOCAL_top_cp)) {
           or_fr_ptr or_frame = DepFr_top_or_fr(dep_fr);
           while (or_frame != LOCAL_top_or_fr) {
             LOCK_OR_FRAME(or_frame);
@@ -1452,22 +2194,22 @@
             or_frame = OrFr_next(or_frame);
           }
           LOCAL_top_or_fr = DepFr_top_or_fr(dep_fr);
-          Set_LOCAL_top_cp(GetOrFr_node(LOCAL_top_or_fr));
+          LOCAL_top_cp = OrFr_node(LOCAL_top_or_fr);
         }
 #endif /* YAPOR */
 #ifdef OPTYAP_ERRORS
         if (PARALLEL_EXECUTION_MODE) {
-          if (YOUNGER_CP(Get_LOCAL_top_cp(), Get_LOCAL_top_cp_on_stack())) {
+          if (YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack)) {
             OPTYAP_ERROR_MESSAGE("YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack) (completion)");
           } else {
             choiceptr aux_cp;
             aux_cp = DepFr_cons_cp(dep_fr);
-            while (aux_cp != Get_LOCAL_top_cp()) {
-              if (YOUNGER_CP(Get_LOCAL_top_cp(), aux_cp)) {
+            while (aux_cp != LOCAL_top_cp) {
+              if (YOUNGER_CP(LOCAL_top_cp, aux_cp)) {
                 OPTYAP_ERROR_MESSAGE("LOCAL_top_cp not in branch (completion)");
                 break;
               }
-              if (EQUAL_OR_YOUNGER_CP(Get_LOCAL_top_cp_on_stack(), aux_cp)) {
+              if (EQUAL_OR_YOUNGER_CP(LOCAL_top_cp_on_stack, aux_cp)) {
                 OPTYAP_ERROR_MESSAGE("shared frozen segments in branch (completion)");
                 break;
               }
@@ -1504,6 +2246,143 @@
 #endif /* TIMESTAMP_CHECK */
       dep_fr = DepFr_next(dep_fr);
     }
+#ifdef LINEAR_TABLING
+  consume_all:
+    {
+      INFO_LINEAR_TABLING("--------------------- goto consume_all ---------------\n");
+      /* consume all */
+      sg_fr_ptr sg_fr;
+      sg_fr = GEN_CP(B)->cp_sg_fr; 
+      INFO_LINEAR_TABLING("sgfr(%p)->state=%d\n",sg_fr,SgFr_state(sg_fr));
+#ifdef LINEAR_TABLING_FOLLOWER
+      if (SgFr_pioneer(sg_fr)==B)
+	SgFr_state(sg_fr) = looping_evaluating;
+#else  /*!LINEAR_TABLING_FOLLOWER */
+      SgFr_state(sg_fr) = looping_evaluating;
+#endif /*LINEAR_TABLING_FOLLOWER */
+
+      //if (IS_BATCHED_GEN_CP(B)) {
+      if (0 && IS_BATCHED_GEN_CP(B)) {    //BEFORE BATCHED
+        /* backtrack */
+        B = B->cp_b;
+        SET_BB(PROTECT_FROZEN_B(B));
+        goto fail;
+      } else {	
+        /* consume_answers*/	
+#ifdef LINEAR_TABLING_DRS 
+#ifdef DUMMY_PRINT
+	SgFr_nr_opt_trie(sg_fr)=SgFr_nr_opt_trie(sg_fr) + SgFr_nr_trie_answers(sg_fr);
+	SgFr_nr_opt_loop(sg_fr)=SgFr_nr_opt_loop(sg_fr)+  SgFr_nr_looping_answers(sg_fr);
+#endif /*DUMMY_PRINT */
+	if (SgFr_stop_loop_ans(sg_fr)!=NULL){
+	  /* first time to load answers from looping answers */	
+	  if(sg_fr==LOCAL_top_sg_fr_on_branch){
+	    remove_branch(sg_fr);	     	   
+	  }
+	  restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+	  SgFr_consuming_answers(sg_fr)=1; /*schedule for looping answers */
+	  PREG = (yamop *) CPREG;
+	  PREFETCH_OP(PREG);
+	  CELL *subs_ptr;
+	  subs_ptr = (CELL *) (GEN_CP(B) + 1);          
+	  subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
+	  SgFr_current_loop_ans(sg_fr)= SgFr_loop_ans(sg_fr);
+	  load_answer_trie(GET_CELL_VALUE(SgFr_current_loop_ans(sg_fr)), subs_ptr);
+	  YENV = ENV;
+	  GONext();
+	}	
+	
+	if (SgFr_new_answer_trie(sg_fr)!=NULL){	  
+	  /*first time to load answers from trie */
+#ifdef DUMMY_PRINT
+	  SgFr_nr_trie_answers(sg_fr)++;
+#endif /*DUMMY_PRINT*/
+	  if (SgFr_new_answer_trie(sg_fr) == SgFr_answer_trie(sg_fr)) {
+	    // yes answer --> procceed 
+	    if(sg_fr==LOCAL_top_sg_fr_on_branch){
+	      remove_branch(sg_fr);	     	   
+	    }
+	    if(HAS_NEW_ANSWERS(sg_fr)){
+	      TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
+	      UNTAG_NEW_ANSWERS(sg_fr);
+	    }	    
+	    pop_generator_node(SgFr_arity(sg_fr));
+	    PREG = (yamop *) CPREG;
+	    PREFETCH_OP(PREG);
+	    YENV = ENV;
+	    GONext();
+	  }
+  	  if(sg_fr!=LOCAL_top_sg_fr_on_branch)
+	    add_branch(sg_fr);   
+	  SgFr_consuming_answers(sg_fr)=2; /*schedule for trie answers */
+	  restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+	  PREG = (yamop *) CPREG;
+	  PREFETCH_OP(PREG);
+	  CELL *subs_ptr;
+	  subs_ptr = (CELL *) (GEN_CP(B) + 1);          
+	  subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
+	  load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);
+	  YENV = ENV;
+	  GONext();
+	}
+	
+	/* no answers to explore  */
+	if(sg_fr==LOCAL_top_sg_fr_on_branch){
+	  remove_branch(sg_fr);
+	}
+	if(HAS_NEW_ANSWERS(sg_fr)){
+	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
+	  UNTAG_NEW_ANSWERS(sg_fr);
+	}
+	B = B->cp_b;
+	SET_BB(PROTECT_FROZEN_B(B));
+	goto fail;                  
+      }
+
+    }
+
+#else  /*!LINEAR_TABLING_DRS */
+       	ans_node = SgFr_first_answer(sg_fr);
+        if (ans_node == NULL) {
+          /* no answers --> fail */
+	  remove_next(sg_fr);
+          B = B->cp_b;
+          SET_BB(PROTECT_FROZEN_B(B));
+          goto fail;
+        }
+        remove_next(sg_fr);
+        pop_generator_node(SgFr_arity(sg_fr));
+        if (ans_node == SgFr_answer_trie(sg_fr)) {
+          /* yes answer --> procceed */
+          PREG = (yamop *) CPREG;
+          PREFETCH_OP(PREG);
+          YENV = ENV;
+          GONext();
+        } else  {
+          /* answers -> get first answer */
+#ifdef LIMIT_TABLING
+	  SgFr_state(sg_fr)++;  /* complete --> complete_in_use */
+	  remove_from_global_sg_fr_list(sg_fr);
+	  TRAIL_FRAME(sg_fr);
+#endif /* LIMIT_TABLING */
+	  /* load answers from the trie */
+	  store_loader_node(tab_ent, ans_node);
+	  PREG = (yamop *) CPREG;
+	  PREFETCH_OP(PREG);
+	  load_answer_trie(ans_node, YENV);
+	  YENV = ENV;
+	  GONext();
+	}
+      }
+    }
+
+
+#endif  /* LINEAR_TABLING_DRS */
+
+
+#endif /* LINEAR_TABLING */
+
+
 
     /* no dependency frames with unconsumed answers found */
 #ifdef YAPOR
@@ -1513,7 +2392,7 @@
         if (YOUNGER_CP(B_FZ, B)) {
           suspend_branch();
           /* check for suspension frames to be resumed */
-          while (YOUNGER_CP(GetOrFr_node(LOCAL_top_susp_or_fr), Get_LOCAL_top_cp())) {
+          while (YOUNGER_CP(OrFr_node(LOCAL_top_susp_or_fr), LOCAL_top_cp)) {
             or_fr_ptr susp_or_fr;
             susp_fr_ptr resume_fr;
             susp_or_fr = LOCAL_top_susp_or_fr;
@@ -1529,9 +2408,9 @@
                 OrFr_nearest_suspnode(susp_or_fr) = susp_or_fr;
               }
               UNLOCK_OR_FRAME(susp_or_fr);
-              rebind_variables(GetOrFr_node(susp_or_fr)->cp_tr, B->cp_tr);
+              rebind_variables(OrFr_node(susp_or_fr)->cp_tr, B->cp_tr);
               resume_suspension_frame(resume_fr, susp_or_fr);
-              B = Get_LOCAL_top_cp();
+              B = LOCAL_top_cp;
               SET_BB(B_FZ);
               TR = TR_FZ;
               TRAIL_LINK(B->cp_tr);
@@ -1547,7 +2426,7 @@
         if (frame_with_suspensions_not_collected(LOCAL_top_or_fr))
           collect_suspension_frames(LOCAL_top_or_fr);
         /* check for suspension frames to be resumed */
-        while (EQUAL_OR_YOUNGER_CP(GetOrFr_node(LOCAL_top_susp_or_fr), Get_LOCAL_top_cp())) {
+        while (EQUAL_OR_YOUNGER_CP(OrFr_node(LOCAL_top_susp_or_fr), LOCAL_top_cp)) {
           or_fr_ptr susp_or_fr;
           susp_fr_ptr resume_fr;
           susp_or_fr = LOCAL_top_susp_or_fr;
@@ -1564,9 +2443,9 @@
             if (YOUNGER_CP(B_FZ, B)) {
               suspend_branch();
             }
-            rebind_variables(GetOrFr_node(susp_or_fr)->cp_tr, B->cp_tr);
+            rebind_variables(OrFr_node(susp_or_fr)->cp_tr, B->cp_tr);
             resume_suspension_frame(resume_fr, susp_or_fr);
-            B = Get_LOCAL_top_cp();
+            B = LOCAL_top_cp;
             SET_BB(B_FZ);
             TR = TR_FZ;
             TRAIL_LINK(B->cp_tr);
@@ -1610,12 +2489,12 @@
         UNLOCK(DepFr_lock(LOCAL_top_dep_fr));
         if (OrFr_owners(LOCAL_top_or_fr) > 1) {
           /* more owners -> move up one node */
-          Set_LOCAL_top_cp_on_stack( GetOrFr_node(OrFr_next_on_stack(LOCAL_top_or_fr)) );
+          LOCAL_top_cp_on_stack = OrFr_node(OrFr_next_on_stack(LOCAL_top_or_fr));
           BITMAP_delete(OrFr_members(LOCAL_top_or_fr), worker_id);
           OrFr_owners(LOCAL_top_or_fr)--;
           LOCAL_top_dep_fr = DepFr_next(LOCAL_top_dep_fr);
           UNLOCK_OR_FRAME(LOCAL_top_or_fr);
-          if (LOCAL_top_sg_fr && Get_LOCAL_top_cp() == SgFr_gen_cp(LOCAL_top_sg_fr)) {
+          if (LOCAL_top_sg_fr && LOCAL_top_cp == SgFr_gen_cp(LOCAL_top_sg_fr)) {
             LOCAL_top_sg_fr = SgFr_next(LOCAL_top_sg_fr);
           }
           SCH_update_local_or_tops();
@@ -1641,7 +2520,9 @@
       GONext();
     } else
 #endif /* YAPOR */
+complete_all:
     {
+       INFO_LINEAR_TABLING("--------------------- goto complete_all ---------------\n");
       /* complete all */
       sg_fr_ptr sg_fr;
 
@@ -1650,9 +2531,10 @@
 	sg_fr = DET_GEN_CP(B)->cp_sg_fr;
       else	 
 #endif /* DETERMINISTIC_TABLING */
-	sg_fr = GEN_CP(B)->cp_sg_fr;
+      sg_fr = GEN_CP(B)->cp_sg_fr;
       private_completion(sg_fr);
-      if (IS_BATCHED_GEN_CP(B)) {
+ 
+      if (0 && IS_BATCHED_GEN_CP(B)) {
         /* backtrack */
         B = B->cp_b;
         SET_BB(PROTECT_FROZEN_B(B));
@@ -1662,6 +2544,7 @@
 	ans_node = SgFr_first_answer(sg_fr);
         if (ans_node == NULL) {
           /* no answers --> fail */
+	  remove_next(sg_fr);
           B = B->cp_b;
           SET_BB(PROTECT_FROZEN_B(B));
           goto fail;
@@ -1674,6 +2557,7 @@
             TABLING_ERROR_MESSAGE("RepPair((CELL)TrailTerm(TR - 1)) != B->cp_tr (completion)");
         }
 #endif /* TABLING_ERRORS */
+        remove_next(sg_fr);
         pop_generator_node(SgFr_arity(sg_fr));
         if (ans_node == SgFr_answer_trie(sg_fr)) {
           /* yes answer --> procceed */
@@ -1696,7 +2580,7 @@
 	    }
             PREG = (yamop *) CPREG;
             PREFETCH_OP(PREG);
-            load_answer(ans_node, YENV);
+            load_answer_trie(ans_node, YENV);
 	    YENV = ENV;
             GONext();
 	  } else {
@@ -1708,9 +2592,7 @@
 	    PREG = (yamop *) TrNode_child(SgFr_answer_trie(sg_fr));
 	    PREFETCH_OP(PREG);
 	    *--YENV = 0;  /* vars_arity */
-#ifndef GLOBAL_TRIE
-	  *--YENV = 0;  /* heap_arity */
-#endif /* GLOBAL_TRIE */
+	    *--YENV = 0;  /* heap_arity */
 	    GONext();
 	  }
 	}

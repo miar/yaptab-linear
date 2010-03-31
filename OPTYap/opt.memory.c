@@ -14,7 +14,7 @@
 ** -------------------------------------- */
 
 #include "Yap.h"
-#if defined(YAPOR) && !defined(THREADS)
+#ifdef YAPOR
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -25,7 +25,7 @@
 #include <sys/shm.h>
 #include <sys/mman.h>
 #include "Yatom.h"
-#include "YapHeap.h"
+#include "Heap.h"
 #include "alloc.h"
 #include "heapgc.h"
 
@@ -58,8 +58,8 @@ void shm_map_memory(int id, int size, void *shmaddr) {
 void
 open_mapfile(long TotalArea) {
   char mapfile[20];
-  strcpy(mapfile,"./mapfile");
-  itos(getpid(), &mapfile[9]);
+  strcpy(mapfile,"/tmp/mapfile");
+  itos(getpid(), &mapfile[12]);
   if ((fd_mapfile = open(mapfile, O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0)
     Yap_Error(FATAL_ERROR, TermNil, "open error (open_mapfile)");
   if (lseek(fd_mapfile, TotalArea, SEEK_SET) < 0) 
@@ -76,6 +76,7 @@ close_mapfile(void) {
     Yap_Error(FATAL_ERROR, TermNil, "close error (close_mapfile)");
 }
 #endif /* MMAP_MEMORY_MAPPING_SCHEME */
+
 
 void map_memory(long HeapArea, long GlobalLocalArea, long TrailAuxArea, int n_workers) {
   void *mmap_addr = (void *)MMAP_ADDR;
@@ -213,11 +214,11 @@ void unmap_memory (void) {
     else INFORMATION_MESSAGE("Can't remove shared memory segment %d", shm_mapid[i]);
   }
 #else /* MMAP_MEMORY_MAPPING_SCHEME */
-  strcpy(MapFile,"./mapfile");
+  strcpy(MapFile,"/tmp/mapfile");
 #ifdef ACOW
-  itos(GLOBAL_master_worker, &MapFile[9]);
+  itos(GLOBAL_master_worker, &MapFile[12]);
 #else /* ENV_COPY || SBA */
-  itos(worker_pid(0), &MapFile[9]);
+  itos(worker_pid(0), &MapFile[12]);
 #endif
   if (remove(MapFile) == 0)
     INFORMATION_MESSAGE("Removing mapfile \"%s\"", MapFile);
@@ -274,4 +275,4 @@ void remap_memory(void) {
   }
 #endif /* ENV_COPY */
 }
-#endif /* YAPOR && !THREADS */
+#endif /* YAPOR */

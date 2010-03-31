@@ -42,7 +42,7 @@ void error_message(const char *mesg, ...);
 ** ------------ */
 
 void Yap_init_global(int max_table_size, int n_workers, int sch_loop, int delay_load);
-void Yap_init_local(void);
+void init_local(void);
 void make_root_frames(void);
 #ifdef YAPOR
 void init_workers(void);
@@ -65,22 +65,13 @@ void finish_yapor(void);
 #ifdef TABLING
 sg_fr_ptr subgoal_search(yamop *preg, CELL **Yaddr);
 ans_node_ptr answer_search(sg_fr_ptr sg_fr, CELL *subs_ptr);
-void load_answer(ans_node_ptr ans_node, CELL *subs_ptr);
-#ifdef GLOBAL_TRIE
-CELL *load_substitution_variable(gt_node_ptr current_node, CELL *aux_stack_ptr);
-#endif /* GLOBAL_TRIE */
+void load_answer_trie(ans_node_ptr ans_node, CELL *subs_ptr);
 void private_completion(sg_fr_ptr sg_fr);
-#ifdef GLOBAL_TRIE
-void free_subgoal_trie_branch(sg_node_ptr node, int nodes_left, int position);
-#else
 void free_subgoal_trie_branch(sg_node_ptr node, int nodes_left, int nodes_extra, int position);
-#endif /* GLOBAL_TRIE */
 void free_answer_trie_branch(ans_node_ptr node, int position);
 void update_answer_trie(sg_fr_ptr sg_fr);
-void show_table(tab_ent_ptr tab_ent, int show_mode);
-#ifdef GLOBAL_TRIE
-void show_global_trie(void);
-#endif /* GLOBAL_TRIE */
+void traverse_table(tab_ent_ptr tab_ent, int show_table);
+void table_stats(void);
 #endif /* TABLING */
 
 
@@ -97,15 +88,40 @@ void resume_suspension_frame(susp_fr_ptr resume_fr, or_fr_ptr top_or_fr);
 
 
 /* ------------- **
-**  or.*engine.c **
+**  or.engine.c  **
 ** ------------- */
 
-#ifdef YAPOR
+#ifdef ENV_COPY
+void make_root_choice_point(void);
+void free_root_choice_point(void);
+int q_share_work(int p);
+void p_share_work(void);
+#endif /* ENV_COPY */
+
+
+/* ---------------- **
+**  or.cowengine.c  **
+** ---------------- */
+
+#ifdef ACOW
 void make_root_choice_point(void);
 void free_root_choice_point(void);
 int q_share_work(int p);
 int p_share_work(void);
-#endif /* YAPOR */
+#endif /* ACOW */
+
+
+/* ---------------- **
+**  or.sbaengine.c  **
+** ---------------- */
+
+#ifdef SBA
+void make_root_choice_point(void);
+void free_root_choice_point(void);
+int q_share_work(int p);
+void p_share_work(void);
+#endif /* SBA */
+
 
 /* ---------------- **
 **  or.scheduler.c  **

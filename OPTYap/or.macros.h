@@ -81,8 +81,8 @@ STD_PROTO(static inline qg_sol_fr_ptr CUT_prune_solution_frames, (qg_sol_fr_ptr,
 #define YAMOP_CUT(INST)            (((INST)->u.Otapl.or_arg) & YAMOP_CUT_FLAG)
 #define YAMOP_FLAGS(INST)          (((INST)->u.Otapl.or_arg) & YAMOP_FLAGS_BITS)
 
-#define INIT_YAMOP_LTT(INST, LTT)  ((INST)->u.Otapl.or_arg = LTT+1)
-#define PUT_YAMOP_LTT(INST, LTT)   (INST)->u.Otapl.or_arg = YAMOP_FLAGS(INST) | (LTT+1)
+#define INIT_YAMOP_LTT(INST, LTT)  (INST)->u.Otapl.or_arg = LTT
+#define PUT_YAMOP_LTT(INST, LTT)   (INST)->u.Otapl.or_arg = YAMOP_FLAGS(INST) | (LTT)
 #define PUT_YAMOP_SEQ(INST)        (INST)->u.Otapl.or_arg |= YAMOP_SEQ_FLAG
 #define PUT_YAMOP_CUT(INST)        (INST)->u.Otapl.or_arg |= YAMOP_CUT_FLAG
 
@@ -118,7 +118,7 @@ STD_PROTO(static inline qg_sol_fr_ptr CUT_prune_solution_frames, (qg_sol_fr_ptr,
 **      Scheduler Macros      **
 ** -------------------------- */
 
-#define SCH_top_shared_cp(CP)  (Get_LOCAL_top_cp() == CP)
+#define SCH_top_shared_cp(CP)  (LOCAL_top_cp == CP)
 
 #define SCH_any_share_request  (LOCAL_share_request != MAX_WORKERS)
 
@@ -129,17 +129,14 @@ STD_PROTO(static inline qg_sol_fr_ptr CUT_prune_solution_frames, (qg_sol_fr_ptr,
           goto shared_end
 
 #define SCH_check_prune_request()     \
-  if (Get_LOCAL_prune_request()) {    \
+        if (LOCAL_prune_request) {    \
           SCHEDULER_GET_WORK();       \
         }
 
-#if defined(ENV_COPY) || defined(SBA) || defined(THREADS)
+#if defined(ENV_COPY) || defined(SBA)
 #define SCH_check_share_request()     \
         if (SCH_any_share_request) {  \
-	  ASP = YENV;                 \
-	  saveregs();                 \
           p_share_work();             \
-	  setregs();                  \
         }
 #else /* ACOW */
 #define SCH_check_share_request()     \
@@ -166,10 +163,10 @@ STD_PROTO(static inline qg_sol_fr_ptr CUT_prune_solution_frames, (qg_sol_fr_ptr,
 ** -------------------- */
 
 #define CUT_prune_to(PRUNE_CP)                     \
-  if (YOUNGER_CP(Get_LOCAL_top_cp(), PRUNE_CP)) {  \
-    if (! Get_LOCAL_prune_request())		   \
+        if (YOUNGER_CP(LOCAL_top_cp, PRUNE_CP)) {  \
+          if (! LOCAL_prune_request)               \
 	    prune_shared_branch(PRUNE_CP);         \
-	  PRUNE_CP = Get_LOCAL_top_cp();	   \
+	  PRUNE_CP = LOCAL_top_cp;                 \
 	}
 
 #define CUT_wait_leftmost()                                           \
@@ -282,8 +279,8 @@ void PUT_OUT_REQUESTABLE(int p) {
 
 static inline 
 void SCH_update_local_or_tops(void) {
-  Set_LOCAL_top_cp(Get_LOCAL_top_cp()->cp_b);
-  LOCAL_top_or_fr = Get_LOCAL_top_cp()->cp_or_fr;
+  LOCAL_top_cp = LOCAL_top_cp->cp_b;
+  LOCAL_top_or_fr = LOCAL_top_cp->cp_or_fr;
   return;
 }
 
@@ -319,8 +316,10 @@ void SCH_set_load(choiceptr current_cp) {
     LOCAL_load = lub;
   else
     LOCAL_load = lub + YAMOP_LTT(current_cp->cp_ap);
+
   return;
 }
+
 
 static inline
 void SCH_new_alternative(yamop *curpc, yamop *new) {
@@ -340,8 +339,8 @@ static inline
 void CUT_send_prune_request(int worker, choiceptr prune_cp) {
   LOCK_WORKER(worker);
   if (YOUNGER_CP(REMOTE_top_cp(worker), prune_cp) &&
-     (! Get_REMOTE_prune_request(worker) || YOUNGER_CP(Get_REMOTE_prune_request(worker), prune_cp)))
-    Set_REMOTE_prune_request(worker, prune_cp);
+     (! REMOTE_prune_request(worker) || YOUNGER_CP(REMOTE_prune_request(worker), prune_cp)))
+    REMOTE_prune_request(worker) = prune_cp;
   UNLOCK_WORKER(worker);
   return;
 }
@@ -350,8 +349,8 @@ void CUT_send_prune_request(int worker, choiceptr prune_cp) {
 static inline
 void CUT_reset_prune_request(void) {
   LOCK_WORKER(worker_id); 
-  if (Get_LOCAL_prune_request() && EQUAL_OR_YOUNGER_CP(Get_LOCAL_prune_request(), Get_LOCAL_top_cp()))
-    Set_LOCAL_prune_request(NULL);
+  if (LOCAL_prune_request && EQUAL_OR_YOUNGER_CP(LOCAL_prune_request, LOCAL_top_cp))
+    LOCAL_prune_request = NULL;
   UNLOCK_WORKER(worker_id);
   return;
 }
@@ -435,7 +434,7 @@ or_fr_ptr CUT_leftmost_until(or_fr_ptr start_or_fr, int until_depth) {
       for (i = 0; i < number_workers; i++) {
         if (BITMAP_member(members, i) && 
             BRANCH_LTT(i, depth) > ltt &&
-            EQUAL_OR_YOUNGER_CP(GetOrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i)))
+            EQUAL_OR_YOUNGER_CP(OrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i)))
           return leftmost_or_fr;
       }
       BITMAP_minus(prune_members, members);
@@ -450,7 +449,7 @@ or_fr_ptr CUT_leftmost_until(or_fr_ptr start_or_fr, int until_depth) {
         for (i = 0; i < number_workers; i++) {
           if (BITMAP_member(members, i) &&
               BRANCH_LTT(i, depth) > ltt &&
-              EQUAL_OR_YOUNGER_CP(GetOrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i))) {
+              EQUAL_OR_YOUNGER_CP(OrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i))) {
             /* update nearest leftnode data */
             OrFr_nearest_leftnode(start_or_fr) = leftmost_or_fr;
             start_or_fr = OrFr_nearest_leftnode(start_or_fr);

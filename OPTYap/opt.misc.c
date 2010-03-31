@@ -33,11 +33,10 @@
 **      Global variables are defined here      **
 ** ------------------------------------------- */
 
-#ifndef THREADS
 #ifdef YAPOR
 struct worker WORKER;
 #endif /* YAPOR */
-#endif
+
 
 
 /* -------------------------- **

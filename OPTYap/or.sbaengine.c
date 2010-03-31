@@ -23,7 +23,7 @@
 #ifdef SBA
 #include <stdio.h>
 #include "Yatom.h"
-#include "YapHeap.h"
+#include "Heap.h"
 #include "or.macros.h"
 #include "opt.mavar.h"
 
@@ -103,9 +103,9 @@ void make_root_choice_point(void) {
   LOCAL_load = 0;
   LOCAL_prune_request = NULL;
   BRANCH(worker_id, 0) = 0;
-  H_FZ = (CELL *) Yap_GlobalBase;
-  B_FZ = (choiceptr) Yap_LocalBase;
-  TR_FZ = (tr_fr_ptr) Yap_TrailBase;
+  H_FZ = H_BASE;
+  B_FZ = B_BASE;
+  TR_FZ = TR_BASE;
 }
 
 
@@ -113,10 +113,10 @@ void free_root_choice_point(void) {
   reset_trail(LOCAL_top_cp->cp_tr, TR);
   TR = LOCAL_top_cp->cp_tr;
   B = LOCAL_top_cp->cp_b;
-  LOCAL_top_cp = (choiceptr) Yap_LocalBase;
-  H_FZ = (CELL *) Yap_GlobalBase;
-  B_FZ = (choiceptr) Yap_LocalBase;
-  TR_FZ = (tr_fr_ptr) Yap_TrailBase;
+  LOCAL_top_cp = B_BASE;
+  H_FZ = H_BASE;
+  B_FZ = B_BASE;
+  TR_FZ = TR_BASE;
 }
 
 
@@ -151,7 +151,7 @@ int q_share_work(int worker_p) {
   register CELL aux_cell;
 
   LOCK_OR_FRAME(LOCAL_top_or_fr);
-  if (Get_REMOTE_prune_request(worker_p)) {
+  if (REMOTE_prune_request(worker_p)) {
     /* worker p with prune request */
     UNLOCK_OR_FRAME(LOCAL_top_or_fr);
     return FALSE;

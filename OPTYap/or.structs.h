@@ -31,19 +31,11 @@ typedef struct or_frame {
   lockvar lock;
   yamop *alternative;
   volatile bitmap members;
-#ifdef THREADS
-  Int node_offset;
-#else
   choiceptr node;
-#endif
   struct or_frame *nearest_livenode;
   /* cut support */
   int depth;
-#ifdef THREADS
-  Int pending_prune_cp_offset;
-#else
   choiceptr pending_prune_cp;
-#endif
   volatile int pending_prune_ltt;
   struct or_frame *nearest_leftnode;
   struct query_goal_solution_frame *query_solutions;
@@ -63,24 +55,10 @@ typedef struct or_frame {
 #define OrFr_lock(X)              ((X)->lock)
 #define OrFr_alternative(X)       ((X)->alternative)
 #define OrFr_members(X)           ((X)->members)
-#ifdef THREADS
-#define GetOrFr_node(X)           offset_to_cptr((X)->node_offset)
-#define SetOrFr_node(X,V)         ((X)->node_offset = cptr_to_offset(V))
-#else
 #define OrFr_node(X)              ((X)->node)
-#define GetOrFr_node(X)           ((X)->node)
-#define SetOrFr_node(X,V)         ((X)->node = V)
-#endif
 #define OrFr_nearest_livenode(X)  ((X)->nearest_livenode)
 #define OrFr_depth(X)             ((X)->depth)
-#ifdef THREADS
-#define Get_OrFr_pend_prune_cp(X) offset_to_cptr_with_null((X)->pending_prune_cp_offset)
-#define Set_OrFr_pend_prune_cp(X,V)  ((X)->pending_prune_cp_offset = cptr_to_offset_with_null(V))
-#else
 #define OrFr_pend_prune_cp(X)     ((X)->pending_prune_cp)
-#define Get_OrFr_pend_prune_cp(X) ((X)->pending_prune_cp)
-#define Set_OrFr_pend_prune_cp(X,V)  ((X)->pending_prune_cp = (V))
-#endif
 #define OrFr_pend_prune_ltt(X)    ((X)->pending_prune_ltt)
 #define OrFr_nearest_leftnode(X)  ((X)->nearest_leftnode)
 #define OrFr_qg_solutions(X)      ((X)->query_solutions)

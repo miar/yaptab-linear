@@ -17,35 +17,6 @@ typedef double realtime;
 typedef unsigned long bitmap;
 
 
-#ifdef THREADS
-/* Threads may not assume addresses are the same at different workers */
-static inline choiceptr
-offset_to_cptr(Int node)
-{
-  return (choiceptr)(LCL0+node);
-}
-
-static inline Int
-cptr_to_offset(choiceptr node)
-{
-  return (Int)((CELL *)node-LCL0);
-}
-
-static inline choiceptr
-offset_to_cptr_with_null(Int node)
-{
-  if (node == 0L) return NULL;
-  return (choiceptr)(LCL0+node);
-}
-
-static inline Int
-cptr_to_offset_with_null(choiceptr node)
-{
-  if (node == NULL) return 0L;
-  return (Int)((CELL *)node-LCL0);
-}
-
-#endif
 
 /* ---------------------------- **
 **      Struct page_header      **
@@ -70,22 +41,20 @@ typedef struct page_header {
 ** ---------------------- */
 
 struct pages {
-#ifdef SHM_MEMORY_ALLOC_SCHEME
 #ifdef YAPOR
   lockvar lock;
 #endif /* YAPOR */
+  volatile long pages_allocated;
+  volatile long structs_in_use;
   int structs_per_page;
   struct page_header *first_free_page;
-  volatile long pages_allocated;
-#endif /* SHM_MEMORY_ALLOC_SCHEME */
-  volatile long structs_in_use;
 };
 
 #define Pg_lock(X)        ((X).lock)
-#define Pg_str_per_pg(X)  ((X).structs_per_page)
-#define Pg_free_pg(X)     ((X).first_free_page)
 #define Pg_pg_alloc(X)    ((X).pages_allocated)
 #define Pg_str_in_use(X)  ((X).structs_in_use)
+#define Pg_str_per_pg(X)  ((X).structs_per_page)
+#define Pg_free_pg(X)     ((X).first_free_page)
 #define Pg_str_free(X)    (Pg_pg_alloc(X) * Pg_str_per_pg(X) - Pg_str_in_use(X))
 
 
@@ -109,16 +78,12 @@ struct global_pages {
   struct pages table_subgoal_answer_frame_pages;
 #endif /* TABLING_INNER_CUTS */
 #ifdef TABLING
-#ifdef GLOBAL_TRIE
-  struct pages global_trie_node_pages;
-  struct pages global_trie_hash_pages;
-#endif /* GLOBAL_TRIE */
   struct pages table_entry_pages;
   struct pages subgoal_frame_pages;
   struct pages subgoal_trie_node_pages;
   struct pages answer_trie_node_pages;
-  struct pages subgoal_trie_hash_pages;
-  struct pages answer_trie_hash_pages;
+  struct pages subgoal_hash_pages;
+  struct pages answer_hash_pages;
   struct pages dependency_frame_pages;
 #endif /* TABLING */
 #if defined(YAPOR) && defined(TABLING)
@@ -144,7 +109,7 @@ struct global_locks {
   lockvar bitmap_pruning_workers;
 #endif /* TABLING_INNER_CUTS */
 
-  int who_locked_heap;
+  lockvar who_locked_heap;
   lockvar heap_access;
   lockvar alloc_block;
 #if defined(YAPOR_ERRORS) || defined(TABLING_ERRORS)
@@ -180,11 +145,7 @@ struct global_data{
   char performance_mode;  /* PERFORMANCE_OFF / PERFORMANCE_ON / PERFORMANCE_IN_EXECUTION */
 
   /* global data related to or-parallelism */
-#if THREADS
-  Int  root_choice_point_offset;
-#else
   choiceptr root_choice_point;
-#endif
   struct or_frame *root_or_frame;
   bitmap present_workers;
   volatile bitmap idle_workers;
@@ -205,9 +166,6 @@ struct global_data{
 #ifdef TABLING
   /* global data related to tabling */
   struct table_entry *root_table_entry;
-#ifdef GLOBAL_TRIE
-  struct global_trie_node *root_global_trie;
-#endif /* GLOBAL_TRIE */
 #ifdef LIMIT_TABLING
   struct subgoal_frame *first_subgoal_frame;
   struct subgoal_frame *last_subgoal_frame;
@@ -224,6 +182,9 @@ struct global_data{
 #endif /* TABLING */
 };
 
+
+
+
 #define GLOBAL_MAX_PAGES                        (GLOBAL.pages.max_pages)
 #define GLOBAL_PAGES_void                       (GLOBAL.pages.void_pages)
 #define GLOBAL_PAGES_or_fr                      (GLOBAL.pages.or_frame_pages)
@@ -231,14 +192,12 @@ struct global_data{
 #define GLOBAL_PAGES_qg_ans_fr                  (GLOBAL.pages.query_goal_answer_frame_pages)
 #define GLOBAL_PAGES_tg_sol_fr                  (GLOBAL.pages.table_subgoal_solution_frame_pages)
 #define GLOBAL_PAGES_tg_ans_fr                  (GLOBAL.pages.table_subgoal_answer_frame_pages)
-#define GLOBAL_PAGES_gt_node                    (GLOBAL.pages.global_trie_node_pages)
-#define GLOBAL_PAGES_gt_hash                    (GLOBAL.pages.global_trie_hash_pages)
 #define GLOBAL_PAGES_tab_ent                    (GLOBAL.pages.table_entry_pages)
 #define GLOBAL_PAGES_sg_fr                      (GLOBAL.pages.subgoal_frame_pages)
 #define GLOBAL_PAGES_sg_node                    (GLOBAL.pages.subgoal_trie_node_pages)
 #define GLOBAL_PAGES_ans_node                   (GLOBAL.pages.answer_trie_node_pages)
-#define GLOBAL_PAGES_sg_hash                    (GLOBAL.pages.subgoal_trie_hash_pages)
-#define GLOBAL_PAGES_ans_hash                   (GLOBAL.pages.answer_trie_hash_pages)
+#define GLOBAL_PAGES_sg_hash                    (GLOBAL.pages.subgoal_hash_pages)
+#define GLOBAL_PAGES_ans_hash                   (GLOBAL.pages.answer_hash_pages)
 #define GLOBAL_PAGES_dep_fr                     (GLOBAL.pages.dependency_frame_pages)
 #define GLOBAL_PAGES_susp_fr                    (GLOBAL.pages.suspension_frame_pages)
 #define SCHEDULER_LOOP                          (GLOBAL.scheduler_loop)
@@ -250,14 +209,7 @@ struct global_data{
 #define GLOBAL_best_times(time)                 (GLOBAL.best_execution_times[time])
 #define GLOBAL_number_goals                     (GLOBAL.number_of_executed_goals)
 #define GLOBAL_performance_mode                 (GLOBAL.performance_mode)
-#if THREADS
-#define Get_GLOBAL_root_cp()	                offset_to_cptr(GLOBAL.root_choice_point_offset)
-#define Set_GLOBAL_root_cp(bptr)                (GLOBAL.root_choice_point_offset = cptr_to_offset(bptr))
-#else
 #define GLOBAL_root_cp                          (GLOBAL.root_choice_point)
-#define Get_GLOBAL_root_cp()                    (GLOBAL.root_choice_point)
-#define Set_GLOBAL_root_cp(bptr)                (GLOBAL.root_choice_point = (bptr))
-#endif
 #define GLOBAL_root_or_fr                       (GLOBAL.root_or_frame)
 #define GLOBAL_bm_present_workers               (GLOBAL.present_workers)
 #define GLOBAL_bm_idle_workers                  (GLOBAL.idle_workers)
@@ -282,7 +234,6 @@ struct global_data{
 #define PARALLEL_EXECUTION_MODE                 (GLOBAL.parallel_execution_mode)
 #define GLOBAL_answers                          (GLOBAL.answers)
 #define GLOBAL_root_tab_ent                     (GLOBAL.root_table_entry)
-#define GLOBAL_root_gt                          (GLOBAL.root_global_trie)
 #define GLOBAL_first_sg_fr                      (GLOBAL.first_subgoal_frame)
 #define GLOBAL_last_sg_fr                       (GLOBAL.last_subgoal_frame)
 #define GLOBAL_check_sg_fr                      (GLOBAL.check_subgoal_frame)
@@ -300,7 +251,7 @@ struct global_data{
 
 #ifdef YAPOR
 struct local_signals{
-#if defined(ENV_COPY) || defined(THREADS)
+#ifdef ENV_COPY
   lockvar lock;
   volatile enum {
     Q_idle = 0,
@@ -309,13 +260,13 @@ struct local_signals{
     local  = 3,
     P_idle = 4
   } P_fase, Q_fase;
-#endif /* ENV_COPY || THREADS */
+#endif /* ENV_COPY */
   volatile enum {
     no_sharing   = 0, 
     sharing      = 1,
     nodes_shared = 2,
     copy_done    = 3,
-    worker_ready = 4
+    ready        = 4
   } reply;
 };
 #endif /* YAPOR */
@@ -327,23 +278,13 @@ struct local_signals{
 ** --------------------------- */
 
 struct local_data{
-#if defined(YAPOR) || defined(THREADS)
-  lockvar lock;
-#endif
 #ifdef YAPOR
   /* local data related to or-parallelism */
+  lockvar lock;
   volatile int load;
-#if THREADS
-  Int top_choice_point_offset;
-#else
   choiceptr top_choice_point;
-#endif
   struct or_frame *top_or_frame;
-#if THREADS
-  Int prune_request_offset;
-#else
   choiceptr prune_request;
-#endif
   volatile int share_request;
   struct local_signals share_signals;
   volatile struct {
@@ -357,39 +298,55 @@ struct local_data{
   struct answer_trie_node *next_free_answer_trie_node;
   struct subgoal_frame *top_subgoal_frame;
   struct dependency_frame *top_dependency_frame;
+
+#ifdef LINEAR_TABLING
+  struct subgoal_frame *top_subgoal_frame_on_branch;
+  struct subgoal_frame *top_subgoal_max_scc;
+#ifdef DUMMY_PRINT
+  int nr_looping_answers;
+  int total_trie_answers;
+  int opt_tries,
+      opt_loop;
+  int nr_consumers;
+#endif /* DUMMY_PRINT */
+  int dfn;
+#endif /* LINEAR_TABLING */
+
 #ifdef TABLING_INNER_CUTS
   choiceptr bottom_pruning_scope;
 #endif /* TABLING_INNER_CUTS */
 #ifdef YAPOR
-#ifdef THREADS
-  Int top_choice_point_on_stack_offset;
-#else
   choiceptr top_choice_point_on_stack;
-#endif
   struct or_frame *top_or_frame_with_suspensions;
 #endif /* YAPOR */
 #endif /* TABLING */
 };
 
+#ifdef DUMMY_PRINT
+
+#define LOCAL_opt_tries                   (LOCAL->opt_tries)
+#define LOCAL_opt_loop                    (LOCAL->opt_loop)
+
+#define LOCAL_total_trie_answers          (LOCAL->total_trie_answers)
+
+#define LOCAL_nr_looping_answers          (LOCAL->nr_looping_answers)
+#define LOCAL_nr_consumers                 (LOCAL->nr_consumers)
+
+#endif /*DUMMY_PRINT */
+
+
+#define LOCAL_dfn                          (LOCAL->dfn)
+#define LOCAL_max_scc                      (LOCAL->top_subgoal_max_scc)
+#define LOCAL_top_sg_fr_on_branch          (LOCAL->top_subgoal_frame_on_branch)
+
+
+
+
 #define LOCAL_lock                         (LOCAL->lock)
 #define LOCAL_load                         (LOCAL->load)
-#if THREADS
-#define Get_LOCAL_top_cp() offset_to_cptr(LOCAL->top_choice_point_offset)
-#define Set_LOCAL_top_cp(cpt) (LOCAL->top_choice_point_offset =  cptr_to_offset(cpt))
-#else
 #define LOCAL_top_cp                       (LOCAL->top_choice_point)
-#define Get_LOCAL_top_cp()		   (LOCAL->top_choice_point)
-#define Set_LOCAL_top_cp(cpt)	           (LOCAL->top_choice_point =  cpt)
-#endif
 #define LOCAL_top_or_fr                    (LOCAL->top_or_frame)
-#if THREADS
-#define Get_LOCAL_prune_request()	   offset_to_cptr_with_null(LOCAL->prune_request_offset)
-#define Set_LOCAL_prune_request(cpt)       (LOCAL->prune_request_offset =  cptr_to_offset_with_null(cpt))
-#else
 #define LOCAL_prune_request                (LOCAL->prune_request)
-#define Get_LOCAL_prune_request()          (LOCAL->prune_request)
-#define Set_LOCAL_prune_request(cpt)       (LOCAL->prune_request = cpt)
-#endif
 #define LOCAL_share_request                (LOCAL->share_request)
 #define LOCAL_reply_signal                 (LOCAL->share_signals.reply)
 #define LOCAL_p_fase_signal                (LOCAL->share_signals.P_fase)
@@ -405,34 +362,14 @@ struct local_data{
 #define LOCAL_top_sg_fr                    (LOCAL->top_subgoal_frame)
 #define LOCAL_top_dep_fr                   (LOCAL->top_dependency_frame)
 #define LOCAL_pruning_scope                (LOCAL->bottom_pruning_scope)
-#if THREADS
-#define Get_LOCAL_top_cp_on_stack() offset_to_cptr(LOCAL->top_choice_point_on_stack_offset)
-#define Set_LOCAL_top_cp_on_stack(cpt) (LOCAL->top_choice_point_on_stack_offset =  cptr_to_offset(cpt))
-#else
 #define LOCAL_top_cp_on_stack              (LOCAL->top_choice_point_on_stack)
-#define Get_LOCAL_top_cp_on_stack()	   (LOCAL->top_choice_point_on_stack)
-#define Set_LOCAL_top_cp_on_stack(cpt)	   (LOCAL->top_choice_point_on_stack =  cpt)
-#endif
 #define LOCAL_top_susp_or_fr               (LOCAL->top_or_frame_with_suspensions)
 
 #define REMOTE_lock(worker)                (REMOTE[worker].lock)
 #define REMOTE_load(worker)                (REMOTE[worker].load)
-#if THREADS
-#define REMOTE_top_cp(worker)              offset_to_cptr(REMOTE[worker].top_choice_point_offset)
-#define Set_REMOTE_top_cp(worker, bptr)    (REMOTE[worker].top_choice_point_offset = cptr_to_offset(bptr))
-#else
 #define REMOTE_top_cp(worker)              (REMOTE[worker].top_choice_point)
-#define Set_REMOTE_top_cp(worker, bptr)    (REMOTE[worker].top_choice_point = (bptr))
-#endif
 #define REMOTE_top_or_fr(worker)           (REMOTE[worker].top_or_frame)
-#if THREADS
-#define Get_REMOTE_prune_request(worker)   offset_to_cptr_with_null(REMOTE[worker].prune_request_offset)
-#define Set_REMOTE_prune_request(worker,cp)   (REMOTE[worker].prune_request_offset = cptr_to_offset_with_null(cp))
-#else
 #define REMOTE_prune_request(worker)       (REMOTE[worker].prune_request)
-#define Get_REMOTE_prune_request(worker)   (REMOTE[worker].prune_request)
-#define Set_REMOTE_prune_request(worker,cp)   (REMOTE[worker].prune_request = cp)
-#endif
 #define REMOTE_share_request(worker)       (REMOTE[worker].share_request)
 #define REMOTE_reply_signal(worker)        (REMOTE[worker].share_signals.reply)
 #define REMOTE_p_fase_signal(worker)       (REMOTE[worker].share_signals.P_fase)
@@ -448,13 +385,7 @@ struct local_data{
 #define REMOTE_top_sg_fr(worker)           (REMOTE[worker].top_subgoal_frame)
 #define REMOTE_top_dep_fr(worker)          (REMOTE[worker].top_dependency_frame)
 #define REMOTE_pruning_scope(worker)       (REMOTE[worker].bottom_pruning_scope)
-#if THREADS
-#define REMOTE_top_cp_on_stack(worker)              offset_to_cptr(REMOTE[worker].top_choice_point_on_stack_offset)
-#define Set_REMOTE_top_cp_on_stack(worker, bptr)    (REMOTE[worker].top_choice_point_on_stack_offset = cptr_to_offset(bptr))
-#else
-#define REMOTE_top_cp_on_stack(worker)              (REMOTE[worker].top_choice_point_on_stack)
-#define Set_REMOTE_top_cp_on_stack(worker, bptr)    (REMOTE[worker].top_choice_point_on_stack = (bptr))
-#endif
+#define REMOTE_top_cp_on_stack(worker)     (REMOTE[worker].top_choice_point_on_stack)
 #define REMOTE_top_susp_or_fr(worker)      (REMOTE[worker].top_or_frame_with_suspensions)
 
 

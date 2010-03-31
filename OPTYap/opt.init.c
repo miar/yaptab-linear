@@ -46,7 +46,6 @@ ma_h_inner_struct *Yap_ma_h_top;
 **      Local macros      **
 ** ---------------------- */
 
-#ifdef SHM_MEMORY_ALLOC_SCHEME
 #define STRUCTS_PER_PAGE(STR_TYPE)  ((Yap_page_size - STRUCT_SIZE(struct page_header)) / STRUCT_SIZE(STR_TYPE))
 
 #define INIT_PAGES(PG, STR_TYPE)                         \
@@ -55,9 +54,6 @@ ma_h_inner_struct *Yap_ma_h_top;
         Pg_str_in_use(PG) = 0;                           \
         Pg_str_per_pg(PG) = STRUCTS_PER_PAGE(STR_TYPE);  \
         Pg_free_pg(PG) = NULL
-#else
-#define INIT_PAGES(PG, STR_TYPE)  Pg_str_in_use(PG) = 0
-#endif /* SHM_MEMORY_ALLOC_SCHEME */
 
 
 
@@ -86,16 +82,12 @@ void Yap_init_global(int max_table_size, int n_workers, int sch_loop, int delay_
   INIT_PAGES(GLOBAL_PAGES_tg_ans_fr, struct table_subgoal_answer_frame);
 #endif /* TABLING_INNER_CUTS */
 #ifdef TABLING
-#ifdef GLOBAL_TRIE
-  INIT_PAGES(GLOBAL_PAGES_gt_node, struct global_trie_node);
-  INIT_PAGES(GLOBAL_PAGES_gt_hash, struct global_trie_hash);
-#endif /* GLOBAL_TRIE */
   INIT_PAGES(GLOBAL_PAGES_tab_ent, struct table_entry);
   INIT_PAGES(GLOBAL_PAGES_sg_fr, struct subgoal_frame);
   INIT_PAGES(GLOBAL_PAGES_sg_node, struct subgoal_trie_node);
   INIT_PAGES(GLOBAL_PAGES_ans_node, struct answer_trie_node);
-  INIT_PAGES(GLOBAL_PAGES_sg_hash, struct subgoal_trie_hash);
-  INIT_PAGES(GLOBAL_PAGES_ans_hash, struct answer_trie_hash);
+  INIT_PAGES(GLOBAL_PAGES_sg_hash, struct subgoal_hash);
+  INIT_PAGES(GLOBAL_PAGES_ans_hash, struct answer_hash);
   INIT_PAGES(GLOBAL_PAGES_dep_fr, struct dependency_frame);
 #endif /* TABLING */
 #if defined(YAPOR) && defined(TABLING)
@@ -149,9 +141,6 @@ void Yap_init_global(int max_table_size, int n_workers, int sch_loop, int delay_
 #ifdef TABLING
   /* global data related to tabling */
   GLOBAL_root_tab_ent = NULL;
-#ifdef GLOBAL_TRIE
-  new_global_trie_node(GLOBAL_root_gt, 0, NULL, NULL, NULL);
-#endif /* GLOBAL_TRIE */
 #ifdef LIMIT_TABLING
   GLOBAL_first_sg_fr = NULL;
   GLOBAL_last_sg_fr = NULL;
@@ -172,28 +161,40 @@ void Yap_init_global(int max_table_size, int n_workers, int sch_loop, int delay_
 }
 
 
-void Yap_init_local(void) {
+void init_local(void) {
 #ifdef YAPOR
   /* local data related to or-parallelism */
   LOCAL = REMOTE + worker_id;
-  Set_LOCAL_top_cp((choiceptr) Yap_LocalBase);
+  LOCAL_top_cp = B_BASE;
   LOCAL_top_or_fr = GLOBAL_root_or_fr;
   LOCAL_load = 0;
   LOCAL_share_request = MAX_WORKERS;
-  LOCAL_reply_signal = worker_ready;
+  LOCAL_reply_signal = ready;
 #ifdef ENV_COPY
   INIT_LOCK(LOCAL_lock_signals);
 #endif /* ENV_COPY */
-  Set_LOCAL_prune_request(NULL);
+  LOCAL_prune_request = NULL;
 #endif /* YAPOR */
   INIT_LOCK(LOCAL_lock);
 #ifdef TABLING
   /* local data related to tabling */
+#ifdef LINEAR_TABLING
+  LOCAL_top_sg_fr_on_branch = NULL;
+  LOCAL_max_scc=NULL;
+  LOCAL_dfn=1;
+#ifdef DUMMY_PRINT
+  LOCAL_opt_tries=0;
+  LOCAL_opt_loop=0;
+  LOCAL_total_trie_answers=0;
+  LOCAL_nr_looping_answers=0;
+  LOCAL_nr_consumers=0;
+#endif /*DUMMY_PRINT */
+#endif /* LINEAR_TABLING */
   LOCAL_next_free_ans_node = NULL;
   LOCAL_top_sg_fr = NULL; 
   LOCAL_top_dep_fr = GLOBAL_root_dep_fr; 
 #ifdef YAPOR
-  Set_LOCAL_top_cp_on_stack((choiceptr) Yap_LocalBase); /* ??? */
+  LOCAL_top_cp_on_stack = B_BASE; /* ??? */
   LOCAL_top_susp_or_fr = GLOBAL_root_or_fr;
 #endif /* YAPOR */
 #endif /* TABLING */
@@ -210,10 +211,10 @@ void make_root_frames(void) {
   INIT_LOCK(OrFr_lock(or_fr));
   OrFr_alternative(or_fr) = NULL;
   BITMAP_copy(OrFr_members(or_fr), GLOBAL_bm_present_workers);
-  SetOrFr_node(or_fr, (choiceptr) Yap_LocalBase);
+  OrFr_node(or_fr) = B_BASE;
   OrFr_nearest_livenode(or_fr) = NULL;
   OrFr_depth(or_fr) = 0;
-  Set_OrFr_pend_prune_cp(or_fr, NULL);
+  OrFr_pend_prune_cp(or_fr) = NULL;
   OrFr_nearest_leftnode(or_fr) = or_fr;
   OrFr_qg_solutions(or_fr) = NULL;
 #ifdef TABLING_INNER_CUTS
@@ -231,9 +232,8 @@ void make_root_frames(void) {
 
 #ifdef TABLING
   /* root dependency frame */
-  if (!GLOBAL_root_dep_fr) {
+  if (!GLOBAL_root_dep_fr)
     new_dependency_frame(GLOBAL_root_dep_fr, FALSE, NULL, NULL, NULL, NULL, NULL);
-  }
 #endif /* TABLING */
 }
 
@@ -241,9 +241,6 @@ void make_root_frames(void) {
 #ifdef YAPOR
 void init_workers(void) {
   int proc;
-#ifdef THREADS
-  return;
-#endif
   NOfThreads = number_workers;
 #ifdef ACOW
   if (number_workers > 1) {

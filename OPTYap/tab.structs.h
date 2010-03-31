@@ -54,7 +54,7 @@
 ** ---------------------------- */
 
 typedef struct table_entry {
-#if defined(YAPOR) || defined(THREADS)
+#ifdef YAPOR
   lockvar lock;
 #endif /* YAPOR */
   struct pred_entry *pred_entry;
@@ -62,7 +62,7 @@ typedef struct table_entry {
   int pred_arity;
   int mode_flags;
   struct subgoal_trie_node *subgoal_trie;
-  struct subgoal_trie_hash *hash_chain;
+  struct subgoal_hash *hash_chain;
   struct table_entry *next;
 } *tab_ent_ptr;
 
@@ -77,25 +77,12 @@ typedef struct table_entry {
 
 
 
-/* -------------------------------------------------------------------------- **
-**      Structs global_trie_node, subgoal_trie_node and answer_trie_node      **
-** -------------------------------------------------------------------------- */
-
-#ifdef GLOBAL_TRIE
-typedef struct global_trie_node {
-  Term entry;
-  struct global_trie_node *parent;
-  struct global_trie_node *child;
-  struct global_trie_node *next;
-} *gt_node_ptr;
-#endif /* GLOBAL_TRIE */
+/* -------------------------------------------------------- **
+**      Structs subgoal_trie_node and answer_trie_node      **
+** -------------------------------------------------------- */
 
 typedef struct subgoal_trie_node {
-#ifdef GLOBAL_TRIE
-  struct global_trie_node *entry;
-#else
   Term entry;
-#endif /* GLOBAL_TRIE */
 #ifdef TABLE_LOCK_AT_NODE_LEVEL
   lockvar lock;
 #endif /* TABLE_LOCK_AT_NODE_LEVEL */
@@ -109,11 +96,7 @@ typedef struct answer_trie_node {
 #ifdef YAPOR
   int or_arg;               /* u.Otapl.or_arg */
 #endif /* YAPOR */
-#ifdef GLOBAL_TRIE
-  struct global_trie_node *entry;
-#else
   Term entry;
-#endif /* GLOBAL_TRIE */
 #ifdef TABLE_LOCK_AT_NODE_LEVEL
   lockvar lock;
 #endif /* TABLE_LOCK_AT_NODE_LEVEL */
@@ -133,43 +116,28 @@ typedef struct answer_trie_node {
 
 
 
-/* -------------------------------------------------------------------------- **
-**      Structs global_trie_hash, subgoal_trie_hash and answer_trie_hash      **
-** -------------------------------------------------------------------------- */
+/* ---------------------------------------------- **
+**      Structs subgoal_hash and answer_hash      **
+** ---------------------------------------------- */
 
-#ifdef GLOBAL_TRIE
-typedef struct global_trie_hash {
-  /* the first field is used for compatibility **
-  ** with the global_trie_node data structure */
-  Term mark;
-  int number_of_buckets;
-  struct global_trie_node **buckets;
-  int number_of_nodes;
-} *gt_hash_ptr;
-#endif /* GLOBAL_TRIE */
-
-typedef struct subgoal_trie_hash {
+typedef struct subgoal_hash {
   /* the first field is used for compatibility **
   ** with the subgoal_trie_node data structure */
-#ifdef GLOBAL_TRIE
-  struct global_trie_node *mark;
-#else
   Term mark;    
-#endif /* GLOBAL_TRIE */
   int number_of_buckets;
   struct subgoal_trie_node **buckets;
   int number_of_nodes;
-  struct subgoal_trie_hash *next;
+  struct subgoal_hash *next;
 } *sg_hash_ptr;
 
-typedef struct answer_trie_hash {
+typedef struct answer_hash {
   /* the first field is used for compatibility **
   ** with the answer_trie_node data structure  */
   OPCODE mark;
   int number_of_buckets;
   struct answer_trie_node **buckets;
   int number_of_nodes;
-  struct answer_trie_hash *next;
+  struct answer_hash *next;
 } *ans_hash_ptr;
 
 #define Hash_mark(X)            ((X)->mark)
@@ -182,30 +150,58 @@ typedef struct answer_trie_hash {
 
 
 
+/* ----------------------------- **
+**      Struct looping_alts      **
+** ----------------------------- */
+/*
+#ifdef LINEAR_TABLING
+
+typedef struct alternatives {
+  yamop               *alt; 
+  struct alternatives *next;
+} *alternatives_ptr;
+
+#define Alt_alt(X)    ((X)->alt)
+#define Alt_next(X)   ((X)->next)
+
+
+typedef struct loop_answers{
+  struct answer_trie_node *ans; 
+  struct loop_answers     *next;
+} *loop_answers_ptr;
+
+#define Loop_ans(X)   ((X)->ans)
+#define Loop_next(X)  ((X)->next)
+
+#endif  LINEAR_TABLING  
+
+*/
+
+
 /* ------------------------------ **
 **      Struct subgoal_frame      **
 ** ------------------------------ */
 
 typedef struct subgoal_frame {
-#if defined(YAPOR) || defined(THREADS)
-  lockvar lock;
-#endif
 #ifdef YAPOR
+  lockvar lock;
   int generator_worker;
   struct or_frame *top_or_frame_on_generator_branch;
 #endif /* YAPOR */
   yamop *code_of_subgoal;
   enum {
-    incomplete      = 0,  /* INCOMPLETE_TABLING */
-    ready           = 1,
-    evaluating      = 2,
-    complete        = 3,
-    complete_in_use = 4,  /* LIMIT_TABLING */
-    compiled        = 5,
-    compiled_in_use = 6   /* LIMIT_TABLING */
+    incomplete          = 0,  /* INCOMPLETE_TABLING */
+    ready               = 1,
+    evaluating          = 2,
+    looping_ready       = 3,  /* LINEAR_TABLING */
+    looping_evaluating  = 4,  /* LINEAR_TABLING */
+    complete            = 5,
+    complete_in_use     = 6,  /* LIMIT_TABLING */
+    compiled            = 7,
+    compiled_in_use     = 8   /* LIMIT_TABLING */
   } state_flag;  /* do not change order !!! */
   choiceptr generator_choice_point;
-  struct answer_trie_hash *hash_chain;
+  struct answer_hash *hash_chain;
   struct answer_trie_node *answer_trie;
   struct answer_trie_node *first_answer;
   struct answer_trie_node *last_answer;
@@ -215,8 +211,41 @@ typedef struct subgoal_frame {
 #ifdef LIMIT_TABLING
   struct subgoal_frame *previous;
 #endif /* LIMIT_TABLING */
+#ifdef LINEAR_TABLING
+#ifdef DUMMY_PRINT
+  int nr_looping_answers;
+  int nr_trie_answers;
+  int nr_opt_trie;
+  int nr_opt_loop;  
+#endif /*DUMMY_PRINT */
+  int dfn;
+  yamop **current_looping_alt;
+  yamop **stop_looping_alt;
+  struct answer_trie_node **stop_looping_ans;
+  struct answer_trie_node **current_looping_ans;
+  int consuming_answers;
+  struct answer_trie_node *new_answer_trie;
+  struct subgoal_frame *next_on_branch;
+  struct subgoal_frame *next_on_scc;
+#ifdef LINEAR_TABLING_DRA
+    yamop *current_alt; 
+#endif /*LINEAR_TABLING_DRA */
+#ifdef LINEAR_TABLING_FOLLOWER
+  yamop *next_alt;
+  struct choicept *pioneer;
+#endif /* LINEAR_TABLING_FOLLOWER */
+  yamop  *loop_alts;
+  struct answer_trie_node *loop_ans;
+
+#endif /* LINEAR_TABLING */
   struct subgoal_frame *next;
 } *sg_fr_ptr;
+
+
+
+
+#define SgFr_loop_alts(X)      ((X)->loop_alts)
+
 
 #define SgFr_lock(X)           ((X)->lock)
 #define SgFr_gen_worker(X)     ((X)->generator_worker)
@@ -234,6 +263,39 @@ typedef struct subgoal_frame {
 #define SgFr_previous(X)       ((X)->previous)
 #define SgFr_next(X)           ((X)->next)
 
+#ifdef DUMMY_PRINT
+#define SgFr_nr_opt_trie(X)          ((X)->nr_opt_trie)
+#define SgFr_nr_opt_loop(X)           ((X)->nr_opt_loop)  
+#define SgFr_nr_looping_answers(X)    ((X)->nr_looping_answers)
+#define SgFr_nr_trie_answers(X)       ((X)->nr_trie_answers)
+#endif /*DUMMY_PRINT */
+
+#define SgFr_new_answer_trie(X)        ((X)->new_answer_trie)
+
+#define SgFr_dfn(X)                    ((X)->dfn)
+
+#define SgFr_current_alt(X)            ((X)->current_alt)
+#define SgFr_next_alt(X)               ((X)->next_alt)
+
+#define SgFr_current_loop_alt(X)       ((X)->current_looping_alt)
+#define SgFr_stop_loop_alt(X)          ((X)->stop_looping_alt)
+
+#define SgFr_consuming_answers(X)      ((X)->consuming_answers)
+
+//#define SgFr_first_loop_ans(X)         ((X)->first_looping_ans)
+#define SgFr_loop_ans(X)               ((X)->loop_ans)
+
+#define SgFr_stop_loop_ans(X)          ((X)->stop_looping_ans)
+#define SgFr_current_loop_ans(X)       ((X)->current_looping_ans)
+
+#define SgFr_next_on_branch(X)         ((X)->next_on_branch)
+#define SgFr_next_on_scc(X)            ((X)->next_on_scc)
+
+#define SgFr_pioneer(X)                ((X)->pioneer)
+
+
+
+
 /* ------------------------------------------------------------------------------------------- **
    SgFr_lock:          spin-lock to modify the frame fields.
    SgFr_gen_worker:    the id of the worker that had allocated the frame.
@@ -246,7 +308,7 @@ typedef struct subgoal_frame {
    SgFr_arity          the arity of the subgoal.
    SgFr_state:         a flag that indicates the subgoal state.
    SgFr_gen_cp:        a pointer to the correspondent generator choice point.
-   SgFr_hash_chain:    a pointer to the first answer_trie_hash struct for the subgoal in hand.
+   SgFr_hash_chain:    a pointer to the first answer_hash struct for the subgoal in hand.
    SgFr_answer_trie:   a pointer to the top answer trie node.
                        It is used to check for/insert new answers.
    SgFr_first_answer:  a pointer to the bottom answer trie node of the first available answer.
@@ -265,10 +327,8 @@ typedef struct subgoal_frame {
 ** --------------------------------- */
 
 typedef struct dependency_frame {
-#if defined(YAPOR) || defined(THREADS)
-  lockvar lock;
-#endif
 #ifdef YAPOR
+  lockvar lock;
   int leader_dependency_is_on_stack;
   struct or_frame *top_or_frame;
 #ifdef TIMESTAMP_CHECK
@@ -385,3 +445,4 @@ struct loader_choicept {
   struct pred_entry *cp_pred_entry;
 #endif /* LOW_LEVEL_TRACER */
 };
+
