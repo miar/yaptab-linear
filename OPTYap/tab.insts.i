@@ -408,8 +408,9 @@
 #define remove_next(SG_FR){                                        \
      if(B !=SgFr_gen_cp(LOCAL_top_sg_fr)){	                   \
         printf("nao devia acontecer\n"); 			   \
-    }							           \
-    LOCAL_top_sg_fr= SgFr_next(LOCAL_top_sg_fr);		   \
+     }else{							   \
+       LOCAL_top_sg_fr= SgFr_next(LOCAL_top_sg_fr);		   \
+    }                \
    }
 
 
