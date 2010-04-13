@@ -439,9 +439,7 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 	SgFr_new_answer_trie(SG_FR) = NULL;                                 \
 	SgFr_init_follower_fields(SG_FR);                                   \
 	SgFr_init_dra_fields(SG_FR);                                        \
-	SgFr_init_batched_fields(SG_FR);	                            \
-	SgFr_next_on_branch(SG_FR) = LOCAL_top_sg_fr_on_branch;             \
-        LOCAL_top_sg_fr_on_branch = SG_FR
+	SgFr_init_batched_fields(SG_FR);	                            
 
                             
 #endif /*DUMMY_PRINT */
@@ -454,8 +452,6 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
         { SgFr_init_yapor_fields(SG_FR);                           \
           SgFr_state(SG_FR) = evaluating;                          \
 	  SgFr_init_linear_tabling_fields(SG_FR);		   \
-	  /*SgFr_next(SG_FR) = LOCAL_top_sg_fr;*/   		   \
-          /*LOCAL_top_sg_fr = SG_FR;*/				   \
 	}
 
 

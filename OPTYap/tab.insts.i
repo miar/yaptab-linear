@@ -2127,8 +2127,6 @@
 	INFO_LINEAR_TABLING("is_leader and has new answers");
 #ifdef LINEAR_TABLING_BATCHED
 	if(SgFr_current_loop_alt(sg_fr)==SgFr_stop_loop_alt(sg_fr) && SgFr_batched_consuming_answers(sg_fr)==0){  
-#else
-        if(SgFr_current_loop_alt(sg_fr)==SgFr_stop_loop_alt(sg_fr)){  
 #endif
 	  /*reset dependant subgoals */
 	  while(LOCAL_max_scc !=sg_fr){                        
@@ -2143,8 +2141,8 @@
 	    restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
 	    batched_consume_first_answer(sg_fr);
 	  }
-#endif	/* LINEAR_TABLING_BATCHED */ 
-	}	
+	}
+#endif	/* LINEAR_TABLING_BATCHED */ 		
 	UNTAG_NEW_ANSWERS(sg_fr);
 	SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr);
 #ifdef LINEAR_TABLING_BATCHED

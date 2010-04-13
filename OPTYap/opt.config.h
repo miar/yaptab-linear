@@ -38,7 +38,7 @@
 
 #define LINEAR_TABLING 1 
 
-//#define LINEAR_TABLING_BATCHED 1
+#define LINEAR_TABLING_BATCHED 1
 
 /* ------------------------------------------------------ **
 **      linear tabling strategy                           **
