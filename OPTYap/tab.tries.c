@@ -1019,6 +1019,7 @@ void load_answer_trie(ans_node_ptr ans_node, CELL *subs_ptr) {
     CELL *subs_var = (CELL *) *(subs_ptr + i);
     t = STACK_POP_DOWN(stack_terms);
     Bind(subs_var, t);
+    //INFO_LINEAR_TABLING("load_answer from trie --> %d",IntOfTerm(*subs_var));  //make sure it is int
   }
 
 #ifdef TABLING_ERRORS
@@ -1046,7 +1047,7 @@ void private_completion(sg_fr_ptr sg_fr) {
 
   insert_into_global_sg_fr_list(aux_sg_fr);
 #else
-  INFO_LINEAR_TABLING("PRIVATE COMPLETION ");
+  INFO_LINEAR_TABLING("private completion ");
 
 #ifndef LINEAR_TABLING
   while (LOCAL_top_sg_fr != sg_fr) {
@@ -1056,9 +1057,8 @@ void private_completion(sg_fr_ptr sg_fr) {
   mark_as_completed(LOCAL_top_sg_fr);
   LOCAL_top_sg_fr = SgFr_next(LOCAL_top_sg_fr);
 #else
-  INFO_LINEAR_TABLING("LOCAL_MAX_SCC= %p", LOCAL_max_scc);
   while (LOCAL_max_scc != sg_fr) {
-    INFO_LINEAR_TABLING("LOCAL_MAX_SCC= %p", LOCAL_max_scc);
+    INFO_LINEAR_TABLING("(while)LOCAL_MAX_SCC= %p", LOCAL_max_scc);
     mark_as_completed(LOCAL_max_scc);
 #ifdef DUMMY_PRINT
     LOCAL_nr_looping_answers=LOCAL_nr_looping_answers+SgFr_nr_looping_answers(LOCAL_max_scc);
@@ -1067,6 +1067,7 @@ void private_completion(sg_fr_ptr sg_fr) {
 #endif /* DUMMY_PRINT */
     LOCAL_max_scc = SgFr_next_on_scc(LOCAL_max_scc);    
   }
+  INFO_LINEAR_TABLING("LOCAL_MAX_SCC= %p", LOCAL_max_scc);
   mark_as_completed(LOCAL_max_scc);
 #ifdef DUMMY_PRINT
   LOCAL_nr_looping_answers=LOCAL_nr_looping_answers+SgFr_nr_looping_answers(LOCAL_max_scc); 
@@ -1074,8 +1075,6 @@ void private_completion(sg_fr_ptr sg_fr) {
   LOCAL_opt_loop=LOCAL_opt_loop+SgFr_nr_opt_loop(LOCAL_max_scc);
 #endif /*DUMMY_PRINT */
   LOCAL_max_scc = SgFr_next_on_scc(LOCAL_max_scc);
-  //  LOCAL_top_sg_fr = LOCAL_max_scc;
-     
 #endif
 
 
@@ -1262,7 +1261,7 @@ static struct trie_statistics{
 
 void traverse_table(tab_ent_ptr tab_ent, int show_table) {
   sg_node_ptr sg_node = TrNode_child(TabEnt_subgoal_trie(tab_ent));
-
+  //INFO_LINEAR_TABLING("traverse_table ");
   TrStat_show = show_table;
   TrStat_subgoals = 0;
   TrStat_sg_incomplete = 0;
@@ -1291,6 +1290,7 @@ void traverse_table(tab_ent_ptr tab_ent, int show_table) {
     } else {
       sg_fr_ptr sg_fr = (sg_fr_ptr) sg_node;
       TrStat_subgoals++;
+      //INFO_LINEAR_TABLING("sg_fr=%p  state=%d",sg_fr,SgFr_state(sg_fr));
       TrStat_sg_linear_nodes = TrStat_sg_min_depth = TrStat_sg_max_depth = 0;
       SHOW_TABLE("  ?- %s.\n", AtomName(TabEnt_atom(tab_ent)));
       TrStat_ans_nodes++;
@@ -1299,18 +1299,23 @@ void traverse_table(tab_ent_ptr tab_ent, int show_table) {
 	if (SgFr_state(sg_fr) < complete) {
 	  TrStat_sg_incomplete++;
 	  SHOW_TABLE("    ---> INCOMPLETE\n");
+	  //INFO_LINEAR_TABLING("INCOMPLETE");
 	} else {
 	  TrStat_answers_no++;
+	  INFO_LINEAR_TABLING("NO");
 	  SHOW_TABLE("    NO\n");
 	}
       } else {  /* SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr) */
 	TrStat_answers_yes++;
 	TrStat_answers++;
+	//INFO_LINEAR_TABLING("TRUE");
 	SHOW_TABLE("    TRUE\n");
       }
     }
-  } else
+  } else{
+    //INFO_LINEAR_TABLING("EMPTY");
     SHOW_TABLE("  EMPTY\n");
+  }
   return;
 }
 

@@ -1232,7 +1232,10 @@ fix_tabling_info(void)
   }
   sg = LOCAL_top_sg_fr;
   while (sg) {
-    SgFr_gen_cp(sg) = GeneratorChoicePtrAdjust(SgFr_gen_cp(sg));
+    SgFr_gen_cp(sg)  = GeneratorChoicePtrAdjust(SgFr_gen_cp(sg));
+#ifdef LINEAR_TABLING_FOLLOWER
+    SgFr_pioneer(sg) = GeneratorChoicePtrAdjust(SgFr_pioneer(sg));
+#endif /*LINEAR_TABLING_FOLLOWER */
     sg = SgFr_next(sg);
   }
 }

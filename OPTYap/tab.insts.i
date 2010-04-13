@@ -276,6 +276,40 @@
 
 #ifdef LINEAR_TABLING
 
+
+#ifdef LINEAR_TABLING_BATCHED
+#define batched_consume_first_answer(sg_fr)                           \
+  {   SgFr_batched_ans(sg_fr)=SgFr_first_answer(sg_fr);               \
+      INFO_LINEAR_TABLING("batched consume first_answer");	      \
+      if (SgFr_batched_ans(sg_fr)!=NULL){                             \
+	if (SgFr_batched_ans(sg_fr) == SgFr_answer_trie(sg_fr)) {     \
+         /* yes answer --> procceed*/	                              \
+          INFO_LINEAR_TABLING("yes answer -->proceed");               \
+	  PREG = (yamop *) CPREG;                                     \
+	  PREFETCH_OP(PREG);                                          \
+	  YENV = ENV;                                                 \
+	  GONext() ;                                                  \
+	}else{	                                                      \
+          INFO_LINEAR_TABLING("consume answer");                      \
+	  PREG = (yamop *) CPREG;                                     \
+	  PREFETCH_OP(PREG);                                          \
+	  CELL *subs_ptr;                                             \
+	  subs_ptr = (CELL *) (GEN_CP(B) + 1);                        \
+	  subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);                \
+	  load_answer_trie(SgFr_batched_ans(sg_fr), subs_ptr);        \
+	  YENV = ENV;                                                 \
+	  GONext();                                                   \
+	}                                                             \
+      }                                                               \
+    }
+   
+#else  /*! LINEAR_TABLING_BATCHED */
+#define batched_consume_first_answer(sg_fr)
+
+#endif /*LINEAR_TABLING_BATCHED */
+
+
+
 #ifdef DUMMY_PRINT
 #define consume_answers(tab_ent,sg_fr)                        \
       ans_node_ptr ans_node;                                  \
@@ -372,9 +406,9 @@
 
 
 #define remove_next(SG_FR){                                        \
-    if(B !=SgFr_gen_cp(LOCAL_top_sg_fr)){	                   \
-        printf("nao devia acontecer\n");                           \
-    }                                                              \
+     if(B !=SgFr_gen_cp(LOCAL_top_sg_fr)){	                   \
+        printf("nao devia acontecer\n"); 			   \
+    }							           \
     LOCAL_top_sg_fr= SgFr_next(LOCAL_top_sg_fr);		   \
    }
 
@@ -399,6 +433,7 @@
           if (SgFr_current_loop_alt(SG_FR)==NULL) {	  		       	              \
 	    SgFr_current_loop_alt(SG_FR)= SgFr_loop_alts(SG_FR);	                      \
 	    SET_CELL_VALUE(SgFr_current_loop_alt(SG_FR),pc);                                  \
+   	    INFO_LINEAR_TABLING("add_alternative=%p",pc);                                     \
           } else if (GET_CELL_VALUE(SgFr_current_loop_alt(SG_FR))!= pc) {                     \
             SgFr_current_loop_alt(SG_FR)++;                                                   \
    	    if (IS_JUMP_CELL(SgFr_current_loop_alt(SG_FR))){                                  \
@@ -408,6 +443,7 @@
               SgFr_current_loop_alt(SG_FR)=nb;					              \
 	    }                                                                                 \
 	    SET_CELL_VALUE(SgFr_current_loop_alt(SG_FR),pc);	                              \
+	    INFO_LINEAR_TABLING("add_alternative=%p",pc);		                      \
           }                                                                                   \
 	}
 
@@ -463,7 +499,9 @@
 #define propagate_dependencies(SG_FR)					                     \
 	{ sg_fr_ptr sf_aux=LOCAL_top_sg_fr_on_branch;                                        \
     	  int dfn=GET_SGFR_DFN(SG_FR);                                                       \
+	  INFO_LINEAR_TABLING("propagate dependencies upto to sg_fr=%p",SG_FR);              \
           while(sf_aux && (GET_SGFR_DFN(sf_aux) >dfn ||SgFr_consuming_answers(sf_aux)==2)) { \
+   	    INFO_LINEAR_TABLING("sgfr_aux=%p",sf_aux);                                       \
             TAG_AS_NO_LEADER(sf_aux);					                     \
 	    if(SgFr_consuming_answers(sf_aux)==2){                                           \
                 add_answer(sf_aux,SgFr_new_answer_trie(sf_aux));                             \
@@ -679,6 +717,7 @@
       init_subgoal_frame(sg_fr);
       UNLOCK(SgFr_lock(sg_fr));
 #ifdef LINEAR_TABLING
+      add_branch(sg_fr);
       add_max_scc(sg_fr);
       add_next(sg_fr);
       store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
@@ -730,6 +769,8 @@
       SgFr_pioneer(sg_fr)=B;
 #endif  /*LINEAR_TABLING_FOLLOWER*/
       SgFr_state(sg_fr) = looping_evaluating; 
+      batched_consume_first_answer(sg_fr);
+      /*else */
       SgFr_stop_loop_alt(LOCAL_max_scc)=SgFr_current_loop_alt(LOCAL_max_scc);
       PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
       PREFETCH_OP(PREG);
@@ -834,6 +875,7 @@
       init_subgoal_frame(sg_fr);
       UNLOCK(SgFr_lock(sg_fr));
 #ifdef LINEAR_TABLING
+      add_branch(sg_fr);
       add_max_scc(sg_fr);
       add_next(sg_fr);
 #ifdef LINEAR_TABLING_FOLLOWER
@@ -882,6 +924,8 @@
       SgFr_pioneer(sg_fr)=B;
 #endif /*LINEAR_TABLING_FOLLOWER */
       SgFr_state(sg_fr) = looping_evaluating; 
+      batched_consume_first_answer(sg_fr);
+      /*else */
       SgFr_stop_loop_alt(LOCAL_max_scc)=SgFr_current_loop_alt(LOCAL_max_scc);
       PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
       PREFETCH_OP(PREG);
@@ -1016,6 +1060,7 @@
       init_subgoal_frame(sg_fr);
       UNLOCK(SgFr_lock(sg_fr));
 #ifdef LINEAR_TABLING
+      add_branch(sg_fr);
       add_max_scc(sg_fr);
       add_next(sg_fr);
 #ifdef LINEAR_TABLING_FOLLOWER
@@ -1063,6 +1108,8 @@
       SgFr_pioneer(sg_fr)=B;
 #endif /*LINEAR_TABLING_FOLLOWER */
       SgFr_state(sg_fr) = looping_evaluating; 
+      batched_consume_first_answer(sg_fr);
+      /*else */
       SgFr_stop_loop_alt(LOCAL_max_scc)=SgFr_current_loop_alt(LOCAL_max_scc);
       PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
       PREFETCH_OP(PREG);
@@ -1510,9 +1557,11 @@
       SgFr_last_answer(sg_fr) = ans_node;
 #ifdef LINEAR_TABLING
       //add_answer(sg_fr,ans_node);
+#ifdef LINEAR_TABLING_DRS
       if (SgFr_new_answer_trie(sg_fr)==NULL){
 	SgFr_new_answer_trie(sg_fr)=ans_node;
       }
+#endif /*LINEAR_TABLING_DRS*/
 #ifdef DUMMY_PRINT
       LOCAL_total_trie_answers++;
 #endif /*DUMMY_PRINT */
@@ -1531,7 +1580,7 @@
       }
 #endif /* TABLING_ERRORS */
       UNLOCK(SgFr_lock(sg_fr));
-      if (0 && IS_BATCHED_GEN_CP(gcp)) {
+      if (IS_BATCHED_GEN_CP(gcp)) {
 
 
 #if defined(TABLING_EARLY_COMPLETION) && !defined(LINEAR_TABLING) 
@@ -1883,6 +1932,47 @@
 #ifdef LINEAR_TABLING
 { 
   sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;       
+  INFO_LINEAR_TABLING("sg_fr=%p",sg_fr);
+
+#ifdef LINEAR_TABLING_BATCHED    
+  if(SgFr_batched_ans(sg_fr)!=NULL){
+    INFO_LINEAR_TABLING("batched answer");        
+    if(SgFr_batched_ans(sg_fr)!=SgFr_last_answer(sg_fr)){
+      INFO_LINEAR_TABLING("batched_ans !=last_answ");
+      SgFr_batched_ans(sg_fr)=TrNode_child(SgFr_batched_ans(sg_fr));
+      restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+      PREG = (yamop *) CPREG;
+      PREFETCH_OP(PREG);
+      CELL *subs_ptr;
+      subs_ptr = (CELL *) (GEN_CP(B) + 1);          
+      subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
+      load_answer_trie(SgFr_batched_ans(sg_fr), subs_ptr);    
+      YENV = ENV;
+      GONext();
+    }else{
+      INFO_LINEAR_TABLING("no more answers to consume");
+      SgFr_batched_ans(sg_fr)=NULL;
+      if(!IS_LEADER(sg_fr)){
+	restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+	SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr);
+	YENV = (CELL *) PROTECT_FROZEN_B(B);
+	set_cut(YENV, B->cp_b);
+	SET_BB(NORM_CP(YENV));
+	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+	PREFETCH_OP(PREG);
+	allocate_environment();
+	GONext();
+      }
+      /*computation on leader nodes follows to standard dra execution */
+      
+    }
+  }
+#endif /*LINEAR_TABLING_BATCHED */
+
+
+
+
+
 
 #if defined(LINEAR_TABLING_FOLLOWER)
   if (SgFr_next_alt(sg_fr)!=NULL){
@@ -1996,7 +2086,7 @@
       TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
       UNTAG_NEW_ANSWERS(sg_fr);
     }
-    
+    remove_next(sg_fr);
     SgFr_consuming_answers(sg_fr)=0;      
     B = B->cp_b;
     SET_BB(PROTECT_FROZEN_B(B));
@@ -2010,7 +2100,9 @@
     if (SgFr_current_loop_alt(sg_fr) != NULL) 
 #endif /*LINEAR_TABLING_DRA*/
       {
-      if (SgFr_state(sg_fr) == evaluating){	   
+      if (SgFr_state(sg_fr) == evaluating){
+
+	/*first time on table completion */	   
 	SgFr_state(sg_fr) = looping_evaluating;  
 	if (!IS_LEADER(sg_fr))	  
 	  remove_branch(sg_fr);
@@ -2018,32 +2110,55 @@
 	SgFr_current_loop_alt(sg_fr)++;
 	ALT_TAG_AS_JUMP_CELL(SgFr_current_loop_alt(sg_fr),SgFr_stop_loop_alt(sg_fr));
 	SgFr_current_loop_alt(sg_fr)=SgFr_stop_loop_alt(sg_fr);
-	//	SgFr_current_loop_alt(sg_fr) = SgFr_stop_loop_alt(sg_fr) = Alt_next(SgFr_current_loop_alt(sg_fr));
-      } else {   
-	SgFr_current_loop_alt(sg_fr)++;
-	if (IS_JUMP_CELL(SgFr_current_loop_alt(sg_fr))){
-	  ALT_JUMP_NEXT_CELL(SgFr_current_loop_alt(sg_fr));	  
-	}
-	//SgFr_current_loop_alt(sg_fr) = Alt_next(SgFr_current_loop_alt(sg_fr));
+      } else { 
+  	/*get next alternative  */
+#ifdef LINEAR_TABLING_BATCHED
+	if (SgFr_batched_consuming_answers(sg_fr)==0)
+#endif /*LINEAR_TABLING_BATCHED */
+	   {
+	     SgFr_current_loop_alt(sg_fr)++;
+	     if (IS_JUMP_CELL(SgFr_current_loop_alt(sg_fr))){
+	      ALT_JUMP_NEXT_CELL(SgFr_current_loop_alt(sg_fr));	  
+	    }
+	  }
       }
-      
+	
       if (IS_LEADER(sg_fr) && HAS_NEW_ANSWERS(sg_fr) ) {  
 	INFO_LINEAR_TABLING("is_leader and has new answers");
+#ifdef LINEAR_TABLING_BATCHED
+	if(SgFr_current_loop_alt(sg_fr)==SgFr_stop_loop_alt(sg_fr) && SgFr_batched_consuming_answers(sg_fr)==0){  
+#else
+        if(SgFr_current_loop_alt(sg_fr)==SgFr_stop_loop_alt(sg_fr)){  
+#endif
+	  /*reset dependant subgoals */
+	  while(LOCAL_max_scc !=sg_fr){                        
+	    SgFr_state(LOCAL_max_scc) = looping_ready;
+	    INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
+	    LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
+	  }
+#ifdef LINEAR_TABLING_BATCHED
+	  /*consume trie answers- if any */	  
+	  if(SgFr_first_answer(sg_fr)!=NULL){
+	    SgFr_batched_consuming_answers(sg_fr)=2;
+	    restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+	    batched_consume_first_answer(sg_fr);
+	  }
+#endif	/* LINEAR_TABLING_BATCHED */ 
+	}	
 	UNTAG_NEW_ANSWERS(sg_fr);
-	SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr);
-	while(LOCAL_max_scc !=sg_fr) {                        
-	  SgFr_state(LOCAL_max_scc) = looping_ready;
-	  LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);	 
-	}
+	SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr);
+#ifdef LINEAR_TABLING_BATCHED
+	SgFr_batched_consuming_answers(sg_fr)=0;
+#endif /*LINEAR_TABLING_BATCHED */
 	restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
 	YENV = (CELL *) PROTECT_FROZEN_B(B);
 	set_cut(YENV, B->cp_b);
 	SET_BB(NORM_CP(YENV));
 	allocate_environment();
 	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
-
+	INFO_LINEAR_TABLING("current_alt=%p",PREG);
 	PREFETCH_OP(PREG);
-	GONext();    
+	GONext();          
       }
       
       if (SgFr_current_loop_alt(sg_fr) != SgFr_stop_loop_alt(sg_fr) ) {  
@@ -2054,6 +2169,7 @@
 	SET_BB(NORM_CP(YENV));
 	allocate_environment();
 	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+	INFO_LINEAR_TABLING("current_alt=%p",PREG);
 	PREFETCH_OP(PREG);
 	GONext();    
       }
@@ -2261,9 +2377,9 @@
       SgFr_state(sg_fr) = looping_evaluating;
 #endif /*LINEAR_TABLING_FOLLOWER */
 
-      //if (IS_BATCHED_GEN_CP(B)) {
-      if (0 && IS_BATCHED_GEN_CP(B)) {    //BEFORE BATCHED
+      if (IS_BATCHED_GEN_CP(B)) {
         /* backtrack */
+	remove_next(sg_fr);
         B = B->cp_b;
         SET_BB(PROTECT_FROZEN_B(B));
         goto fail;
@@ -2300,12 +2416,14 @@
 	  if (SgFr_new_answer_trie(sg_fr) == SgFr_answer_trie(sg_fr)) {
 	    // yes answer --> procceed 
 	    if(sg_fr==LOCAL_top_sg_fr_on_branch){
+	      remove_next(sg_fr);
 	      remove_branch(sg_fr);	     	   
 	    }
 	    if(HAS_NEW_ANSWERS(sg_fr)){
 	      TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
 	      UNTAG_NEW_ANSWERS(sg_fr);
-	    }	    
+	    }
+	    remove_next(sg_fr);
 	    pop_generator_node(SgFr_arity(sg_fr));
 	    PREG = (yamop *) CPREG;
 	    PREFETCH_OP(PREG);
@@ -2334,6 +2452,7 @@
 	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
 	  UNTAG_NEW_ANSWERS(sg_fr);
 	}
+	remove_next(sg_fr);
 	B = B->cp_b;
 	SET_BB(PROTECT_FROZEN_B(B));
 	goto fail;                  
@@ -2534,9 +2653,10 @@ complete_all:
       sg_fr = GEN_CP(B)->cp_sg_fr;
       private_completion(sg_fr);
  
-      if (0 && IS_BATCHED_GEN_CP(B)) {
+      if (IS_BATCHED_GEN_CP(B)) {
         /* backtrack */
         B = B->cp_b;
+	remove_next(sg_fr);
         SET_BB(PROTECT_FROZEN_B(B));
         goto fail;
       } else {

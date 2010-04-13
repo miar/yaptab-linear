@@ -237,11 +237,21 @@ typedef struct subgoal_frame {
   yamop  *loop_alts;
   struct answer_trie_node *loop_ans;
 
+#ifdef LINEAR_TABLING_BATCHED 
+  struct answer_trie_node *batched_ans;
+  int batched_consuming_answers;
+#endif /*LINEAR_TABLING_BATCHED */
+
+
 #endif /* LINEAR_TABLING */
   struct subgoal_frame *next;
 } *sg_fr_ptr;
 
 
+
+#define SgFr_batched_consuming_answers(X)  ((X)->batched_consuming_answers)
+
+#define SgFr_batched_ans(X)                ((X)->batched_ans)
 
 
 #define SgFr_loop_alts(X)      ((X)->loop_alts)
