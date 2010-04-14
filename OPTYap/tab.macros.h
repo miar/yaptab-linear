@@ -753,10 +753,10 @@ void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
 static inline
 void abolish_incomplete_subgoals(choiceptr prune_cp) {
   //  INFO_LINEAR_TABLING("abolish_incomplete_subgoals");
-  /*
+
 #ifdef LINEAR_TABLING_BATCHED
-  return;
-#endif LINEAR_TABLING_BATCHED */
+    return;
+#endif LINEAR_TABLING_BATCHED 
 
 #ifndef LINEAR_TABLING
 
@@ -793,7 +793,7 @@ void abolish_incomplete_subgoals(choiceptr prune_cp) {
     if(sg_fr==LOCAL_top_sg_fr_on_branch)
       LOCAL_top_sg_fr_on_branch=SgFr_next_on_branch(LOCAL_top_sg_fr_on_branch);
     //SET_SGFR_DFN(sg_fr,0);			            
-    //TAG_AS_LEADER(sg_fr);   
+    //TAG_AS_LEADER(sg_fr);  
     free_alternatives(sg_fr);
     free_drs_answers(sg_fr);                                            
 #endif /*LINEAR_TABLING */

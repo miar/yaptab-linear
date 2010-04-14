@@ -375,6 +375,12 @@
 }
 
 
+#ifdef LINEAR_TABLING_BATCHED
+#define add_next(SG_FR)
+#define add_next_follower(SG_FR)
+#define remove_next(SG_FR)
+#else
+
 #define add_next(SG_FR){                                           \
        if(SG_FR!=LOCAL_top_sg_fr){                                 \
 	 SgFr_next(SG_FR) = LOCAL_top_sg_fr;   		           \
@@ -413,7 +419,7 @@
     }                \
    }
 
-
+#endif /*LINEAR_TABLING_BATCHED */
 
 
 
