@@ -404,7 +404,7 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
         SgFr_current_alt(SG_FR) = NULL;                     
 #else
 #define SgFr_init_dra_fields(SG_FR)
-#endif /* LINEAR_TABLING_BASIC */
+#endif /* LINEAR_TABLING_DRA */
 
 #ifdef DUMMY_PRINT
 #define SgFr_init_linear_tabling_fields(SG_FR)   	         \
@@ -756,7 +756,7 @@ void abolish_incomplete_subgoals(choiceptr prune_cp) {
 
 #ifdef LINEAR_TABLING_BATCHED
     return;
-#endif LINEAR_TABLING_BATCHED 
+#endif /*LINEAR_TABLING_BATCHED */
 
 #ifndef LINEAR_TABLING
 

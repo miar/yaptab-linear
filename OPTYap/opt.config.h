@@ -35,10 +35,12 @@
 ** ----------------------------------- */
 
 //#define DEBUG_LINEAR_TABLING 1  
+//#define DUMMY_PRINT        1
+
 
 #define LINEAR_TABLING 1 
 
-#define LINEAR_TABLING_BATCHED 1
+//#define LINEAR_TABLING_BATCHED 1
 
 /* ------------------------------------------------------ **
 **      linear tabling strategy                           **
@@ -50,13 +52,11 @@
 **      DRS- Dynamic Reordering of Solutions (optional)   **
 ** ------------------------------------------------------ */
 
-#define LINEAR_TABLING_BASIC 1  
-//#define LINEAR_TABLING_DRA 1  
-//#define LINEAR_TABLING_FOLLOWER 1 
+#define LINEAR_TABLING_DRA 1  
+#define LINEAR_TABLING_FOLLOWER 1 
 
-//#define LINEAR_TABLING_DRS     1
+#define LINEAR_TABLING_DRS     1
 
-//#define DUMMY_PRINT        1
 
 #define MAX_LOOP_ALT_BUCKET   10
 
@@ -278,24 +278,8 @@
 #endif /* YAPOR_ERRORS && TABLING_ERRORS */
 
 
-#ifdef LINEAR_TABLING
-#if defined(LINEAR_TABLING_FOLLOWER) && !defined(LINEAR_TABLING_BASIC) && !defined(LINEAR_TABLING_DRA)
-#define LINEAR_TABLING_BASIC
-#endif /*defined(LINEAR_TABLING_FOLLOWER) && !defined(LINEAR_TABLING_BASIC) && !defined(LINEAR_TABLING_DRA) */
 
-#if (defined(LINEAR_TABLING_DRA) && defined(LINEAR_TABLING_BASIC))
-#error Please define a linear tabling strategy (supported modes:dra,basic,dra+follower,follower (basic mode))
-#endif /*(defined(LINEAR_TABLING_DRA) && defined(LINEAR_TABLING_BASIC)) */
 
-#if (!defined(LINEAR_TABLING_DRA) && !defined(LINEAR_TABLING_BASIC) && !defined(LINEAR_TABLING_FOLLOWER))
-#error Please define a linear tabling strategy (supported modes:dra,basic,dra+follower,follower (basic mode))
-#endif /*(!defined(LINEAR_TABLING_DRA) && !defined(LINEAR_TABLING_BASIC) && !defined(LINEAR_TABLING_FOLLOWER))*/
-
-#else
-#undef LINEAR_TABLING_DRA
-#undef LINEAR_TABLING_FOLLOWER
-#undef LINEAR_TABLING_BASIC
-#endif /* LINEAR_TABLING */
 
 
 
