@@ -188,6 +188,10 @@ void Yap_init_local(void) {
   LOCAL_total_trie_answers=0;
   LOCAL_nr_looping_answers=0;
   LOCAL_nr_consumers=0;
+  LOCAL_nr_generators=0;
+  LOCAL_nr_propagate_depen_cicles=0;
+  LOCAL_nr_is_leader_and_has_new_answers=0;
+  LOCAL_nr_of_followers=0;
 #endif /*DUMMY_PRINT */
 #endif /* LINEAR_TABLING */
   LOCAL_next_free_ans_node = NULL;
