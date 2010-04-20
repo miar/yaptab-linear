@@ -777,10 +777,9 @@ Int p_show_all_tables(void) {
 static
 Int p_print_drs_opt(void) {
   fprintf(Yap_stdout,"|-------------------------------------------------------------------------\n");
-  fprintf(Yap_stdout,"| Nr of followers                         = %d \n", LOCAL_nr_followers);  
-  fprintf(Yap_stdout,"| Nr of generators                        = %d \n", LOCAL_nr_generators-LOCAL_nr_followers);
-  fprintf(Yap_stdout,"| Nr of consumers                         = %d \n", LOCAL_nr_consumers);
-  fprintf(Yap_stdout,"| Nr of loaders                           = %d \n", LOCAL_nr_loaders); 
+  fprintf(Yap_stdout,"| Nr of all follower  nodes               = %d \n", LOCAL_nr_followers);  
+  fprintf(Yap_stdout,"| Nr of all generator nodes               = %d \n", LOCAL_nr_generators-LOCAL_nr_followers);
+  fprintf(Yap_stdout,"| Nr of all consumer  nodes               = %d \n", LOCAL_nr_consumers);
   fprintf(Yap_stdout,"| Nr of consumed answers                  = %d \n", LOCAL_nr_consumed_answers); //not drs->load_answer_trie.  drs->inside code
   fprintf(Yap_stdout,"| Nr of consumed alternatives             = %d \n", LOCAL_nr_consumed_alternatives);
   fprintf(Yap_stdout,"| Nr of propagate dependencies cicles     = %d \n", LOCAL_nr_propagate_depen_cicles);

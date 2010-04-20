@@ -305,7 +305,6 @@ struct local_data{
   int nr_followers;
   int nr_generators;
   int nr_consumers;
-  int nr_loaders;
   int nr_consumed_answers;
   int nr_consumed_alternatives;
   int nr_propagate_depen_cicles;
@@ -330,7 +329,6 @@ struct local_data{
 #define LOCAL_nr_followers                        (LOCAL->nr_followers)
 #define LOCAL_nr_generators                       (LOCAL->nr_generators)
 #define LOCAL_nr_consumers                        (LOCAL->nr_consumers)
-#define LOCAL_nr_loaders                          (LOCAL->nr_loaders)
 #define LOCAL_nr_consumed_answers                 (LOCAL->nr_consumed_answers)
 #define LOCAL_nr_consumed_alternatives            (LOCAL->nr_consumed_alternatives)
 #define LOCAL_nr_propagate_depen_cicles         (LOCAL->nr_propagate_depen_cicles)

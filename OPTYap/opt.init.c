@@ -186,7 +186,6 @@ void Yap_init_local(void) {
   LOCAL_nr_followers=0;
   LOCAL_nr_generators=0;
   LOCAL_nr_consumers=0;
-  LOCAL_nr_loaders=0;
   LOCAL_nr_consumed_answers=0;
   LOCAL_nr_consumed_alternatives=0;
   LOCAL_nr_propagate_depen_cicles=0;

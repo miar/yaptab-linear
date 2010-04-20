@@ -222,7 +222,6 @@
 
 #define store_loader_node(TAB_ENT, ANSWER, TYPE)	      \
         { register choiceptr lcp;                             \
-	  DUMMY_LOCAL_nr_loaders_inc();		              \
 	  /* initialize lcp */                                \
           lcp = NORM_CP(LOAD_CP(YENV) - 1);                   \
           /* store loader choice point */                     \
@@ -347,7 +346,6 @@
 #define DUMMY_LOCAL_nr_followers_inc()                  (LOCAL_nr_followers++)
 #define DUMMY_LOCAL_nr_generators_inc()                 (LOCAL_nr_generators++)
 #define DUMMY_LOCAL_nr_consumers_inc()                  (LOCAL_nr_consumers++)
-#define DUMMY_LOCAL_nr_loaders_inc()                    (LOCAL_nr_loaders++)
 
 #define consume_answers(tab_ent,sg_fr)                        \
       ans_node_ptr ans_node;                                  \
@@ -383,7 +381,6 @@
 #define DUMMY_LOCAL_nr_followers_inc()
 #define DUMMY_LOCAL_nr_generators_inc()
 #define DUMMY_LOCAL_nr_consumers_inc()
-#define DUMMY_LOCAL_nr_loaders_inc()
 
 
 #define consume_answers(tab_ent,sg_fr)                        \
