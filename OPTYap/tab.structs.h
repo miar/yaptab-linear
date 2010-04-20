@@ -212,12 +212,6 @@ typedef struct subgoal_frame {
   struct subgoal_frame *previous;
 #endif /* LIMIT_TABLING */
 #ifdef LINEAR_TABLING
-#ifdef DUMMY_PRINT
-  int nr_looping_answers;
-  int nr_trie_answers;
-  int nr_opt_trie;
-  int nr_opt_loop;  
-#endif /*DUMMY_PRINT */
   int dfn;
   yamop **current_looping_alt;
   yamop **stop_looping_alt;
@@ -272,13 +266,6 @@ typedef struct subgoal_frame {
 #define SgFr_try_answer(X)     ((X)->try_answer)
 #define SgFr_previous(X)       ((X)->previous)
 #define SgFr_next(X)           ((X)->next)
-
-#ifdef DUMMY_PRINT
-#define SgFr_nr_opt_trie(X)          ((X)->nr_opt_trie)
-#define SgFr_nr_opt_loop(X)           ((X)->nr_opt_loop)  
-#define SgFr_nr_looping_answers(X)    ((X)->nr_looping_answers)
-#define SgFr_nr_trie_answers(X)       ((X)->nr_trie_answers)
-#endif /*DUMMY_PRINT */
 
 #define SgFr_new_answer_trie(X)        ((X)->new_answer_trie)
 
@@ -451,6 +438,9 @@ struct consumer_choicept {
 struct loader_choicept {
   struct choicept cp;
   struct answer_trie_node *cp_last_answer;
+#ifdef DUMMY_PRINT
+  int type_of_node;
+#endif /*DUMMY_PRINT */  
 #ifdef LOW_LEVEL_TRACER
   struct pred_entry *cp_pred_entry;
 #endif /* LOW_LEVEL_TRACER */

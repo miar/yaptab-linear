@@ -318,18 +318,6 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 #ifdef LINEAR_TABLING
 
 
-#ifdef DUMMY_PRINT
-#define DUMMY_SgFr_init_dummy_print_fields(SG_FR)                \
-        SgFr_nr_looping_answers(SG_FR)=0;			 \
-        SgFr_nr_trie_answers(SG_FR)=0;	                         \
-        SgFr_nr_opt_trie(SG_FR)=0;                               \
-        SgFr_nr_opt_loop(SG_FR)=0;                               
-
-#else /*!DUMMY_PRINT */
-#define DUMMY_SgFr_init_dummy_print_fields(SG_FR)
-#endif /*DUMMY_PRINT */
-
-
 #ifdef LINEAR_TABLING_BATCHED
 #define SgFr_init_batched_fields(SG_FR)                         \
         SgFr_batched_ans(SG_FR)= NULL;                          \
@@ -419,7 +407,6 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 #define SgFr_init_linear_tabling_fields(SG_FR)   	                    \
         SET_SGFR_DFN(SG_FR,LOCAL_dfn++);			            \
 	TAG_AS_LEADER(SG_FR);                                               \
-	DUMMY_SgFr_init_dummy_print_fields(SG_FR);                          \
         SgFr_stop_loop_ans(SG_FR) = NULL;                                   \
         SgFr_current_loop_ans(SG_FR) = NULL;                                \
         SgFr_stop_loop_alt(SG_FR) = NULL;                                   \

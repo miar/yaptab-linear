@@ -35,7 +35,7 @@
 ** ----------------------------------- */
 
 //#define DEBUG_LINEAR_TABLING 1  
-//#define DUMMY_PRINT        1
+#define DUMMY_PRINT        1
 
 
 #define LINEAR_TABLING 1 

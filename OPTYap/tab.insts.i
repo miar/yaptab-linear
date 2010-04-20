@@ -77,7 +77,7 @@
             GEN_CP(gcp)->cp_dep_fr = NULL;                            \
           }                                                           \
           GEN_CP(gcp)->cp_sg_fr = SG_FR;                              \
-          store_low_level_trace_info(GEN_CP(gcp), TAB_ENT);           \		     
+          store_low_level_trace_info(GEN_CP(gcp), TAB_ENT);           \
           set_cut((CELL *)gcp, B);                                    \
           B = gcp;                                                    \
           YAPOR_SET_LOAD(B);                                          \
@@ -217,7 +217,36 @@
           GONext();                                       \
         }
 
-#define store_loader_node(TAB_ENT, ANSWER)                    \
+
+#ifdef DUMMY_PRINT
+
+#define store_loader_node(TAB_ENT, ANSWER, TYPE)	      \
+        { register choiceptr lcp;                             \
+	  DUMMY_LOCAL_nr_loaders_inc();		              \
+	  /* initialize lcp */                                \
+          lcp = NORM_CP(LOAD_CP(YENV) - 1);                   \
+          /* store loader choice point */                     \
+          HBREG = H;                                          \
+          store_yaam_reg_cpdepth(lcp);                        \
+          lcp->cp_tr = TR;         	                      \
+          lcp->cp_ap = LOAD_ANSWER;                           \
+          lcp->cp_h  = H;                                     \
+          lcp->cp_b  = B;                                     \
+          lcp->cp_env= ENV;                                   \
+          lcp->cp_cp = CPREG;                                 \
+          LOAD_CP(lcp)->cp_last_answer = ANSWER;              \
+          LOAD_CP(lcp)->type_of_node = TYPE;	              \
+          store_low_level_trace_info(LOAD_CP(lcp), TAB_ENT);  \
+          /* set_cut((CELL *)lcp, B); --> no effect */        \
+          B = lcp;                                            \
+          YAPOR_SET_LOAD(B);                                  \
+          SET_BB(B);                                          \
+          TABLING_ERRORS_check_stack;                         \
+        }
+
+#else /* !DUMMY_PRINT */
+
+#define store_loader_node(TAB_ENT, ANSWER)	              \
         { register choiceptr lcp;                             \
 	  /* initialize lcp */                                \
           lcp = NORM_CP(LOAD_CP(YENV) - 1);                   \
@@ -238,6 +267,10 @@
           SET_BB(B);                                          \
           TABLING_ERRORS_check_stack;                         \
         }
+
+#endif /*DUMMY_PRINT */
+
+
 
 #define restore_loader_node(ANSWER)           \
         H = HBREG = PROTECT_FROZEN_H(B);      \
@@ -310,35 +343,47 @@
 
 
 #ifdef DUMMY_PRINT
-#define DUMMY_LOCAL_nr_generators_inc()                    (LOCAL_nr_generators++)
-#define DUMMY_LOCAL_nr_of_followers_inc()                  (LOCAL_nr_of_followers++)
+
+#define DUMMY_LOCAL_nr_followers_inc()                  (LOCAL_nr_followers++)
+#define DUMMY_LOCAL_nr_generators_inc()                 (LOCAL_nr_generators++)
+#define DUMMY_LOCAL_nr_consumers_inc()                  (LOCAL_nr_consumers++)
+#define DUMMY_LOCAL_nr_loaders_inc()                    (LOCAL_nr_loaders++)
+
+#define consume_answers(tab_ent,sg_fr)                        \
+      ans_node_ptr ans_node;                                  \
+      DUMMY_LOCAL_nr_consumers_inc();                         \
+      ans_node = SgFr_first_answer(sg_fr);                    \
+      if (ans_node == NULL) {                                 \
+	/* no answers --> fail */                             \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	goto fail;                                            \
+      } else if (ans_node == SgFr_answer_trie(sg_fr)) {       \
+	/* yes answer --> procceed */                         \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	PREG = (yamop *) CPREG;                               \
+	PREFETCH_OP(PREG);                                    \
+	YENV = ENV;                                           \
+	GONext();                                             \
+      } else {                                                \
+	/* answers -> get first answer */                     \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	store_loader_node(tab_ent, ans_node,0);		      \
+	PREG = (yamop *) CPREG;                               \
+	PREFETCH_OP(PREG);                                    \
+	load_answer_trie(ans_node, YENV);                     \
+	YENV = ENV;                                           \
+	GONext();                                             \
+      }
+
 #define DUMMY_LOCAL_nr_propagate_depen_cicles_inc()        (LOCAL_nr_propagate_depen_cicles++)
 #define	DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc() (LOCAL_nr_is_leader_and_has_new_answers++)
 
-#define DUMMY_LOCAL_nr_consumers_inc()        (LOCAL_nr_consumers++)
-#define DUMMY_add_answer(SG_FR)               (SgFr_nr_looping_answers(SG_FR)++)
-#define DUMMY_LOCAL_total_trie_answers_inc()  (LOCAL_total_trie_answers++)
-#define DUMMY_SgFr_nr_trie_answers(SG_FR)     (SgFr_nr_trie_answers(SG_FR)++)
-
-
-#define DUMMY_consume_all(SG_FR){					                   \
- 	SgFr_nr_opt_trie(SG_FR)=SgFr_nr_opt_trie(SG_FR) + SgFr_nr_trie_answers(SG_FR);     \
-	SgFr_nr_opt_loop(sg_fr)=SgFr_nr_opt_loop(SG_FR)+  SgFr_nr_looping_answers(SG_FR); \
-    }
-
 
 #else /*! DUMMY_PRINT */
-#define DUMMY_LOCAL_nr_of_followers_inc()
+#define DUMMY_LOCAL_nr_followers_inc()
 #define DUMMY_LOCAL_nr_generators_inc()
-#define	DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc()
-#define DUMMY_LOCAL_nr_propagate_depen_cicles_inc()
 #define DUMMY_LOCAL_nr_consumers_inc()
-#define DUMMY_add_answer(SG_FR)
-#define DUMMY_LOCAL_total_trie_answers_inc()
-#define DUMMY_SgFr_nr_trie_answers(SG_FR)
-#define DUMMY_consume_all(SG_FR)
-
-#endif /*DUMMY_PRINT*/
+#define DUMMY_LOCAL_nr_loaders_inc()
 
 
 #define consume_answers(tab_ent,sg_fr)                        \
@@ -366,6 +411,12 @@
 	YENV = ENV;                                           \
 	GONext();                                             \
       }
+
+
+#define	DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc()
+#define DUMMY_LOCAL_nr_propagate_depen_cicles_inc()
+
+#endif /*DUMMY_PRINT*/
 
 
 #define add_max_scc(SG_FR){				      \
@@ -455,11 +506,9 @@
 
 #define add_answer(SG_FR,ans)              					                        \
           if (SgFr_stop_loop_ans(SG_FR)==NULL) {	  		       	                        \
-	     DUMMY_add_answer(SG_FR);						                        \
   	     SgFr_stop_loop_ans(SG_FR)= SgFr_loop_ans(SG_FR);                                           \
              SET_CELL_VALUE(SgFr_stop_loop_ans(SG_FR),ans);                                             \
           } else if (GET_CELL_VALUE(SgFr_stop_loop_ans(SG_FR))!= ans) {                                 \
-   	     DUMMY_add_answer(SG_FR);                                                                   \
              SgFr_stop_loop_ans(SG_FR)++;                                                               \
 	     if (IS_JUMP_CELL(SgFr_stop_loop_ans(SG_FR))){		                                \
 	       struct answer_trie_node * nb;                                                            \
@@ -683,6 +732,11 @@
 
 
   PBOp(table_try_single, Otapl)
+
+#ifdef DUMMY_PRINT
+  LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
+
     INFO_LINEAR_TABLING("-------------------------table_try_single ---------------");
     tab_ent_ptr tab_ent;
     sg_fr_ptr sg_fr;
@@ -817,7 +871,11 @@
           /* load answers from the trie */
 	  UNLOCK(SgFr_lock(sg_fr));
 	  if(TrNode_child(ans_node) != NULL) {
+#ifdef DUMMY_PRINT
+	    store_loader_node(tab_ent, ans_node,0);
+#else /*!DUMMY_PRINT */
 	    store_loader_node(tab_ent, ans_node);
+#endif /*DUMMY_PRINT */
 	  }
           PREG = (yamop *) CPREG;
           PREFETCH_OP(PREG);
@@ -843,6 +901,9 @@
 
   PBOp(table_try_me, Otapl)
   //    INFO_LINEAR_TABLING("-------------------------table_try_me ---------------");
+#ifdef DUMMY_PRINT
+  LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
 
     tab_ent_ptr tab_ent;
     sg_fr_ptr sg_fr;
@@ -921,7 +982,7 @@
       if (IS_JUMP_CELL(follower_alt))
 	ALT_JUMP_NEXT_CELL(follower_alt);
       if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
-	DUMMY_LOCAL_nr_of_followers_inc();
+	DUMMY_LOCAL_nr_followers_inc();
 	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
 	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);	
 	add_next_follower(sg_fr);
@@ -940,9 +1001,8 @@
 #ifdef LINEAR_TABLING
       propagate_dependencies(sg_fr);
 #ifdef LINEAR_TABLING_FOLLOWER
-      DUMMY_LOCAL_nr_of_followers_inc();
       if (SgFr_next_alt(sg_fr)!=NULL){
-	DUMMY_LOCAL_nr_of_followers_inc();
+	DUMMY_LOCAL_nr_followers_inc();
 	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
 	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
 	add_next_follower(sg_fr);
@@ -1006,7 +1066,11 @@
           /* load answers from the trie */
 	  UNLOCK(SgFr_lock(sg_fr));
 	  if(TrNode_child(ans_node) != NULL) {
-     	    store_loader_node(tab_ent, ans_node);
+#ifdef DUMMY_PRINT
+	    store_loader_node(tab_ent, ans_node,0);
+#else /*!DUMMY_PRINT */
+	    store_loader_node(tab_ent, ans_node);
+#endif /*DUMMY_PRINT */
      	  }
 	  PREG = (yamop *) CPREG;
           PREFETCH_OP(PREG);
@@ -1031,6 +1095,11 @@
 
 
   PBOp(table_try, Otapl)
+
+#ifdef DUMMY_PRINT
+  LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
+
     tab_ent_ptr tab_ent;
     sg_fr_ptr sg_fr;
     check_trail(TR);
@@ -1108,7 +1177,7 @@
       if (IS_JUMP_CELL(follower_alt))
 	ALT_JUMP_NEXT_CELL(follower_alt);	  
       if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
-	DUMMY_LOCAL_nr_of_followers_inc();
+	DUMMY_LOCAL_nr_followers_inc();
 	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
 	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
 	add_next_follower(sg_fr);
@@ -1127,7 +1196,7 @@
       propagate_dependencies(sg_fr);
 #ifdef LINEAR_TABLING_FOLLOWER
       if (SgFr_next_alt(sg_fr)!=NULL){
-	DUMMY_LOCAL_nr_of_followers_inc();
+	DUMMY_LOCAL_nr_followers_inc();
 	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
 	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
 	add_next_follower(sg_fr);
@@ -1191,7 +1260,11 @@
           /* load answers from the trie */
 	  UNLOCK(SgFr_lock(sg_fr));
 	  if(TrNode_child(ans_node) != NULL) {
+#ifdef DUMMY_PRINT
+	    store_loader_node(tab_ent, ans_node,0);
+#else /*!DUMMY_PRINT */
 	    store_loader_node(tab_ent, ans_node);
+#endif /*DUMMY_PRINT */
 	  }
           PREG = (yamop *) CPREG;
           PREFETCH_OP(PREG);
@@ -1216,6 +1289,11 @@
 
 
   Op(table_retry_me, Otapl)
+
+#ifdef DUMMY_PRINT
+  LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
+
     INFO_LINEAR_TABLING("-------------------------table_retry_me ---------------\n");
 #ifdef LINEAR_TABLING
     sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;
@@ -1245,6 +1323,11 @@
 
 
  Op(table_retry, Otapl)
+
+#ifdef DUMMY_PRINT
+ LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
+
      INFO_LINEAR_TABLING("-------------------------table_retry ---------------\n");
 #ifdef LINEAR_TABLING
     sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;
@@ -1275,6 +1358,11 @@
 
 
   Op(table_trust_me, Otapl)
+
+#ifdef DUMMY_PRINT
+  LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
+
     INFO_LINEAR_TABLING("-------------------------table_trust_me ---------------\n");
 #ifdef LINEAR_TABLING
     sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr; 
@@ -1316,6 +1404,11 @@
 
 
   Op(table_trust, Otapl)
+
+#ifdef DUMMY_PRINT
+  LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
+
    INFO_LINEAR_TABLING("-------------------------table_trust ---------------\n");
 #ifdef LINEAR_TABLING
    sg_fr_ptr sgfr = GEN_CP(B)->cp_sg_fr; 
@@ -1550,7 +1643,7 @@
 	SgFr_new_answer_trie(sg_fr)=ans_node;
       }
 #endif /*LINEAR_TABLING_DRS*/
-      DUMMY_LOCAL_total_trie_answers_inc();
+
       INFO_LINEAR_TABLING("nova resposta");
       TAG_NEW_ANSWERS(sg_fr);      
 #endif /* LINEAR_TABLING */
@@ -1994,7 +2087,11 @@
       TRAIL_FRAME(sg_fr);
 #endif /* LIMIT_TABLING */
       /* load answers from the trie */
+#ifdef DUMMY_PRINT
+      store_loader_node(tab_ent, ans_node,0);
+#else /*!DUMMY_PRINT */
       store_loader_node(tab_ent, ans_node);
+#endif /*DUMMY_PRINT */
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
       load_answer_trie(ans_node, YENV);
@@ -2020,7 +2117,10 @@
       PREFETCH_OP(PREG);
       CELL *subs_ptr;
       subs_ptr = (CELL *) (GEN_CP(B) + 1);          
-      subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);      
+      subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
+#ifdef DUMMY_PRINT
+      LOCAL_nr_consumed_answers++;      
+#endif /*DUMMY_PRINT */
       load_answer_trie(GET_CELL_VALUE(SgFr_current_loop_ans(sg_fr)), subs_ptr);
       YENV = ENV;
       GONext();
@@ -2029,15 +2129,15 @@
       if(sg_fr!=LOCAL_top_sg_fr_on_branch)
 	add_branch(sg_fr);
       SgFr_consuming_answers(sg_fr)=2;
-
-      DUMMY_SgFr_nr_trie_answers(sg_fr);
-
       restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
       CELL *subs_ptr;
       subs_ptr = (CELL *) (GEN_CP(B) + 1);          
-      subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);      
+      subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
+#ifdef DUMMY_PRINT
+      LOCAL_nr_consumed_answers++;      
+#endif /*DUMMY_PRINT */
       load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);
       YENV = ENV;
       GONext();
@@ -2049,15 +2149,17 @@
   if (SgFr_consuming_answers(sg_fr)==2){
     if (SgFr_new_answer_trie(sg_fr)!=SgFr_last_answer(sg_fr)){
       SgFr_new_answer_trie(sg_fr)=TrNode_child(SgFr_new_answer_trie(sg_fr));
-
-      DUMMY_SgFr_nr_trie_answers(sg_fr);
-
       restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
       CELL *subs_ptr;
       subs_ptr = (CELL *) (GEN_CP(B) + 1);          
       subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
+
+#ifdef DUMMY_PRINT
+      LOCAL_nr_consumed_answers++;      
+#endif /*DUMMY_PRINT */
+
       load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);    
       YENV = ENV;
       GONext();
@@ -2143,6 +2245,9 @@
 	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
 	INFO_LINEAR_TABLING("current_alt=%p",PREG);
 	PREFETCH_OP(PREG);
+#ifdef DUMMY_PRINT
+	LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
 	GONext();          
       }
       
@@ -2156,6 +2261,9 @@
 	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
 	INFO_LINEAR_TABLING("current_alt=%p",PREG);
 	PREFETCH_OP(PREG);
+#ifdef DUMMY_PRINT
+	LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
 	GONext();    
       }
     }
@@ -2369,7 +2477,6 @@
       } else {	
         /* consume_answers*/	
 #ifdef LINEAR_TABLING_DRS 
-        DUMMY_consume_all(sg_fr);
 	if (SgFr_stop_loop_ans(sg_fr)!=NULL){
 	  /* first time to load answers from looping answers */	
 	  if(sg_fr==LOCAL_top_sg_fr_on_branch){
@@ -2383,6 +2490,9 @@
 	  subs_ptr = (CELL *) (GEN_CP(B) + 1);          
 	  subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
 	  SgFr_current_loop_ans(sg_fr)= SgFr_loop_ans(sg_fr);
+#ifdef DUMMY_PRINT
+      LOCAL_nr_consumed_answers++;      
+#endif /*DUMMY_PRINT */
 	  load_answer_trie(GET_CELL_VALUE(SgFr_current_loop_ans(sg_fr)), subs_ptr);
 	  YENV = ENV;
 	  GONext();
@@ -2390,7 +2500,6 @@
 	
 	if (SgFr_new_answer_trie(sg_fr)!=NULL){	  
 	  /*first time to load answers from trie */
-	  DUMMY_SgFr_nr_trie_answers(sg_fr);
 	  if (SgFr_new_answer_trie(sg_fr) == SgFr_answer_trie(sg_fr)) {
 	    // yes answer --> procceed 
 	    if(sg_fr==LOCAL_top_sg_fr_on_branch){
@@ -2417,6 +2526,9 @@
 	  CELL *subs_ptr;
 	  subs_ptr = (CELL *) (GEN_CP(B) + 1);          
 	  subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
+#ifdef DUMMY_PRINT
+      LOCAL_nr_consumed_answers++;      
+#endif /*DUMMY_PRINT */
 	  load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);
 	  YENV = ENV;
 	  GONext();
@@ -2463,7 +2575,11 @@
 	  TRAIL_FRAME(sg_fr);
 #endif /* LIMIT_TABLING */
 	  /* load answers from the trie */
-	  store_loader_node(tab_ent, ans_node);
+#ifdef DUMMY_PRINT
+	    store_loader_node(tab_ent, ans_node,1);
+#else /*!DUMMY_PRINT */
+	    store_loader_node(tab_ent, ans_node);
+#endif /*DUMMY_PRINT */
 	  PREG = (yamop *) CPREG;
 	  PREFETCH_OP(PREG);
 	  load_answer_trie(ans_node, YENV);
@@ -2674,7 +2790,11 @@ complete_all:
 	  if (IsMode_LoadAnswers(TabEnt_mode(tab_ent))) {
             /* load answers from the trie */
 	    if(TrNode_child(ans_node) != NULL) {
-	      store_loader_node(tab_ent, ans_node);
+#ifdef DUMMY_PRINT
+	    store_loader_node(tab_ent, ans_node,0);
+#else /*!DUMMY_PRINT */
+	    store_loader_node(tab_ent, ans_node);
+#endif /*DUMMY_PRINT */
 	    }
             PREG = (yamop *) CPREG;
             PREFETCH_OP(PREG);

@@ -916,6 +916,12 @@ ans_node_ptr answer_search(sg_fr_ptr sg_fr, CELL *subs_ptr) {
 
 
 void load_answer_trie(ans_node_ptr ans_node, CELL *subs_ptr) {
+
+#if defined(DUMMY_PRINT) && !defined(LINEAR_TABLING_DRS)
+  if((LOAD_CP(B)->type_of_node)==1)
+     LOCAL_nr_consumed_answers++;  
+#endif /* DUMMY_PRINT && !LINEAR_TABLING_DRS */
+
   CELL *stack_vars_base, *stack_vars, *stack_terms_base, *stack_terms;
   int subs_arity, i, n_vars = -1;
   Term t;
@@ -1060,20 +1066,10 @@ void private_completion(sg_fr_ptr sg_fr) {
   while (LOCAL_max_scc != sg_fr) {
     INFO_LINEAR_TABLING("(while)LOCAL_MAX_SCC= %p", LOCAL_max_scc);
     mark_as_completed(LOCAL_max_scc);
-#ifdef DUMMY_PRINT
-    LOCAL_nr_looping_answers=LOCAL_nr_looping_answers+SgFr_nr_looping_answers(LOCAL_max_scc);
-    LOCAL_opt_tries=LOCAL_opt_tries+SgFr_nr_opt_trie(LOCAL_max_scc);
-    LOCAL_opt_loop=LOCAL_opt_loop+SgFr_nr_opt_loop(LOCAL_max_scc);
-#endif /* DUMMY_PRINT */
     LOCAL_max_scc = SgFr_next_on_scc(LOCAL_max_scc);    
   }
   INFO_LINEAR_TABLING("LOCAL_MAX_SCC= %p", LOCAL_max_scc);
   mark_as_completed(LOCAL_max_scc);
-#ifdef DUMMY_PRINT
-  LOCAL_nr_looping_answers=LOCAL_nr_looping_answers+SgFr_nr_looping_answers(LOCAL_max_scc); 
-  LOCAL_opt_tries=LOCAL_opt_tries+SgFr_nr_opt_trie(LOCAL_max_scc);
-  LOCAL_opt_loop=LOCAL_opt_loop+SgFr_nr_opt_loop(LOCAL_max_scc);
-#endif /*DUMMY_PRINT */
   LOCAL_max_scc = SgFr_next_on_scc(LOCAL_max_scc);
 #endif
 

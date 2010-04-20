@@ -302,16 +302,16 @@ struct local_data{
   struct subgoal_frame *top_subgoal_frame_on_branch;
   struct subgoal_frame *top_subgoal_max_scc;
 #ifdef DUMMY_PRINT
-  int nr_looping_answers;
-  int total_trie_answers;
-  int opt_tries,
-      opt_loop;  
-  int nr_consumers;
+  int nr_followers;
   int nr_generators;
+  int nr_consumers;
+  int nr_loaders;
+  int nr_consumed_answers;
+  int nr_consumed_alternatives;
   int nr_propagate_depen_cicles;
   int nr_is_leader_and_has_new_answers;
-  int nr_of_followers;
 #endif /* DUMMY_PRINT */
+
   int dfn;
 #endif /* LINEAR_TABLING */
 
@@ -327,21 +327,31 @@ struct local_data{
 
 #ifdef DUMMY_PRINT
 
-#define LOCAL_nr_of_followers                   (LOCAL->nr_of_followers)
-
-#define LOCAL_nr_is_leader_and_has_new_answers  (LOCAL-> nr_is_leader_and_has_new_answers)
-#define LOCAL_nr_generators                     (LOCAL->nr_generators)
+#define LOCAL_nr_followers                        (LOCAL->nr_followers)
+#define LOCAL_nr_generators                       (LOCAL->nr_generators)
+#define LOCAL_nr_consumers                        (LOCAL->nr_consumers)
+#define LOCAL_nr_loaders                          (LOCAL->nr_loaders)
+#define LOCAL_nr_consumed_answers                 (LOCAL->nr_consumed_answers)
+#define LOCAL_nr_consumed_alternatives            (LOCAL->nr_consumed_alternatives)
 #define LOCAL_nr_propagate_depen_cicles         (LOCAL->nr_propagate_depen_cicles)
+#define LOCAL_nr_is_leader_and_has_new_answers  (LOCAL-> nr_is_leader_and_has_new_answers)
+//---------------------------------------------------------------------
 
-#define LOCAL_opt_tries                         (LOCAL->opt_tries)
+
 #define LOCAL_opt_loop                          (LOCAL->opt_loop)
 
 #define LOCAL_total_trie_answers                (LOCAL->total_trie_answers)
 
 #define LOCAL_nr_looping_answers                (LOCAL->nr_looping_answers)
-#define LOCAL_nr_consumers                      (LOCAL->nr_consumers)
+
 
 #endif /*DUMMY_PRINT */
+
+
+
+
+
+
 
 
 #define LOCAL_dfn                          (LOCAL->dfn)
