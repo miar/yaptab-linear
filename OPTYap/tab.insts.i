@@ -1646,7 +1646,6 @@
 	SgFr_new_answer_trie(sg_fr)=ans_node;
       }
 #endif /*LINEAR_TABLING_DRS*/
-
       INFO_LINEAR_TABLING("nova resposta");
       TAG_NEW_ANSWERS(sg_fr);      
 #endif /* LINEAR_TABLING */
@@ -2052,10 +2051,6 @@
 #endif /*LINEAR_TABLING_BATCHED */
 
 
-
-
-
-
 #if defined(LINEAR_TABLING_FOLLOWER)
   if (SgFr_next_alt(sg_fr)!=NULL){
     PREG = SgFr_next_alt(sg_fr);
@@ -2065,6 +2060,27 @@
   }
   if (SgFr_pioneer(sg_fr) != B){
     INFO_LINEAR_TABLING("follower");
+//-------------------------NEW
+    if (SgFr_state(sg_fr) == looping_evaluating){
+      yamop **follower_alt=SgFr_current_loop_alt(sg_fr)+1;
+      if (IS_JUMP_CELL(follower_alt))
+	ALT_JUMP_NEXT_CELL(follower_alt);
+      if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
+#ifdef DUMMY_PRINT
+	DUMMY_LOCAL_nr_followers_inc();
+	LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
+	restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+	YENV = (CELL *) PROTECT_FROZEN_B(B);
+	set_cut(YENV, B->cp_b);
+	SET_BB(NORM_CP(YENV));
+	allocate_environment();
+	SgFr_current_loop_alt(sg_fr)=follower_alt;
+	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+	GONext();
+      }       
+    }
+    //-------------------------NEW END
     /* pop generator node and store loader to consume all answers*/
     ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
     if (ans_node == NULL) {
