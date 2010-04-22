@@ -2060,7 +2060,6 @@
   }
   if (SgFr_pioneer(sg_fr) != B){
     INFO_LINEAR_TABLING("follower");
-//-------------------------NEW
     if (SgFr_state(sg_fr) == looping_evaluating){
       yamop **follower_alt=SgFr_current_loop_alt(sg_fr)+1;
       if (IS_JUMP_CELL(follower_alt))
@@ -2080,7 +2079,6 @@
 	GONext();
       }       
     }
-    //-------------------------NEW END
     /* pop generator node and store loader to consume all answers*/
     ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
     if (ans_node == NULL) {
