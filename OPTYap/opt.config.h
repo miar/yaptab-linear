@@ -22,8 +22,6 @@
 
 
 
-
-
 /* ---------------------------------------------------------------- **
 **                 TABLING Configuration Parameters                 **
 ** ---------------------------------------------------------------- */
@@ -53,9 +51,9 @@
 ** ------------------------------------------------------ */
 
 #define LINEAR_TABLING_DRA 1  
-//#define LINEAR_TABLING_FOLLOWER 1 
+#define LINEAR_TABLING_FOLLOWER 1 
 
-//#define LINEAR_TABLING_DRS     1
+#define LINEAR_TABLING_DRS     1
 
 
 #define MAX_LOOP_ALT_BUCKET   10

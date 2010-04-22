@@ -979,7 +979,10 @@
       if (IS_JUMP_CELL(follower_alt))
 	ALT_JUMP_NEXT_CELL(follower_alt);
       if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
+#ifdef DUMMY_PRINT
 	DUMMY_LOCAL_nr_followers_inc();
+	LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
 	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
 	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);	
 	add_next_follower(sg_fr);
@@ -1174,7 +1177,10 @@
       if (IS_JUMP_CELL(follower_alt))
 	ALT_JUMP_NEXT_CELL(follower_alt);	  
       if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
+#ifdef DUMMY_PRINT
 	DUMMY_LOCAL_nr_followers_inc();
+	LOCAL_nr_consumed_alternatives++;
+#endif /* DUMMY_PRINT */
 	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
 	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
 	add_next_follower(sg_fr);
@@ -2095,8 +2101,6 @@
       YENV = ENV;
       GONext();
     }   
-
-
   }
 #endif  /*LINEAR_TABLING_FOLLOWER */
 
