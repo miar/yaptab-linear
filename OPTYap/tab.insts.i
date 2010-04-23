@@ -2074,6 +2074,12 @@
 	SET_BB(NORM_CP(YENV));
 	allocate_environment();
 	SgFr_current_loop_alt(sg_fr)=follower_alt;
+	if (IS_LEADER(sg_fr) && HAS_NEW_ANSWERS(sg_fr) ) {  
+	  INFO_LINEAR_TABLING("is_leader and has new answers");
+	  DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc();
+	  UNTAG_NEW_ANSWERS(sg_fr);
+	  SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr);
+	}
 	PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
 	GONext();
       }       
