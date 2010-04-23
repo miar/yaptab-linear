@@ -2066,7 +2066,6 @@
 	ALT_JUMP_NEXT_CELL(follower_alt);
       if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
 #ifdef DUMMY_PRINT
-	DUMMY_LOCAL_nr_followers_inc();
 	LOCAL_nr_consumed_alternatives++;
 #endif /* DUMMY_PRINT */
 	restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
