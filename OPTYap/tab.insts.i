@@ -811,7 +811,11 @@
       allocate_environment();
       GONext();
     } else if (SgFr_state(sg_fr) == evaluating || 
-               SgFr_state(sg_fr) == looping_evaluating) { 
+               SgFr_state(sg_fr) == looping_evaluating
+#ifdef LINEAR_TABLING_FOLLOWER	       
+	       || SgFr_state(sg_fr) == looping_follower_cons
+#endif  /*LINEAR_TABLING_FOLLOWER*/
+               ){ 
 
       propagate_dependencies(sg_fr);
       consume_answers(tab_ent,sg_fr);
@@ -979,6 +983,7 @@
       if (IS_JUMP_CELL(follower_alt))
 	ALT_JUMP_NEXT_CELL(follower_alt);
       if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
+	INFO_LINEAR_TABLING("follower");
 #ifdef DUMMY_PRINT
 	DUMMY_LOCAL_nr_followers_inc();
 	LOCAL_nr_consumed_alternatives++;
@@ -997,11 +1002,19 @@
      consume_answers(tab_ent,sg_fr);  
 
 #endif /* LINEAR TABLING */
+
+#ifdef LINEAR_TABLING_FOLLOWER	       
+    }else if (SgFr_state(sg_fr) == looping_follower_cons){ 
+      propagate_dependencies(sg_fr);
+      consume_answers(tab_ent,sg_fr);
+#endif  /*LINEAR_TABLING_FOLLOWER*/
+
     } else if (SgFr_state(sg_fr) == evaluating) {
 #ifdef LINEAR_TABLING
       propagate_dependencies(sg_fr);
 #ifdef LINEAR_TABLING_FOLLOWER
       if (SgFr_next_alt(sg_fr)!=NULL){
+	INFO_LINEAR_TABLING("follower");
 	DUMMY_LOCAL_nr_followers_inc();
 	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
 	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
@@ -1177,6 +1190,7 @@
       if (IS_JUMP_CELL(follower_alt))
 	ALT_JUMP_NEXT_CELL(follower_alt);	  
       if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
+	INFO_LINEAR_TABLING("follower");
 #ifdef DUMMY_PRINT
 	DUMMY_LOCAL_nr_followers_inc();
 	LOCAL_nr_consumed_alternatives++;
@@ -1194,11 +1208,19 @@
 #endif  /*LINEAR_TABLING_FOLLOWER*/
       consume_answers(tab_ent,sg_fr);
 #endif /* LINEAR TABLING */
+
+#ifdef LINEAR_TABLING_FOLLOWER	       
+    }else if (SgFr_state(sg_fr) == looping_follower_cons){ 
+      propagate_dependencies(sg_fr);
+      consume_answers(tab_ent,sg_fr);
+#endif  /*LINEAR_TABLING_FOLLOWER*/
+
     } else if (SgFr_state(sg_fr) == evaluating) {
 #ifdef LINEAR_TABLING
       propagate_dependencies(sg_fr);
 #ifdef LINEAR_TABLING_FOLLOWER
       if (SgFr_next_alt(sg_fr)!=NULL){
+	INFO_LINEAR_TABLING("follower");
 	DUMMY_LOCAL_nr_followers_inc();
 	register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
 	store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
@@ -2124,7 +2146,6 @@
 #endif  /*LINEAR_TABLING_FOLLOWER */
 
 
-
 #ifdef LINEAR_TABLING_DRS 
   if (SgFr_consuming_answers(sg_fr)==1){
     /*continue loading looping answers */    
@@ -2483,7 +2504,7 @@
       INFO_LINEAR_TABLING("sgfr(%p)->state=%d\n",sg_fr,SgFr_state(sg_fr));
 #ifdef LINEAR_TABLING_FOLLOWER
       if (SgFr_pioneer(sg_fr)==B)
-	SgFr_state(sg_fr) = looping_evaluating;
+	SgFr_state(sg_fr) = looping_follower_cons;
 #else  /*!LINEAR_TABLING_FOLLOWER */
       SgFr_state(sg_fr) = looping_evaluating;
 #endif /*LINEAR_TABLING_FOLLOWER */
