@@ -195,11 +195,10 @@ typedef struct subgoal_frame {
     evaluating               = 2,
     looping_ready            = 3,  /* LINEAR_TABLING */
     looping_evaluating       = 4,  /* LINEAR_TABLING */
-    looping_follower_cons    = 5,
-    complete                 = 6,
-    complete_in_use          = 7,  /* LIMIT_TABLING */
-    compiled                 = 8,
-    compiled_in_use          = 9   /* LIMIT_TABLING */
+    complete                 = 5,
+    complete_in_use          = 6,  /* LIMIT_TABLING */
+    compiled                 = 7,
+    compiled_in_use          = 8   /* LIMIT_TABLING */
   } state_flag;  /* do not change order !!! */
   choiceptr generator_choice_point;
   struct answer_hash *hash_chain;
