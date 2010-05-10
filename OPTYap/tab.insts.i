@@ -383,6 +383,7 @@
 #define DUMMY_LOCAL_nr_consumers_inc()
 
 
+
 #define consume_answers(tab_ent,sg_fr)                        \
       ans_node_ptr ans_node;                                  \
       DUMMY_LOCAL_nr_consumers_inc();                         \
@@ -2115,42 +2116,6 @@
 	GONext();
       }       
     }
-    /* pop generator node and store loader to consume all answers*/
-    ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
-    if (ans_node == NULL) {
-      /* no answers --> fail */
-      remove_next(sg_fr);
-      B = B->cp_b;
-      SET_BB(PROTECT_FROZEN_B(B));
-      goto fail;
-    }
-    remove_next(sg_fr);
-    pop_generator_node(SgFr_arity(sg_fr));
-    if (ans_node == SgFr_answer_trie(sg_fr)) {
-      /* yes answer --> procceed */
-      PREG = (yamop *) CPREG;
-      PREFETCH_OP(PREG);
-      YENV = ENV;
-      GONext();
-    } else  {
-      /* answers -> get first answer */
-#ifdef LIMIT_TABLING
-      SgFr_state(sg_fr)++;  /* complete --> complete_in_use */
-      remove_from_global_sg_fr_list(sg_fr);
-      TRAIL_FRAME(sg_fr);
-#endif /* LIMIT_TABLING */
-      /* load answers from the trie */
-#ifdef DUMMY_PRINT
-      store_loader_node(tab_ent, ans_node,0);
-#else /*!DUMMY_PRINT */
-      store_loader_node(tab_ent, ans_node);
-#endif /*DUMMY_PRINT */
-      PREG = (yamop *) CPREG;
-      PREFETCH_OP(PREG);
-      load_answer_trie(ans_node, YENV);
-      YENV = ENV;
-      GONext();
-    }   
   }
 #endif  /*OLD_FOLLOWER */
 
@@ -2205,11 +2170,9 @@
       CELL *subs_ptr;
       subs_ptr = (CELL *) (GEN_CP(B) + 1);          
       subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
-
 #ifdef DUMMY_PRINT
       LOCAL_nr_consumed_answers++;      
 #endif /*DUMMY_PRINT */
-
       load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);    
       YENV = ENV;
       GONext();
@@ -2229,7 +2192,7 @@
     B = B->cp_b;
     SET_BB(PROTECT_FROZEN_B(B));
     goto fail;  
-}
+  }
    
 #endif /*LINEAR_TABLING_DRS */
 
@@ -2242,7 +2205,7 @@
       if (SgFr_state(sg_fr) == evaluating){
 #ifdef LINEAR_TABLING_FOLLOWER
 	if (SgFr_pioneer(sg_fr)!=B)
-	  goto consume_all;
+	  goto follower_consume_all;
 #endif /*LINEAR_TABLING_FOLLOWER */
 	/*first time on table completion */	   
 	SgFr_state(sg_fr) = looping_evaluating;  
@@ -2336,13 +2299,12 @@
 	}	
       }
       UNTAG_NEW_ANSWERS(sg_fr);
-      goto consume_all;
-    }
+      /* turn follower node as a consumer node */
+      goto follower_consume_all;
+    } 
+    
 #endif /*LINEAR_TABLING_FOLLOWER */
-
-
-
-
+    
 
 
 #ifdef LINEAR_TABLING_DRS
@@ -2530,6 +2492,47 @@
       dep_fr = DepFr_next(dep_fr);
     }
 #ifdef LINEAR_TABLING
+ follower_consume_all:
+  {
+    /* pop generator node and store loader to consume all answers*/
+    sg_fr_ptr sg_fr;
+    sg_fr = GEN_CP(B)->cp_sg_fr; 
+    ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
+    if (ans_node == NULL) {
+      /* no answers --> fail */
+      remove_next(sg_fr);
+      B = B->cp_b;
+      SET_BB(PROTECT_FROZEN_B(B));
+      goto fail;
+    }
+    remove_next(sg_fr);
+    pop_generator_node(SgFr_arity(sg_fr));
+    if (ans_node == SgFr_answer_trie(sg_fr)) {
+      /* yes answer --> procceed */
+      PREG = (yamop *) CPREG;
+      PREFETCH_OP(PREG);
+      YENV = ENV;
+      GONext();
+    } else  {
+      /* answers -> get first answer */
+#ifdef LIMIT_TABLING
+      SgFr_state(sg_fr)++;  /* complete --> complete_in_use */
+      remove_from_global_sg_fr_list(sg_fr);
+      TRAIL_FRAME(sg_fr);
+#endif /* LIMIT_TABLING */
+      /* load answers from the trie */
+#ifdef DUMMY_PRINT
+      store_loader_node(tab_ent, ans_node,0);
+#else /*!DUMMY_PRINT */
+      store_loader_node(tab_ent, ans_node);
+#endif /*DUMMY_PRINT */
+      PREG = (yamop *) CPREG;
+      PREFETCH_OP(PREG);
+      load_answer_trie(ans_node, YENV);
+      YENV = ENV;
+      GONext();
+    }
+  }
   consume_all:
     {
       INFO_LINEAR_TABLING("--------------------- goto consume_all ---------------\n");
@@ -2665,14 +2668,8 @@
 	}
       }
     }
-
-
 #endif  /* LINEAR_TABLING_DRS */
-
-
 #endif /* LINEAR_TABLING */
-
-
 
     /* no dependency frames with unconsumed answers found */
 #ifdef YAPOR

@@ -227,6 +227,9 @@ typedef struct subgoal_frame {
 #ifdef LINEAR_TABLING_FOLLOWER
   yamop *next_alt;
   struct choicept *pioneer;
+#ifdef LINEAR_TABLING_FOLLOWER_SP
+  struct choicept *sub_pioneer;
+#endif /*LINEAR_TABLING_FOLLOWER_SP */
 #endif /* LINEAR_TABLING_FOLLOWER */
   yamop  *loop_alts;
   struct answer_trie_node *loop_ans;
@@ -290,6 +293,7 @@ typedef struct subgoal_frame {
 
 #define SgFr_pioneer(X)                ((X)->pioneer)
 
+#define SgFr_sub_pioneer(X)            ((X)->sub_pioneer)
 
 
 
