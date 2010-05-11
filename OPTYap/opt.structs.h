@@ -310,7 +310,6 @@ struct local_data{
   int nr_propagate_depen_cicles;
   int nr_is_leader_and_has_new_answers;
 #endif /* DUMMY_PRINT */
-
   int dfn;
 #endif /* LINEAR_TABLING */
 

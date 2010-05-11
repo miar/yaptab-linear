@@ -1384,9 +1384,7 @@
   ENDOp();
 
 
-
   Op(table_trust_me, Otapl)
-
 #ifdef DUMMY_PRINT
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i10: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
@@ -2241,7 +2239,14 @@
 		INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
 		LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
 	      }
-	    }
+
+	    } 
+#ifdef LINEAR_TABLING_FOLLOWER_SP
+	  else{
+	    SgFr_sub_pioneer(sg_fr)=B;
+	  }
+#endif /*LINEAR_TABLING_FOLLOWER_SP */
+
 #ifdef LINEAR_TABLING_BATCHED
 	  /*consume trie answers- if any */	  
 	  if(SgFr_first_answer(sg_fr)!=NULL){
@@ -2250,9 +2255,9 @@
 	    batched_consume_first_answer(sg_fr);
 	  }
 	}
-#endif	/* LINEAR_TABLING_BATCHED */ 		
+#endif	/*LINEAR_TABLING_BATCHED*/ 		
 	UNTAG_NEW_ANSWERS(sg_fr);
-	SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr) = next_loop_alt;
+	SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr) = next_loop_alt; 
 #ifdef LINEAR_TABLING_BATCHED
 	SgFr_batched_consuming_answers(sg_fr)=0;
 #endif /*LINEAR_TABLING_BATCHED */
@@ -2290,9 +2295,17 @@
       }
     }
     
-
 #ifdef LINEAR_TABLING_FOLLOWER
     if (SgFr_pioneer(sg_fr)!=B){
+#ifdef LINEAR_TABLING_FOLLOWER_SP
+      if(SgFr_sub_pioneer(sg_fr)==B){
+	remove_next(sg_fr);
+	B=SgFr_pioneer(sg_fr);
+	SgFr_sub_pioneer(sg_fr)=NULL;
+	goto fail;      
+      }
+#endif /*LINEAR_TABLING_FOLLOWER_SP*/
+
       if (!IS_LEADER(sg_fr)){
 	if (HAS_NEW_ANSWERS(sg_fr)) {
 	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
@@ -2492,6 +2505,7 @@
       dep_fr = DepFr_next(dep_fr);
     }
 #ifdef LINEAR_TABLING
+#ifdef LINEAR_TABLING_FOLLOWER
  follower_consume_all:
   {
     /* pop generator node and store loader to consume all answers*/
@@ -2533,6 +2547,8 @@
       GONext();
     }
   }
+#endif /*LINEAR_TABLING_FOLLOWER */
+
   consume_all:
     {
       INFO_LINEAR_TABLING("--------------------- goto consume_all ---------------\n");

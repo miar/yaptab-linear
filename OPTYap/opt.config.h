@@ -50,14 +50,14 @@
 **      DRS- Dynamic Reordering of Solutions (optional)   **
 ** ------------------------------------------------------ */
 
-#define LINEAR_TABLING_DRA 1  
+//#define LINEAR_TABLING_DRA 1  
 #define LINEAR_TABLING_FOLLOWER 1 
 
-//#define LINEAR_TABLING_FOLLOWER_SP  1  
+#define LINEAR_TABLING_FOLLOWER_SP  1  
 /* follower sub pioneer */
 
 
-#define LINEAR_TABLING_DRS     1
+//#define LINEAR_TABLING_DRS     1
 
 
 #define MAX_LOOP_ALT_BUCKET   10
