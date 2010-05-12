@@ -2045,8 +2045,8 @@
     INFO_LINEAR_TABLING("batched answer");        
     if(SgFr_batched_ans(sg_fr)!=SgFr_last_answer(sg_fr)){
       INFO_LINEAR_TABLING("batched_ans !=last_answ");
-      SgFr_batched_ans(sg_fr)=TrNode_child(SgFr_batched_ans(sg_fr));
       restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+      SgFr_batched_ans(sg_fr)=TrNode_child(SgFr_batched_ans(sg_fr));			
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
       CELL *subs_ptr;
