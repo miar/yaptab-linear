@@ -2069,7 +2069,7 @@
 	allocate_environment();
 	GONext();
       }
-      /*computation on leader nodes follows to standard dra execution */
+      /*computation on leader nodes follows to standard dra/basic/follower/drs execution */
       
     }
   }
@@ -2083,7 +2083,6 @@
     PREFETCH_OP(PREG);
     GONext();    
   }
-
 #endif /*(LINEAR_TABLING_FOLLOWER)*/
 
 #ifdef OLD_FOLLOWER
@@ -2213,9 +2212,9 @@
 	next_loop_alt = SgFr_stop_loop_alt(sg_fr) = sg_fr->loop_alts;
       } else { 
   	/*get next alternative  */
-#ifdef LINEAR_TABLING_BATCHED
-	if (SgFr_batched_consuming_answers(sg_fr)==0)
-#endif /*LINEAR_TABLING_BATCHED */
+	//#ifdef LINEAR_TABLING_BATCHED
+	//	if (SgFr_batched_consuming_answers(sg_fr)==0)
+	//#endif /*LINEAR_TABLING_BATCHED */
 	   {
 	     if (IS_JUMP_CELL(next_loop_alt)) {
 	      ALT_JUMP_NEXT_CELL(next_loop_alt);	  
@@ -2227,7 +2226,7 @@
 	INFO_LINEAR_TABLING("is_leader and has new answers");
 	DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc();	
 #ifdef LINEAR_TABLING_BATCHED
-	if(SgFr_current_loop_alt(sg_fr)==SgFr_stop_loop_alt(sg_fr) && SgFr_batched_consuming_answers(sg_fr)==0){  
+	if(next_loop_alt==SgFr_stop_loop_alt(sg_fr) && SgFr_batched_consuming_answers(sg_fr)==0){  
 #endif
 	  /*reset dependant subgoals */
 #ifdef LINEAR_TABLING_FOLLOWER
@@ -2255,12 +2254,10 @@
 	    batched_consume_first_answer(sg_fr);
 	  }
 	}
+	SgFr_batched_consuming_answers(sg_fr)=0;
 #endif	/*LINEAR_TABLING_BATCHED*/ 		
 	UNTAG_NEW_ANSWERS(sg_fr);
 	SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr) = next_loop_alt; 
-#ifdef LINEAR_TABLING_BATCHED
-	SgFr_batched_consuming_answers(sg_fr)=0;
-#endif /*LINEAR_TABLING_BATCHED */
 	restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
 	YENV = (CELL *) PROTECT_FROZEN_B(B);
 	set_cut(YENV, B->cp_b);
@@ -2548,7 +2545,6 @@
     }
   }
 #endif /*LINEAR_TABLING_FOLLOWER */
-
   consume_all:
     {
       INFO_LINEAR_TABLING("--------------------- goto consume_all ---------------\n");
@@ -2563,7 +2559,6 @@
 #else  /*!LINEAR_TABLING_FOLLOWER */
       SgFr_state(sg_fr) = looping_evaluating;
 #endif /*LINEAR_TABLING_FOLLOWER */
-
       if (IS_BATCHED_GEN_CP(B)) {
         /* backtrack */
 	remove_next(sg_fr);
