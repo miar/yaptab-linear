@@ -408,6 +408,7 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
         SgFr_stop_loop_ans(SG_FR) = NULL;                                   \
         SgFr_current_loop_ans(SG_FR) = NULL;                                \
         SgFr_stop_loop_alt(SG_FR) = NULL;                                   \
+        SgFr_first_loop_alt(SG_FR) = NULL;                                  \
 	SgFr_current_loop_alt(SG_FR) = NULL;                                \
         SgFr_consuming_answers(SG_FR)=0;	                            \
 	SgFr_new_answer_trie(SG_FR) = NULL;                                 \

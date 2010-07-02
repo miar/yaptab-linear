@@ -33,7 +33,7 @@
 ** ----------------------------------- */
 
 //#define DEBUG_LINEAR_TABLING 1  
-#define DUMMY_PRINT        1
+//#define DUMMY_PRINT        1
 
 
 #define LINEAR_TABLING 1 
@@ -45,8 +45,8 @@
 **            (suported modes:                            **
 **                  --BASIC                               **
 **		    --DRA                                 **
-**		    --FOLLOWER (basic mode)               **
-**		    --DRA+FOLLOWER)                       **
+**		    --DRE (basic mode)                    **
+**		    --DRA+DRE)                            **
 **      DRS- Dynamic Reordering of Solutions (optional)   **
 ** ------------------------------------------------------ */
 

@@ -213,6 +213,7 @@ typedef struct subgoal_frame {
 #endif /* LIMIT_TABLING */
 #ifdef LINEAR_TABLING
   int dfn;
+  yamop **first_looping_alt;
   yamop **current_looping_alt;
   yamop **stop_looping_alt;
   struct answer_trie_node **stop_looping_ans;
@@ -242,14 +243,11 @@ typedef struct subgoal_frame {
 } *sg_fr_ptr;
 
 
-
 #define SgFr_batched_consuming_answers(X)  ((X)->batched_consuming_answers)
 
 #define SgFr_batched_ans(X)                ((X)->batched_ans)
 
-
 #define SgFr_loop_alts(X)      ((X)->loop_alts)
-
 
 #define SgFr_lock(X)           ((X)->lock)
 #define SgFr_gen_worker(X)     ((X)->generator_worker)
@@ -274,6 +272,7 @@ typedef struct subgoal_frame {
 #define SgFr_current_alt(X)            ((X)->current_alt)
 #define SgFr_next_alt(X)               ((X)->next_alt)
 
+#define SgFr_first_loop_alt(X)         ((X)->first_looping_alt)
 #define SgFr_current_loop_alt(X)       ((X)->current_looping_alt)
 #define SgFr_stop_loop_alt(X)          ((X)->stop_looping_alt)
 

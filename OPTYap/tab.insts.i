@@ -807,7 +807,7 @@
       SgFr_state(sg_fr) = looping_evaluating; 
       batched_consume_first_answer(sg_fr);
       /*else */
-      SgFr_stop_loop_alt(LOCAL_max_scc)=SgFr_current_loop_alt(LOCAL_max_scc);
+      SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr)= SgFr_first_loop_alt(sg_fr);
       PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
       PREFETCH_OP(PREG);
       allocate_environment();
@@ -975,7 +975,7 @@
       SgFr_state(sg_fr) = looping_evaluating; 
       batched_consume_first_answer(sg_fr);
       /*else */
-      SgFr_current_loop_alt(LOCAL_max_scc) = SgFr_stop_loop_alt(LOCAL_max_scc);
+      SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr)= SgFr_first_loop_alt(sg_fr);
       PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
       PREFETCH_OP(PREG);
       allocate_environment();
@@ -1181,7 +1181,7 @@
       SgFr_state(sg_fr) = looping_evaluating; 
       batched_consume_first_answer(sg_fr);
       /*else */
-      SgFr_stop_loop_alt(LOCAL_max_scc)=SgFr_current_loop_alt(LOCAL_max_scc);
+      SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr)= SgFr_first_loop_alt(sg_fr);
       PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
       PREFETCH_OP(PREG);
       allocate_environment();
@@ -2190,7 +2190,6 @@
    
 #endif /*LINEAR_TABLING_DRS */
 
-
 #ifdef LINEAR_TABLING_DRA
     if (SgFr_current_loop_alt(sg_fr) != NULL) 
 #endif /*LINEAR_TABLING_DRA*/
@@ -2207,6 +2206,7 @@
 	  remove_branch(sg_fr);
 	ALT_TAG_AS_JUMP_CELL(next_loop_alt,sg_fr->loop_alts);
 	next_loop_alt = SgFr_stop_loop_alt(sg_fr) = sg_fr->loop_alts;
+	SgFr_first_loop_alt(sg_fr)=SgFr_stop_loop_alt(sg_fr);
       } else { 
   	/*get next alternative  */
 	//#ifdef LINEAR_TABLING_BATCHED
