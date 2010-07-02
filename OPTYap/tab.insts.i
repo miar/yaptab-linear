@@ -1668,7 +1668,7 @@
 	SgFr_new_answer_trie(sg_fr)=ans_node;
       }
 #endif /*LINEAR_TABLING_DRS*/
-      INFO_LINEAR_TABLING("nova resposta");
+      INFO_LINEAR_TABLING("nova resposta sg_fr=%p  ans_node=%p",sg_fr,ans_node);
       TAG_NEW_ANSWERS(sg_fr);      
 #endif /* LINEAR_TABLING */
 
@@ -2130,6 +2130,7 @@
 #ifdef DUMMY_PRINT
       LOCAL_nr_consumed_answers++;      
 #endif /*DUMMY_PRINT */
+      INFO_LINEAR_TABLING("drs- consume loop answer %p",GET_CELL_VALUE(SgFr_current_loop_ans(sg_fr)));
       load_answer_trie(GET_CELL_VALUE(SgFr_current_loop_ans(sg_fr)), subs_ptr);
       YENV = ENV;
       GONext();
@@ -2147,6 +2148,7 @@
 #ifdef DUMMY_PRINT
       LOCAL_nr_consumed_answers++;      
 #endif /*DUMMY_PRINT */
+      INFO_LINEAR_TABLING("drs- consume trie answer %p",SgFr_new_answer_trie(sg_fr), subs_ptr);
       load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);
       YENV = ENV;
       GONext();
@@ -2156,21 +2158,22 @@
   /*continue loading answers from trie */
 
   if (SgFr_consuming_answers(sg_fr)==2){
-    if (SgFr_new_answer_trie(sg_fr)!=SgFr_last_answer(sg_fr)){
-      SgFr_new_answer_trie(sg_fr)=TrNode_child(SgFr_new_answer_trie(sg_fr));
-      restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
-      PREG = (yamop *) CPREG;
-      PREFETCH_OP(PREG);
-      CELL *subs_ptr;
-      subs_ptr = (CELL *) (GEN_CP(B) + 1);          
-      subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
+       if (SgFr_new_answer_trie(sg_fr)!=SgFr_last_answer(sg_fr)){
+	 SgFr_new_answer_trie(sg_fr)=TrNode_child(SgFr_new_answer_trie(sg_fr));
+	 restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+	 PREG = (yamop *) CPREG;
+	 PREFETCH_OP(PREG);
+	 CELL *subs_ptr;
+	 subs_ptr = (CELL *) (GEN_CP(B) + 1);          
+	 subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
 #ifdef DUMMY_PRINT
-      LOCAL_nr_consumed_answers++;      
+	 LOCAL_nr_consumed_answers++;      
 #endif /*DUMMY_PRINT */
-      load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);    
-      YENV = ENV;
-      GONext();
-    }
+	 INFO_LINEAR_TABLING("drs- consume trie answer %p",SgFr_new_answer_trie(sg_fr), subs_ptr);
+	 load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);    
+	 YENV = ENV;
+	 GONext();      
+       }
   }
   /*no more answers to explore. */
   if(SgFr_consuming_answers(sg_fr)==1 || SgFr_consuming_answers(sg_fr)==2){
@@ -2182,6 +2185,7 @@
       UNTAG_NEW_ANSWERS(sg_fr);
     }
     remove_next(sg_fr);
+    SgFr_new_answer_trie(sg_fr)=NULL;
     SgFr_consuming_answers(sg_fr)=0;      
     B = B->cp_b;
     SET_BB(PROTECT_FROZEN_B(B));
@@ -2248,7 +2252,11 @@
 	SgFr_batched_consuming_answers(sg_fr)=0;
 #endif	/*LINEAR_TABLING_BATCHED*/ 		
 	UNTAG_NEW_ANSWERS(sg_fr);
+#ifdef LINEAR_TABLING_DSLA
 	SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr) = next_loop_alt; 
+#else
+	SgFr_current_loop_alt(sg_fr) = next_loop_alt; 
+#endif /*LINEAR_TABLING_DSLA*/
 	restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
 	YENV = (CELL *) PROTECT_FROZEN_B(B);
 	set_cut(YENV, B->cp_b);
@@ -2566,6 +2574,7 @@
 #ifdef DUMMY_PRINT
       LOCAL_nr_consumed_answers++;      
 #endif /*DUMMY_PRINT */
+          INFO_LINEAR_TABLING("drs- consume loop answer %p",GET_CELL_VALUE(SgFr_current_loop_ans(sg_fr)));
 	  load_answer_trie(GET_CELL_VALUE(SgFr_current_loop_ans(sg_fr)), subs_ptr);
 	  YENV = ENV;
 	  GONext();
@@ -2602,6 +2611,7 @@
 #ifdef DUMMY_PRINT
       LOCAL_nr_consumed_answers++;      
 #endif /*DUMMY_PRINT */
+          INFO_LINEAR_TABLING("drs- consume trie answer %p",SgFr_new_answer_trie(sg_fr), subs_ptr);
 	  load_answer_trie(SgFr_new_answer_trie(sg_fr), subs_ptr);
 	  YENV = ENV;
 	  GONext();

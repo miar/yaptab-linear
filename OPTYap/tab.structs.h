@@ -216,10 +216,12 @@ typedef struct subgoal_frame {
   yamop **first_looping_alt;
   yamop **current_looping_alt;
   yamop **stop_looping_alt;
+#ifdef LINEAR_TABLING_DRS
+  int consuming_answers;
   struct answer_trie_node **stop_looping_ans;
   struct answer_trie_node **current_looping_ans;
-  int consuming_answers;
   struct answer_trie_node *new_answer_trie;
+#endif /*LINEAR_TABLING_DRS*/
   struct subgoal_frame *next_on_branch;
   struct subgoal_frame *next_on_scc;
 #ifdef LINEAR_TABLING_DRA
