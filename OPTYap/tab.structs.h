@@ -224,13 +224,10 @@ typedef struct subgoal_frame {
 #ifdef LINEAR_TABLING_DRA
     yamop *current_alt; 
 #endif /*LINEAR_TABLING_DRA */
-#ifdef LINEAR_TABLING_FOLLOWER
+#ifdef LINEAR_TABLING_DRE
   yamop *next_alt;
   struct choicept *pioneer;
-#ifdef LINEAR_TABLING_FOLLOWER_SP
-  struct choicept *sub_pioneer;
-#endif /*LINEAR_TABLING_FOLLOWER_SP */
-#endif /* LINEAR_TABLING_FOLLOWER */
+#endif /* LINEAR_TABLING_DRE */
   yamop  *loop_alts;
   struct answer_trie_node *loop_ans;
 

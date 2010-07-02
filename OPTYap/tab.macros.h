@@ -384,24 +384,14 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 #define free_drs_answers(sg_fr)
 #endif /* LINEAR_TABLING_DRS */
 
-#ifdef LINEAR_TABLING_FOLLOWER_SP
-#define SgFr_init_follower_fields_sp(SG_FR)         \
-        SgFr_sub_pioneer(SG_FR)= NULL 
 
-#else
-#define SgFr_init_follower_fields_sp(SG_FR)
-#endif /* LINEAR_TABLING_FOLLOWER_SP */
-
-
-
-#ifdef LINEAR_TABLING_FOLLOWER
+#ifdef LINEAR_TABLING_DRE
 #define SgFr_init_follower_fields(SG_FR)                         \
-        SgFr_init_follower_fields_sp(SG_FR);                     \
         SgFr_next_alt(SG_FR) = NULL; 			         \
  	SgFr_pioneer(SG_FR) = NULL       
 #else
 #define SgFr_init_follower_fields(SG_FR)
-#endif /* LINEAR_TABLING_FOLLOWER */
+#endif /* LINEAR_TABLING_DRE */
 
 
 #ifdef LINEAR_TABLING_DRA
