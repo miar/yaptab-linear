@@ -304,7 +304,7 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
         { register ans_node_ptr ans_node;                          \
           ALLOC_SUBGOAL_FRAME(SG_FR);                              \
 	  ALLOC_ALTERNATIVES_BUCKET(SgFr_loop_alts(SG_FR));	   \
-	  ALLOC_ANSWERS_BUCKET(SgFr_loop_ans(SG_FR));	           \
+          SgFr_allocate_drs_looping_structure(SG_FR); 		   \
           INIT_LOCK(SgFr_lock(SG_FR));                             \
           SgFr_code(SG_FR) = CODE;                                 \
           SgFr_state(SG_FR) = ready;                               \
@@ -354,15 +354,18 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 
 
 #ifdef LINEAR_TABLING_DRS
-#define free_drs_answers(sg_fr){		 \
-    if (SgFr_current_loop_ans(sg_fr)!=NULL){     \
+#define SgFr_allocate_drs_looping_structure(SG_FR)    \
+       ALLOC_ANSWERS_BUCKET(SgFr_loop_ans(SG_FR)); 
+
+#define free_drs_answers(SG_FR){		 \
+    if (SgFr_current_loop_ans(SG_FR)!=NULL){     \
        struct answer_trie_node **next=NULL;      \
        struct answer_trie_node **curr=NULL;      \
-       curr=SgFr_loop_ans(sg_fr);                \
+       curr=SgFr_loop_ans(SG_FR);                \
        next= curr+MAX_LOOP_ANS_BUCKET;           \
        if (*next!=1){                            \
          ANS_JUMP_NEXT_CELL(next);               \
-         while(next!=SgFr_loop_ans(sg_fr)){      \
+         while(next!=SgFr_loop_ans(SG_FR)){      \
 	   FREE_ANSWERS_BUCKET(curr);            \
 	   curr=next;                            \
 	   next= curr+MAX_LOOP_ANS_BUCKET;       \
@@ -373,15 +376,16 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
        }                                         \
        FREE_ANSWERS_BUCKET(curr);                \
      }                                           \
-    SgFr_stop_loop_ans(sg_fr) = NULL;	         \
-    SgFr_current_loop_ans(sg_fr) = NULL;	 \
-    SgFr_consuming_answers(sg_fr)=0;	         \
-    SgFr_new_answer_trie(sg_fr) = NULL;  	 \
-    SgFr_loop_ans(sg_fr)=NULL;   		 \
+    SgFr_stop_loop_ans(SG_FR) = NULL;	         \
+    SgFr_current_loop_ans(SG_FR) = NULL;	 \
+    SgFr_consuming_answers(SG_FR)=0;	         \
+    SgFr_new_answer_trie(SG_FR) = NULL;  	 \
+    SgFr_loop_ans(SG_FR)=NULL;   		 \
    }
 
 #else 
 #define free_drs_answers(sg_fr)
+#define SgFr_allocate_drs_looping_structure(SG_FR)
 #endif /* LINEAR_TABLING_DRS */
 
 
@@ -402,17 +406,28 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 #endif /* LINEAR_TABLING_DRA */
 
 
+#ifdef LINEAR_TABLING_DRS
+#define SgFr_init_drs_fields(SG_FR)                                         \
+        SgFr_consuming_answers(SG_FR)=0;	                            \
+	SgFr_new_answer_trie(SG_FR) = NULL;                                 \
+        SgFr_stop_loop_ans(SG_FR) = NULL;                                   \
+        SgFr_current_loop_ans(SG_FR) = NULL;                                \
+        SgFr_cp(SG_FR)=NULL;
+#else
+#define SgFr_init_drs_fields(SG_FR)
+#endif /* LINEAR_TABLING_DRS */
+
+
+
+
 #define SgFr_init_linear_tabling_fields(SG_FR)   	                    \
         SET_SGFR_DFN(SG_FR,LOCAL_dfn++);			            \
 	TAG_AS_LEADER(SG_FR);                                               \
-        SgFr_stop_loop_ans(SG_FR) = NULL;                                   \
-        SgFr_current_loop_ans(SG_FR) = NULL;                                \
         SgFr_stop_loop_alt(SG_FR) = NULL;                                   \
         SgFr_first_loop_alt(SG_FR) = NULL;                                  \
 	SgFr_current_loop_alt(SG_FR) = NULL;                                \
-        SgFr_consuming_answers(SG_FR)=0;	                            \
-	SgFr_new_answer_trie(SG_FR) = NULL;                                 \
 	SgFr_init_follower_fields(SG_FR);                                   \
+    	SgFr_init_drs_fields(SG_FR);                                        \
 	SgFr_init_dra_fields(SG_FR);                                        \
 	SgFr_init_batched_fields(SG_FR);	                            
 

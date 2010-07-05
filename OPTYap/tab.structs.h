@@ -217,6 +217,8 @@ typedef struct subgoal_frame {
   yamop **current_looping_alt;
   yamop **stop_looping_alt;
 #ifdef LINEAR_TABLING_DRS
+  yamop *continuation_point;
+  struct answer_trie_node *loop_ans;
   int consuming_answers;
   struct answer_trie_node **stop_looping_ans;
   struct answer_trie_node **current_looping_ans;
@@ -232,14 +234,10 @@ typedef struct subgoal_frame {
   struct choicept *pioneer;
 #endif /* LINEAR_TABLING_DRE */
   yamop  *loop_alts;
-  struct answer_trie_node *loop_ans;
-
 #ifdef LINEAR_TABLING_BATCHED 
   struct answer_trie_node *batched_ans;
   int batched_consuming_answers;
 #endif /*LINEAR_TABLING_BATCHED */
-
-
 #endif /* LINEAR_TABLING */
   struct subgoal_frame *next;
 } *sg_fr_ptr;
@@ -281,6 +279,9 @@ typedef struct subgoal_frame {
 #define SgFr_consuming_answers(X)      ((X)->consuming_answers)
 
 //#define SgFr_first_loop_ans(X)         ((X)->first_looping_ans)
+
+#define SgFr_cp(X)                     ((X)->continuation_point)
+
 #define SgFr_loop_ans(X)               ((X)->loop_ans)
 
 #define SgFr_stop_loop_ans(X)          ((X)->stop_looping_ans)
