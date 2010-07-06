@@ -1039,6 +1039,21 @@ void load_answer_trie(ans_node_ptr ans_node, CELL *subs_ptr) {
 
 void private_completion(sg_fr_ptr sg_fr) {
   /* complete subgoals */
+
+#ifdef LINEAR_TABLING
+  INFO_LINEAR_TABLING("private completion ");
+  while (LOCAL_max_scc != sg_fr) {
+    INFO_LINEAR_TABLING("(while)LOCAL_MAX_SCC= %p", LOCAL_max_scc);
+    mark_as_completed(LOCAL_max_scc);
+    LOCAL_max_scc = SgFr_next_on_scc(LOCAL_max_scc);    
+  }
+  INFO_LINEAR_TABLING("LOCAL_MAX_SCC= %p", LOCAL_max_scc);
+  mark_as_completed(LOCAL_max_scc);
+  LOCAL_max_scc = SgFr_next_on_scc(LOCAL_max_scc);
+  return;
+
+#else /* ! LINEAR_TABLING */
+
 #ifdef LIMIT_TABLING
   sg_fr_ptr aux_sg_fr;
   while (LOCAL_top_sg_fr != sg_fr) {
@@ -1053,27 +1068,12 @@ void private_completion(sg_fr_ptr sg_fr) {
 
   insert_into_global_sg_fr_list(aux_sg_fr);
 #else
-  INFO_LINEAR_TABLING("private completion ");
-
-#ifndef LINEAR_TABLING
   while (LOCAL_top_sg_fr != sg_fr) {
     mark_as_completed(LOCAL_top_sg_fr);
     LOCAL_top_sg_fr = SgFr_next(LOCAL_top_sg_fr);
   }
   mark_as_completed(LOCAL_top_sg_fr);
   LOCAL_top_sg_fr = SgFr_next(LOCAL_top_sg_fr);
-#else
-  while (LOCAL_max_scc != sg_fr) {
-    INFO_LINEAR_TABLING("(while)LOCAL_MAX_SCC= %p", LOCAL_max_scc);
-    mark_as_completed(LOCAL_max_scc);
-    LOCAL_max_scc = SgFr_next_on_scc(LOCAL_max_scc);    
-  }
-  INFO_LINEAR_TABLING("LOCAL_MAX_SCC= %p", LOCAL_max_scc);
-  mark_as_completed(LOCAL_max_scc);
-  LOCAL_max_scc = SgFr_next_on_scc(LOCAL_max_scc);
-#endif
-
-
 #endif /* LIMIT_TABLING */
 
   /* release dependency frames */
@@ -1085,8 +1085,7 @@ void private_completion(sg_fr_ptr sg_fr) {
 
   /* adjust freeze registers */
   adjust_freeze_registers();
-
-  return;
+#endif /* LINEAR_TABLING */
 }
 
 

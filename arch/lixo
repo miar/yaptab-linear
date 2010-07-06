@@ -1,0 +1,196 @@
+% Restoring file /home/miguel/Desktop/yap-ns/arch/startup.yss
+YAP version 6.0.4
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fd24  state=1 
+ ]
+[ add_alternative=0x1003d394 ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fd24  state=2 
+ ]
+[ -------------------------table_retry ---------------
+ ]
+[ add_alternative=0x1003d424 ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=1 
+ ]
+[ add_alternative=0x1003d4c4 ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fd24  state=2 
+ ]
+[ -------------------------table_retry ---------------
+ ]
+[ add_alternative=0x1003d514 ]
+[ nova resposta sg_fr=0x1011fe04  ans_node=0x1011fe7c ]
+[ -------------------------table_trust ---------------
+ ]
+[ add_alternative=0x1003d55c ]
+[ nova resposta sg_fr=0x1011fe04  ans_node=0x1011fe9c ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ --------------------- goto consume_all ---------------
+ ]
+[ sgfr(0x1011fe04)->state=4
+ ]
+[ drs- consume trie answer 0x1011fe7c ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ drs- consume trie answer 0x1011fe9c ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ -------------------------table_trust ---------------
+ ]
+[ add_alternative=0x1003d47c ]
+[ nova resposta sg_fr=0x1011fd24  ans_node=0x1011febc ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fd24 ]
+[ is_leader and has new answers ]
+[ LOCAL_MAX_SCC=0x1011fe04 ]
+[ current_alt=0x1003d394 ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fd24  state=4 
+ ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=3 
+ ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fd24  state=4 
+ ]
+[ nova resposta sg_fr=0x1011fe04  ans_node=0x1011fedc ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ next loop alt ]
+[ current_alt=0x1003d514 ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ next loop alt ]
+[ current_alt=0x1003d55c ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ --------------------- goto consume_all ---------------
+ ]
+[ sgfr(0x1011fe04)->state=4
+ ]
+[ drs- consume trie answer 0x1011fedc ]	
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fd24 ]
+[ is_leader and has new answers ]
+[ LOCAL_MAX_SCC=0x1011fe04 ]
+[ current_alt=0x1003d424 ]    
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=3 
+ ]
+
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fd24  state=4 
+ ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ next loop alt ]
+[ current_alt=0x1003d514 ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ next loop alt ]
+[ current_alt=0x1003d55c ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ --------------------- goto consume_all ---------------
+ ]
+[ sgfr(0x1011fe04)->state=4
+ ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fd24 ]
+[ next loop alt ]
+[ current_alt=0x1003d47c ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fd24 ]
+[ next loop alt ]
+[ current_alt=0x1003d394 ]     
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fd24  state=4 
+ ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=4 
+ ]
+[ nova resposta sg_fr=0x1011fd24  ans_node=0x1011fefc ]
+[ nova resposta sg_fr=0x1011fd24  ans_node=0x1011ff1c ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=4 
+ ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=4 
+ ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fd24 ]
+[ is_leader and has new answers ]
+[ LOCAL_MAX_SCC=0x1011fe04 ]
+[ current_alt=0x1003d424 ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=3 
+ ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fd24  state=4 
+ ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ next loop alt ]
+[ current_alt=0x1003d514 ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ next loop alt ]
+[ current_alt=0x1003d55c ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fe04 ]
+[ --------------------- goto consume_all ---------------
+ ]
+[ sgfr(0x1011fe04)->state=4
+ ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fd24 ]
+[ next loop alt ]
+[ current_alt=0x1003d47c ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fd24 ]
+[ next loop alt ]
+[ current_alt=0x1003d394 ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fd24  state=4 
+ ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=4 
+ ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=4 
+ ]
+[ -------------------------table_try ---------------
+ ]
+[ sg_fr= 0x1011fe04  state=4 
+ ]
+[ -------------------------table_completion --------------- ]
+[ sg_fr=0x1011fd24 ]
+[ is leader ]
+[ --------------------- goto complete_all ---------------
+ ]
+[ private completion  ]
+[ (while)LOCAL_MAX_SCC= 0x1011fe04 ]
+[ LOCAL_MAX_SCC= 0x1011fd24 ]
+ % YAP execution halted

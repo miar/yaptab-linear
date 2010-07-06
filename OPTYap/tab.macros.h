@@ -17,10 +17,19 @@
 
 #include "opt.mavar.h"
 
+#ifdef LINEAR_TABLING
+#include "linear.tab.macros.h"
+#endif /*LINEAR_TABLING */
+
+
+
+
 
 /* -------------------- **
 **      Prototypes      **
 ** -------------------- */
+
+
 
 STD_PROTO(static inline void adjust_freeze_registers, (void));
 STD_PROTO(static inline void mark_as_completed, (sg_fr_ptr));
@@ -74,43 +83,10 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 
 
 
+
 /* ----------------------- **
 **     Tabling Macros      **
 ** ----------------------- */
-
-/* linear tabling macros */
-
-
-#define ALT_TAG_AS_JUMP_CELL(PTR,NEXT_NODE)       ((*PTR)= (yamop *)((unsigned long int)NEXT_NODE | 0x1))
-#define ALT_JUMP_NEXT_CELL(PTR)                   (PTR=(yamop*)(((unsigned long int)(*PTR)) & 0xFFFFFFFE))
-
-
-
-#define IS_JUMP_CELL(PTR)                         (((unsigned long int)(*PTR)) & 0x1)
-
-#define ANS_TAG_AS_JUMP_CELL(PTR,NEXT_NODE)       ((*PTR)= (struct answer_trie_node *)((unsigned long int)NEXT_NODE | 0x1))
-#define ANS_JUMP_NEXT_CELL(PTR)                   (PTR=(struct answer_trie_node *)(((unsigned long int)(*PTR)) & 0xFFFFFFFE))
-
-#define GET_CELL_VALUE(PTR)                       (*(PTR))
-
-#define SET_CELL_VALUE(PTR,VALUE)                 (*(PTR)=VALUE)
-
-
-
-
-
-#define TAG_NEW_ANSWERS(SG_FR)   (SgFr_dfn(SG_FR)=(SgFr_dfn(SG_FR)| 0x1))
-#define TAG_AS_LEADER(SG_FR)     (SgFr_dfn(SG_FR)=(SgFr_dfn(SG_FR)| 0x2))
-
-#define UNTAG_NEW_ANSWERS(SG_FR) (SgFr_dfn(SG_FR)=(SgFr_dfn(SG_FR) & ~(0x1)))
-#define TAG_AS_NO_LEADER(SG_FR)  (SgFr_dfn(SG_FR)=(SgFr_dfn(SG_FR) & ~(0x2)))
-#define HAS_NEW_ANSWERS(SG_FR)   (SgFr_dfn(SG_FR) & 0x1)
-#define IS_LEADER(SG_FR)         (SgFr_dfn(SG_FR) & 0x2)
-
-#define GET_SGFR_DFN(SG_FR)     (SgFr_dfn(SG_FR)>>2)
-#define SET_SGFR_DFN(SG_FR,NR)  (SgFr_dfn(SG_FR)=(NR<<2))
-
-
 
 #define NORM_CP(CP)                 ((choiceptr)(CP))
 #define GEN_CP(CP)                  ((struct generator_choicept *)(CP))
