@@ -124,6 +124,8 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 
 
 
+
+
 #endif /*LINEAR_TABLING_DRA */
 
 
@@ -258,9 +260,10 @@ static inline void propagate_dependencies(sg_fr_ptr SG_FR){
   INFO_LINEAR_TABLING("propagate dependencies upto to sg_fr=%p",SG_FR);
   while(sf_aux && (GET_SGFR_DFN(sf_aux) >dfn 
 #ifdef LINEAR_TABLING_DRS
-       ||SgFr_consuming_answers(sf_aux)==2)
+	||SgFr_consuming_answers(sf_aux)==2)){
+#else  
+       )){
 #endif /*LINEAR_TABLING_DRS */
-     ){ 
        DUMMY_LOCAL_nr_propagate_depen_cicles_inc();                                     
        INFO_LINEAR_TABLING("sgfr_aux=%p",sf_aux);                                       
        TAG_AS_NO_LEADER(sf_aux);
