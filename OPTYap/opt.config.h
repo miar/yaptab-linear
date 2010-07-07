@@ -33,7 +33,7 @@
 ** ----------------------------------- */
 
 //#define DEBUG_LINEAR_TABLING 1  
-//#define DUMMY_PRINT        1
+#define DUMMY_PRINT        1
 
 
 #define LINEAR_TABLING 1 
@@ -59,7 +59,7 @@
 
 
 
-//#define LINEAR_TABLING_DRS     1
+#define LINEAR_TABLING_DRS     1
 
 
 #define MAX_LOOP_ALT_BUCKET   10

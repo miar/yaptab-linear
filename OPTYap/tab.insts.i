@@ -13,7 +13,9 @@
 **      Tabling instructions: auxiliary macros      **
 ** ------------------------------------------------ */
 
-
+#ifdef LINEAR_TABLING
+#include "linear.tab.insts.i"
+#endif /*LINEAR_TABLING */
 
 #ifdef LOW_LEVEL_TRACER
 #define store_low_level_trace_info(CP, TAB_ENT)  CP->cp_pred_entry = TabEnt_pe(TAB_ENT)
@@ -193,6 +195,10 @@
         }
 
 
+
+
+
+
 #define consume_answer_and_procceed(DEP_FR, ANSWER)       \
         { CELL *subs_ptr;                                 \
           /* restore consumer choice point */             \
@@ -220,7 +226,7 @@
         }
 
 
-#if !defined(LINEAR_TABLING) || !defined(DUMMY_PRINT)
+#ifndef LINEAR_TABLING
 #define store_loader_node(TAB_ENT, ANSWER)	              \
         { register choiceptr lcp;                             \
 	  /* initialize lcp */                                \
@@ -242,7 +248,10 @@
           SET_BB(B);                                          \
           TABLING_ERRORS_check_stack;                         \
         }
-#endif /*!defined(LINEAR_TABLING) || !defined(DUMMY_PRINT) */
+#endif /*!LINEAR_TABLING*/
+
+
+
 
 #define restore_loader_node(ANSWER)           \
         H = HBREG = PROTECT_FROZEN_H(B);      \
@@ -345,7 +354,6 @@
     GONext();
   ENDOp();
 #endif /* TABLING_INNER_CUTS */
-
 
 
   PBOp(table_load_answer, Otapl)
@@ -617,12 +625,15 @@
 
 
 
+
+
+
+
+
   PBOp(table_try_me, Otapl)
   //    INFO_LINEAR_TABLING("-------------------------table_try_me ---------------");
-
     tab_ent_ptr tab_ent;
     sg_fr_ptr sg_fr;
-
     check_trail(TR);
     tab_ent = PREG->u.Otapl.te;
     YENV2MEM;
@@ -635,7 +646,6 @@
       LOCAL_nr_consumed_alternatives++;
       INFO_LINEAR_TABLING("i4: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
-
       init_subgoal_frame(sg_fr);
       UNLOCK(SgFr_lock(sg_fr));
 #ifdef LINEAR_TABLING
@@ -824,9 +834,9 @@
 
 
 
+
+
   PBOp(table_try, Otapl)
-
-
     tab_ent_ptr tab_ent;
     sg_fr_ptr sg_fr;
     check_trail(TR);
@@ -1028,17 +1038,16 @@
     }
   ENDPBOp();
 
-
+/*------------------------------------------------------------------------------------------------*/
 
   Op(table_retry_me, Otapl)
-
-#ifdef DUMMY_PRINT
-  LOCAL_nr_consumed_alternatives++;
-  INFO_LINEAR_TABLING("i8: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
-#endif /* DUMMY_PRINT */
-
-    INFO_LINEAR_TABLING("-------------------------table_retry_me ---------------\n");
+/*------------------------------------------------LINEAR TABLING------------------------------*/
 #ifdef LINEAR_TABLING
+    INFO_LINEAR_TABLING("-------------------------table_retry_me ---------------\n");
+#ifdef DUMMY_PRINT
+    LOCAL_nr_consumed_alternatives++;
+    INFO_LINEAR_TABLING("i8: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
+#endif /* DUMMY_PRINT */
     sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;
 #ifdef LINEAR_TABLING_DRE
     restore_generator_node(PREG->u.Otapl.s, COMPLETION);
@@ -1046,7 +1055,6 @@
 #else
     restore_generator_node(PREG->u.Otapl.s, PREG->u.Otapl.d);
 #endif  /*LINEAR_TABLING_DRE */
-
 #ifdef LINEAR_TABLING_DRA
      SgFr_current_alt(sg_fr) = NEXTOP(PREG,Otapl); 
 #else
@@ -1066,28 +1074,25 @@
 
 
  Op(table_retry, Otapl)
-
-#ifdef DUMMY_PRINT
- LOCAL_nr_consumed_alternatives++;
- INFO_LINEAR_TABLING("i9: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
-#endif /* DUMMY_PRINT */
-
-     INFO_LINEAR_TABLING("-------------------------table_retry ---------------\n");
+/*------------------------------------------------LINEAR TABLING------------------------------*/
 #ifdef LINEAR_TABLING
+    INFO_LINEAR_TABLING("-------------------------table_retry ---------------\n");
+#ifdef DUMMY_PRINT
+    LOCAL_nr_consumed_alternatives++;
+    INFO_LINEAR_TABLING("i9: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
+#endif /* DUMMY_PRINT */
     sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;
 #ifdef LINEAR_TABLING_DRE
-   restore_generator_node(PREG->u.Otapl.s, COMPLETION);
-   SgFr_next_alt(sg_fr)= NEXTOP(PREG,Otapl);
+    restore_generator_node(PREG->u.Otapl.s, COMPLETION);
+    SgFr_next_alt(sg_fr)= NEXTOP(PREG,Otapl);
 #else
     restore_generator_node(PREG->u.Otapl.s, NEXTOP(PREG,Otapl));
 #endif /*LINEAR_TABLING_DRE */
-
 #ifdef LINEAR_TABLING_DRA
-      SgFr_current_alt(sg_fr) = PREG->u.Otapl.d;
+    SgFr_current_alt(sg_fr) = PREG->u.Otapl.d;
 #else
-      add_alternative(sg_fr,PREG->u.Otapl.d);
+    add_alternative(sg_fr,PREG->u.Otapl.d);
 #endif /* LINEAR_TABLING_DRA */
-
 #else /*!LINEAR_TABLING */
     restore_generator_node(PREG->u.Otapl.s, NEXTOP(PREG,Otapl));
 #endif /*LINEAR_TABLING */
@@ -1101,13 +1106,13 @@
 
 
   Op(table_trust_me, Otapl)
+/*------------------------------------------------LINEAR TABLING------------------------------*/
+#ifdef LINEAR_TABLING
+    INFO_LINEAR_TABLING("-------------------------table_trust_me ---------------\n");
 #ifdef DUMMY_PRINT
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i10: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
-
-    INFO_LINEAR_TABLING("-------------------------table_trust_me ---------------\n");
-#ifdef LINEAR_TABLING
     sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr; 
 #ifdef LINEAR_TABLING_DRE
     SgFr_next_alt(sg_fr)= NULL;
@@ -1117,8 +1122,8 @@
 #else 
     add_alternative(sg_fr,NEXTOP(PREG,Otapl));
 #endif /*LINEAR_TABLING_DRA */ 
-
 #endif /*LINEAR_TABLING */
+
     restore_generator_node(PREG->u.Otapl.s, COMPLETION);
 #ifdef DETERMINISTIC_TABLING
     if (B_FZ > B && IS_BATCHED_NORM_GEN_CP(B)) {   
@@ -1147,14 +1152,13 @@
 
 
   Op(table_trust, Otapl)
-
+/*------------------------------------------------LINEAR TABLING------------------------------*/
+#ifdef LINEAR_TABLING
+  INFO_LINEAR_TABLING("-------------------------table_trust ---------------\n");
 #ifdef DUMMY_PRINT
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i11: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
-
-   INFO_LINEAR_TABLING("-------------------------table_trust ---------------\n");
-#ifdef LINEAR_TABLING
    sg_fr_ptr sgfr = GEN_CP(B)->cp_sg_fr; 
 #ifdef LINEAR_TABLING_DRE
    SgFr_next_alt(sgfr)= NULL;
@@ -1165,6 +1169,7 @@
     add_alternative(sgfr,PREG->u.Otapl.d);
 #endif /* LINEAR_TABLING_DRA*/
 #endif /* LINEAR_TABLING */
+
    restore_generator_node(PREG->u.Otapl.s, COMPLETION);
 #ifdef DETERMINISTIC_TABLING
   if (B_FZ > B && IS_BATCHED_NORM_GEN_CP(B)) {    

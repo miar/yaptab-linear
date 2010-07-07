@@ -1,3 +1,10 @@
+/* ------------------------------------------ **
+**      yaptab suspend compatibility          **
+** ------------------------------------------ */
+
+#define find_leader_node(LEADER_CP, DEP_ON_STACK)
+
+
 /* -------------------- **
 **      macros          **
 ** -------------------- */
@@ -27,29 +34,6 @@
 STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 
 #ifdef DUMMY_PRINT
-
-#define store_loader_node(TAB_ENT, ANSWER, TYPE)	      \
-        { register choiceptr lcp;                             \
-	  /* initialize lcp */                                \
-          lcp = NORM_CP(LOAD_CP(YENV) - 1);                   \
-          /* store loader choice point */                     \
-          HBREG = H;                                          \
-          store_yaam_reg_cpdepth(lcp);                        \
-          lcp->cp_tr = TR;         	                      \
-          lcp->cp_ap = LOAD_ANSWER;                           \
-          lcp->cp_h  = H;                                     \
-          lcp->cp_b  = B;                                     \
-          lcp->cp_env= ENV;                                   \
-          lcp->cp_cp = CPREG;                                 \
-          LOAD_CP(lcp)->cp_last_answer = ANSWER;              \
-          LOAD_CP(lcp)->type_of_node = TYPE;	              \
-          store_low_level_trace_info(LOAD_CP(lcp), TAB_ENT);  \
-          /* set_cut((CELL *)lcp, B); --> no effect */        \
-          B = lcp;                                            \
-          YAPOR_SET_LOAD(B);                                  \
-          SET_BB(B);                                          \
-          TABLING_ERRORS_check_stack;                         \
-        }
 
 #define consume_answers(tab_ent,sg_fr)                        \
       ans_node_ptr ans_node;                                  \
@@ -120,10 +104,11 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 
 /*------------------------------------------------LINEAR TABLING DRA------------------------------*/
 #ifdef LINEAR_TABLING_DRA
+#define SgFr_init_dra_fields(SG_FR)                         \
+        SgFr_current_alt(SG_FR) = NULL;                     
 
-
-
-
+#else
+#define SgFr_init_dra_fields(SG_FR)
 
 
 #endif /*LINEAR_TABLING_DRA */
@@ -135,8 +120,8 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 /*------------------------------------------------LINEAR TABLING DRE------------------------------*/
 #ifdef LINEAR_TABLING_DRE
 
-
-#define add_next_follower(SG_FR){                                  \
+#define add_next_follower(SG_FR)                                   \
+{                                                                  \
         sg_fr_ptr sgfr_aux=NULL;                                   \
         new_subgoal_frame(sgfr_aux, PREG);                         \
         DRS_add_next_follower_fields(sgfr_aux);                    \
@@ -148,6 +133,16 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
         SgFr_next(sgfr_aux) = LOCAL_top_sg_fr;   		   \
         LOCAL_top_sg_fr = sgfr_aux;				   \
    }
+
+#define SgFr_init_follower_fields(SG_FR)                         \
+{                                        			 \
+        SgFr_next_alt(SG_FR) = NULL; 			         \
+        SgFr_pioneer(SG_FR) = NULL;                              \
+}
+
+#else
+#define SgFr_init_follower_fields(SG_FR)
+
 
 
 #endif  /*LINEAR_TABLING_DRE */
@@ -164,7 +159,7 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
         SgFr_current_loop_ans(sgfr_aux) = NULL;                     \
 }
 
-#define add_answer(SG_FR,ans)						                        \
+#define add_answer(SG_FR,ans)						                                \
 {                                                                                                       \
           if (SgFr_stop_loop_ans(SG_FR)==NULL) {	  		       	                        \
   	     SgFr_stop_loop_ans(SG_FR)= SgFr_loop_ans(SG_FR);                                           \
@@ -180,15 +175,61 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
             SET_CELL_VALUE(SgFr_stop_loop_ans(SG_FR),ans);                                              \
          }                                                                                              \
 }
+
+
+#define SgFr_allocate_drs_looping_structure(SG_FR)    \
+       ALLOC_ANSWERS_BUCKET(SgFr_loop_ans(SG_FR)); 
+
+#define free_drs_answers(SG_FR)                  \
+{		                                 \
+    if (SgFr_current_loop_ans(SG_FR)!=NULL){     \
+       struct answer_trie_node **next=NULL;      \
+       struct answer_trie_node **curr=NULL;      \
+       curr=SgFr_loop_ans(SG_FR);                \
+       next= curr+MAX_LOOP_ANS_BUCKET;           \
+       if (*next!=1){                            \
+         ANS_JUMP_NEXT_CELL(next);               \
+         while(next!=SgFr_loop_ans(SG_FR)){      \
+	   FREE_ANSWERS_BUCKET(curr);            \
+	   curr=next;                            \
+	   next= curr+MAX_LOOP_ANS_BUCKET;       \
+	   if((*next)==1)                        \
+	     break;                              \
+  	   ANS_JUMP_NEXT_CELL(next);             \
+         }                                       \
+       }                                         \
+       FREE_ANSWERS_BUCKET(curr);                \
+     }                                           \
+    SgFr_stop_loop_ans(SG_FR) = NULL;	         \
+    SgFr_current_loop_ans(SG_FR) = NULL;	 \
+    SgFr_consuming_answers(SG_FR)=0;	         \
+    SgFr_new_answer_trie(SG_FR) = NULL;  	 \
+    SgFr_loop_ans(SG_FR)=NULL;   		 \
+ }
+
+#define SgFr_init_drs_fields(SG_FR)                                         \
+{   									    \
+        SgFr_consuming_answers(SG_FR)=0;	                            \
+	SgFr_new_answer_trie(SG_FR) = NULL;                                 \
+        SgFr_stop_loop_ans(SG_FR) = NULL;                                   \
+        SgFr_current_loop_ans(SG_FR) = NULL;                                \
+        SgFr_cp(SG_FR)=NULL;                                                \
+}
+
+
+
 #else
 #define DRS_add_next_follower_fields(sgfr_aux)
-
+#define free_drs_answers(sg_fr)
+#define SgFr_allocate_drs_looping_structure(SG_FR)
+#define SgFr_init_drs_fields(SG_FR)
 #endif /*LINEAR_TABLING_DRS */
 
-
-
-
 /*------------------------------------------------LINEAR TABLING------------------------------*/
+
+
+
+
 
 #define add_next(SG_FR)                                            \
 {                                                                  \
@@ -203,7 +244,7 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 #define remove_next(SG_FR)                                         \
 {                                                                  \
      if(B !=SgFr_gen_cp(LOCAL_top_sg_fr)){	                   \
-        printf("nao devia acontecer\n"); 			   \
+        printf("nao pode acontecer\n"); 			   \
      }else{							   \
        LOCAL_top_sg_fr= SgFr_next(LOCAL_top_sg_fr);		   \
      }								   \
@@ -253,7 +294,50 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
    }
 
 
-					
+#define free_alternatives(sg_fr)                  \
+{    		                                  \
+  if (SgFr_current_loop_alt(sg_fr)!=NULL){        \
+    yamop **next=NULL;                            \
+    yamop **curr=NULL;                            \
+    curr=SgFr_loop_alts(sg_fr);                   \
+    next= curr+MAX_LOOP_ALT_BUCKET;               \
+    if (*next!=1){                                \
+      ALT_JUMP_NEXT_CELL(next);                   \
+      while(next!=SgFr_loop_alts(sg_fr)){         \
+	FREE_ALTERNATIVES_BUCKET(curr);           \
+	curr=next;                                \
+	next= curr+MAX_LOOP_ALT_BUCKET;           \
+	if((*next)==1)                            \
+	  break;                                  \
+	ALT_JUMP_NEXT_CELL(next);                 \
+      }                                           \
+    }                                             \
+    FREE_ALTERNATIVES_BUCKET(curr);               \
+   }                                              \
+   SgFr_stop_loop_alt(sg_fr) = NULL;              \
+   SgFr_current_loop_alt(sg_fr) = NULL;           \
+   SgFr_init_dra_fields(sg_fr);			  \
+   SgFr_loop_alts(sg_fr)=NULL;                    \
+}
+
+
+#define SgFr_init_linear_tabling_fields(SG_FR)                              \
+{	   								    \
+        SET_SGFR_DFN(SG_FR,LOCAL_dfn++);			            \
+	TAG_AS_LEADER(SG_FR);                                               \
+        SgFr_stop_loop_alt(SG_FR) = NULL;                                   \
+        SgFr_first_loop_alt(SG_FR) = NULL;                                  \
+	SgFr_current_loop_alt(SG_FR) = NULL;                                \
+	SgFr_init_follower_fields(SG_FR);                                   \
+    	SgFr_init_drs_fields(SG_FR);                                        \
+	SgFr_init_dra_fields(SG_FR);                                        \
+	SgFr_init_batched_fields(SG_FR);	                            \
+}
+
+
+
+
+			
 static inline void propagate_dependencies(sg_fr_ptr SG_FR){
   sg_fr_ptr sf_aux=LOCAL_top_sg_fr_on_branch;                                        
   int dfn=GET_SGFR_DFN(SG_FR);                                                       
@@ -294,4 +378,6 @@ static inline void propagate_dependencies(sg_fr_ptr SG_FR){
 #endif /*LINEAR_TABLING_DRA*/
   }                                                                              
 }							                             
+
+
 
