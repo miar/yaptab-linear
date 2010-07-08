@@ -17,6 +17,7 @@
 
 #include "opt.mavar.h"
 
+
 #ifdef LINEAR_TABLING
 #include "linear.tab.macros.h"
 #else
@@ -34,11 +35,10 @@
 #endif /*LINEAR_TABLING*/
 
 
+
 /* -------------------- **
 **      Prototypes      **
 ** -------------------- */
-
-
 
 STD_PROTO(static inline void adjust_freeze_registers, (void));
 STD_PROTO(static inline void mark_as_completed, (sg_fr_ptr));
@@ -1167,3 +1167,11 @@ tg_sol_fr_ptr CUT_prune_tg_solution_frames(tg_sol_fr_ptr solutions, int ltt) {
   }
 }
 #endif /* TABLING_INNER_CUTS */
+
+
+
+
+
+//#ifdef LINEAR_TABLING
+//#include "linear.tab.insts.h"
+//#endif /*LINEAR_TABLING*/

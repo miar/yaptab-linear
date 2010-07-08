@@ -33,6 +33,7 @@
 ** -------------------- */
 STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 
+
 #ifdef DUMMY_PRINT
 
 #define consume_answers(tab_ent,sg_fr)                        \
@@ -154,7 +155,7 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 {								    \
         SgFr_cp(sgfr_aux) =NULL;                                    \
         SgFr_consuming_answers(sgfr_aux)=0;                         \
-        SgFr_new_answer_trie(sgfr_aux) = NULL;                      \				 
+        SgFr_new_answer_trie(sgfr_aux) = NULL;                      \
 	SgFr_stop_loop_ans(sgfr_aux) = NULL;                        \
         SgFr_current_loop_ans(sgfr_aux) = NULL;                     \
 }

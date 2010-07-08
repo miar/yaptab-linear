@@ -15,7 +15,7 @@
 
 #ifdef LINEAR_TABLING
 #include "linear.tab.insts.i"
-#endif /*LINEAR_TABLING */
+#else
 
 #ifdef LOW_LEVEL_TRACER
 #define store_low_level_trace_info(CP, TAB_ENT)  CP->cp_pred_entry = TabEnt_pe(TAB_ENT)
@@ -1037,6 +1037,8 @@
       }
     }
   ENDPBOp();
+
+#endif /*LINEAR_TABLING */
 
 /*------------------------------------------------------------------------------------------------*/
 

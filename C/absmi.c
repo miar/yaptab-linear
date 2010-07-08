@@ -489,12 +489,12 @@
 *									 *
 *									 *
 *************************************************************************/
-
-
 #define IN_ABSMI_C 1
+
 
 #include "absmi.h"
 #include "heapgc.h"
+
 
 #ifdef CUT_C
 #include "cut_c.h"
@@ -607,6 +607,13 @@ char *Yap_op_names[_std_top + 1] =
 
 #endif
 
+
+#ifdef LINEAR_TABLING
+#include "../OPTYap/linear.tab.insts.h"
+#endif /* LINEAR_TABLING */
+
+
+
 Int 
 Yap_absmi(int inp)
 {
@@ -662,6 +669,13 @@ Yap_absmi(int inp)
   };
 
 #endif /* USE_THREADED_CODE */
+
+
+
+
+
+
+
 
 #ifdef SHADOW_REGS
 
