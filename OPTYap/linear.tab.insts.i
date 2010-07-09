@@ -44,15 +44,11 @@ ENDPBOp();
     } else if (SgFr_state(sg_fr) == evaluating || 
                SgFr_state(sg_fr) == looping_evaluating){ 
       propagate_dependencies(sg_fr);
-      consume_answers(tab_ent,sg_fr);
+      fail_or_yes_answer(tab_ent,sg_fr);
+      consume_answers(tab_ent,ans_node,sg_fr);
     } else {
       /* subgoal completed */
-      ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
-      if (ans_node == NULL) {
-	/* no answers --> fail */
-	UNLOCK(SgFr_lock(sg_fr));
-	goto fail;
-      }
+      fail_or_yes_answer(tab_ent,sg_fr);
       table_try_with_completed(sg_fr,ans_node,tab_ent);
     }
   ENDPBOp();
@@ -67,19 +63,18 @@ ENDPBOp();
     } else if (SgFr_state(sg_fr) == looping_ready) {
       table_try_with_looping_ready(sg_fr);
     } else if (SgFr_state(sg_fr) == evaluating) {
-      table_try_with_evaluating(sg_fr);
-      consume_answers(tab_ent,sg_fr);
+      propagate_dependencies(sg_fr);
+      DRE_table_try_with_evaluating(sg_fr);
+      fail_or_yes_answer(tab_ent,sg_fr);
+      consume_answers(tab_ent,ans_node,sg_fr);
     } else if (SgFr_state(sg_fr) == looping_evaluating) {
-      table_try_with_looping_evaluating(sg_fr);
-      consume_answers(tab_ent,sg_fr);
+      propagate_dependencies(sg_fr);
+      DRE_table_try_with_looping_evaluating(sg_fr);
+      fail_or_yes_answer(tab_ent,sg_fr);
+      consume_answers(tab_ent,ans_node,sg_fr);
     } else {
       /* subgoal completed */
-      ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
-      if (ans_node == NULL) {
-	/* no answers --> fail */
-	UNLOCK(SgFr_lock(sg_fr));
-	goto fail;
-      }
+      fail_or_yes_answer(tab_ent,sg_fr);
       table_try_with_completed(sg_fr,ans_node,tab_ent);
     }
   ENDPBOp();
@@ -90,23 +85,23 @@ ENDPBOp();
     table_try_begin();
     if (SgFr_state(sg_fr) == ready) {
       /* subgoal new */
+      INFO_LINEAR_TABLING(" outside  B=%p",B);
       table_try_with_ready(sg_fr,PREG->u.Otapl.d, NEXTOP(PREG,Otapl));
     } else if (SgFr_state(sg_fr) == looping_ready) {
       table_try_with_looping_ready(sg_fr);
-    } else if (SgFr_state(sg_fr) == evaluating) {
-      table_try_with_evaluating(sg_fr);
-      consume_answers(tab_ent,sg_fr);
+        } else if (SgFr_state(sg_fr) == evaluating) {
+      propagate_dependencies(sg_fr);
+      DRE_table_try_with_evaluating(sg_fr);
+      fail_or_yes_answer(tab_ent,sg_fr);
+      consume_answers(tab_ent,ans_node,sg_fr);
     } else if (SgFr_state(sg_fr) == looping_evaluating) {
-      table_try_with_looping_evaluating(sg_fr);
-      consume_answers(tab_ent,sg_fr);
+      propagate_dependencies(sg_fr);
+      DRE_table_try_with_looping_evaluating(sg_fr);
+      fail_or_yes_answer(tab_ent,sg_fr);
+      consume_answers(tab_ent,ans_node,sg_fr);
     } else {
       /* subgoal completed */
-      ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
-      if (ans_node == NULL) {
-	/* no answers --> fail */
-	UNLOCK(SgFr_lock(sg_fr));
-	goto fail;
-      }
+      fail_or_yes_answer(tab_ent,sg_fr);
       table_try_with_completed(sg_fr,ans_node,tab_ent);
     }
   ENDPBOp();

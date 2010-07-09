@@ -1,3 +1,6 @@
+#ifndef LINEAR_TAB_MACROS_H
+#define LINEAR_TAB_MACROS_H
+
 /* ------------------------------------------ **
 **      yaptab suspend compatibility          **
 ** ------------------------------------------ */
@@ -31,77 +34,9 @@
 /* -------------------- **
 **      Prototypes      **
 ** -------------------- */
-STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 
 
-#ifdef DUMMY_PRINT
 
-#define consume_answers(tab_ent,sg_fr)                        \
-      ans_node_ptr ans_node;                                  \
-      DUMMY_LOCAL_nr_consumers_inc();                         \
-      ans_node = SgFr_first_answer(sg_fr);                    \
-      if (ans_node == NULL) {                                 \
-	/* no answers --> fail */                             \
-	UNLOCK(SgFr_lock(sg_fr));                             \
-	goto fail;                                            \
-      } else if (ans_node == SgFr_answer_trie(sg_fr)) {       \
-	/* yes answer --> procceed */                         \
-	UNLOCK(SgFr_lock(sg_fr));                             \
-	PREG = (yamop *) CPREG;                               \
-	PREFETCH_OP(PREG);                                    \
-	YENV = ENV;                                           \
-	GONext();                                             \
-      } else {                                                \
-	/* answers -> get first answer */                     \
-	UNLOCK(SgFr_lock(sg_fr));                             \
-	store_loader_node(tab_ent, ans_node,0);		      \
-	PREG = (yamop *) CPREG;                               \
-	PREFETCH_OP(PREG);                                    \
-	load_answer_trie(ans_node, YENV);                     \
-	YENV = ENV;                                           \
-	GONext();                                             \
-      }
-
-#define DUMMY_LOCAL_nr_followers_inc()                  (LOCAL_nr_followers++)
-#define DUMMY_LOCAL_nr_generators_inc()                 (LOCAL_nr_generators++)
-#define DUMMY_LOCAL_nr_consumers_inc()                  (LOCAL_nr_consumers++)
-#define DUMMY_LOCAL_nr_propagate_depen_cicles_inc()        (LOCAL_nr_propagate_depen_cicles++)
-#define	DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc() (LOCAL_nr_is_leader_and_has_new_answers++)
-
-#else  /*! DUMMY_PRINT */
-
-#define consume_answers(tab_ent,sg_fr)                        \
-      ans_node_ptr ans_node;                                  \
-      DUMMY_LOCAL_nr_consumers_inc();                         \
-      ans_node = SgFr_first_answer(sg_fr);                    \
-      if (ans_node == NULL) {                                 \
-	/* no answers --> fail */                             \
-	UNLOCK(SgFr_lock(sg_fr));                             \
-	goto fail;                                            \
-      } else if (ans_node == SgFr_answer_trie(sg_fr)) {       \
-	/* yes answer --> procceed */                         \
-	UNLOCK(SgFr_lock(sg_fr));                             \
-	PREG = (yamop *) CPREG;                               \
-	PREFETCH_OP(PREG);                                    \
-	YENV = ENV;                                           \
-	GONext();                                             \
-      } else {                                                \
-	/* answers -> get first answer */                     \
-	UNLOCK(SgFr_lock(sg_fr));                             \
-	store_loader_node(tab_ent, ans_node);                 \
-	PREG = (yamop *) CPREG;                               \
-	PREFETCH_OP(PREG);                                    \
-	load_answer_trie(ans_node, YENV);                     \
-	YENV = ENV;                                           \
-	GONext();                                             \
-      }
-
-#define DUMMY_LOCAL_nr_followers_inc()
-#define DUMMY_LOCAL_nr_generators_inc()
-#define DUMMY_LOCAL_nr_consumers_inc()
-#define	DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc()
-#define DUMMY_LOCAL_nr_propagate_depen_cicles_inc()
-#endif /*DUMMY_PRINT */
 
 /*------------------------------------------------LINEAR TABLING DRA------------------------------*/
 #ifdef LINEAR_TABLING_DRA
@@ -113,8 +48,6 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 
 
 #endif /*LINEAR_TABLING_DRA */
-
-
 
 
 
@@ -229,6 +162,26 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 /*------------------------------------------------LINEAR TABLING------------------------------*/
 
 
+#define fail_or_yes_answer(tab_ent,sg_fr)		      \
+      ans_node_ptr ans_node;                                  \
+      DUMMY_LOCAL_nr_consumers_inc();                         \
+      ans_node = SgFr_first_answer(sg_fr);                    \
+      if (ans_node == NULL) {                                 \
+	/* no answers --> fail */                             \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	goto fail;                                            \
+      } else if (ans_node == SgFr_answer_trie(sg_fr)) {       \
+	/* yes answer --> procceed */                         \
+	UNLOCK(SgFr_lock(sg_fr));                             \
+	PREG = (yamop *) CPREG;                               \
+	PREFETCH_OP(PREG);                                    \
+	YENV = ENV;                                           \
+	GONext();                                             \
+      }							      \
+
+
+
+
 
 
 
@@ -272,27 +225,6 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 }
 
 
-
-#define add_alternative(SG_FR,pc)						              \
-  {                                                                                           \
-      if (SgFr_state(SG_FR) == evaluating) {				                      \
-          if (SgFr_current_loop_alt(SG_FR)==NULL) {	  		       	              \
-	    SgFr_current_loop_alt(SG_FR)= SgFr_loop_alts(SG_FR);	                      \
-	    SET_CELL_VALUE(SgFr_current_loop_alt(SG_FR),pc);                                  \
-   	    INFO_LINEAR_TABLING("add_alternative=%p",pc);                                     \
-          } else if (GET_CELL_VALUE(SgFr_current_loop_alt(SG_FR))!= pc) {                     \
-            SgFr_current_loop_alt(SG_FR)++;                                                   \
-   	    if (IS_JUMP_CELL(SgFr_current_loop_alt(SG_FR))){                                  \
-	      yamop *nb;                                                                      \
-              ALLOC_ALTERNATIVES_BUCKET(nb);				                      \
-   	      ALT_TAG_AS_JUMP_CELL(SgFr_current_loop_alt(SG_FR),nb);                          \
-              SgFr_current_loop_alt(SG_FR)=nb;					              \
-	    }                                                                                 \
-	    SET_CELL_VALUE(SgFr_current_loop_alt(SG_FR),pc);	                              \
-	    INFO_LINEAR_TABLING("add_alternative=%p",pc);		                      \
-          }                                                                                   \
-	}                                                                                     \
-   }
 
 
 #define free_alternatives(sg_fr)                  \
@@ -339,46 +271,7 @@ STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
 
 
 			
-static inline void propagate_dependencies(sg_fr_ptr SG_FR){
-  sg_fr_ptr sf_aux=LOCAL_top_sg_fr_on_branch;                                        
-  int dfn=GET_SGFR_DFN(SG_FR);                                                       
-  INFO_LINEAR_TABLING("propagate dependencies upto to sg_fr=%p",SG_FR);
-  while(sf_aux && (GET_SGFR_DFN(sf_aux) >dfn 
-#ifdef LINEAR_TABLING_DRS
-	||SgFr_consuming_answers(sf_aux)==2)){
-#else  
-       )){
-#endif /*LINEAR_TABLING_DRS */
-       DUMMY_LOCAL_nr_propagate_depen_cicles_inc();                                     
-       INFO_LINEAR_TABLING("sgfr_aux=%p",sf_aux);                                       
-       TAG_AS_NO_LEADER(sf_aux);
-#ifdef LINEAR_TABLING_DRS
-   if(SgFr_consuming_answers(sf_aux)==2){
-       add_answer(sf_aux,SgFr_new_answer_trie(sf_aux))
-    }
-#endif /*LINEAR_TABLING_DRS */
-#if defined(LINEAR_TABLING_DRA) && defined(LINEAR_TABLING_DRS)
-    else 
-#endif /*LINEAR_TABLING_DRA && LINEAR_TABLING_DRS */
-#ifdef LINEAR_TABLING_DRA
-   add_alternative(sf_aux, SgFr_current_alt(sf_aux));			     
-#endif /*LINEAR_TABLING_DRA*/
-       sf_aux = SgFr_next_on_branch(sf_aux);		        	             
-  }	                                                                             
-  if (sf_aux) {	
-#ifdef LINEAR_TABLING_DRS
-   if(SgFr_consuming_answers(sf_aux)==2){
-       add_answer(sf_aux,SgFr_new_answer_trie(sf_aux))
-    }
-#endif /*LINEAR_TABLING_DRS */
-#if defined(LINEAR_TABLING_DRA) && defined(LINEAR_TABLING_DRS)
-    else 
-#endif /*LINEAR_TABLING_DRA && LINEAR_TABLING_DRS */
-#ifdef LINEAR_TABLING_DRA
-   add_alternative(sf_aux, SgFr_current_alt(sf_aux));			     
-#endif /*LINEAR_TABLING_DRA*/
-  }                                                                              
-}							                             
 
 
+#endif /*LINEAR_TAB_MACROS_H */
 

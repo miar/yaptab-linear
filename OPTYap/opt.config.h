@@ -32,8 +32,8 @@
 **      linear tabling? (optional)     **
 ** ----------------------------------- */
 
-//#define DEBUG_LINEAR_TABLING 1  
-#define DUMMY_PRINT        1
+#define DEBUG_LINEAR_TABLING 1  
+//#define DUMMY_PRINT        1
 
 
 #define LINEAR_TABLING 1 
@@ -55,7 +55,7 @@
 
 #define LINEAR_TABLING_DSLA 1
 #define LINEAR_TABLING_DRA 1  
-#define LINEAR_TABLING_DRE 1 
+//#define LINEAR_TABLING_DRE 1 
 
 
 
