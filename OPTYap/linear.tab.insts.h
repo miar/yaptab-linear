@@ -245,46 +245,7 @@
 
 
 
-
-/*
-#define table_try_with_ready(sg_fr,PREG_CI,PREG_NI){   \
-  init_subgoal_frame(sg_fr);                                                    \
-  INFO_LINEAR_TABLING("ola 1"); \
-  UNLOCK(SgFr_lock(sg_fr));\
-  store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, PREG_NI);\
-  add_branch(sg_fr);\
-  add_max_scc(sg_fr);\
-  add_next(sg_fr);\
-  SgFr_current_alt(sg_fr) =  PREG_CI;\
-  PREG = PREG_CI;                          \
-  PREFETCH_OP(PREG);\
-  allocate_environment();\
-  INFO_LINEAR_TABLING("ola 2");\
-  GONext();\
-}
-*/
-
-
-
-#ifdef LINEAR_TABLING_DRE
-STD_PROTO(static inline void DRE_table_try_with_evaluating, (sg_fr_ptr));
-STD_PROTO(static inline void DRE_table_try_with_looping_evaluating, (sg_fr_ptr));
-#else
-#define DRE_table_try_with_evaluating(sg_fr_ptr)
-#define DRE_table_try_with_looping_evaluating(sg_fr_ptr)
-#endif /*LINEAR_TABLING_DRE */
-
-          
-STD_PROTO(static inline void table_try_single_with_ready, (sg_fr_ptr,yamop*));
-STD_PROTO(static inline void table_try_with_ready, (sg_fr_ptr,yamop*,yamop*));
-STD_PROTO(static inline void table_try_with_looping_ready, (sg_fr_ptr));
-STD_PROTO(static inline void table_try_with_completed,(sg_fr_ptr,ans_node_ptr,tab_ent_ptr));
-STD_PROTO(static inline void consume_answers, (tab_ent_ptr,ans_node_ptr,sg_fr_ptr));
-STD_PROTO(static inline void propagate_dependencies, (sg_fr_ptr));
-
-
-
-static inline void propagate_dependencies(sg_fr_ptr SG_FR){
+inline void propagate_dependencies(sg_fr_ptr SG_FR){
   sg_fr_ptr sf_aux=LOCAL_top_sg_fr_on_branch;                                        
   int dfn=GET_SGFR_DFN(SG_FR);                                                       
   INFO_LINEAR_TABLING("propagate dependencies upto to sg_fr=%p",SG_FR);
@@ -327,7 +288,7 @@ static inline void propagate_dependencies(sg_fr_ptr SG_FR){
 
 
 
-static inline void consume_answers(tab_ent_ptr tab_ent,ans_node_ptr ans_node,sg_fr_ptr sg_fr) {
+inline void consume_all_answers_on_trie(tab_ent_ptr tab_ent,ans_node_ptr ans_node,sg_fr_ptr sg_fr) {
   /* answers -> get first answer */                     
   UNLOCK(SgFr_lock(sg_fr));                             
 #ifdef DUMMY_PRINT
@@ -339,14 +300,13 @@ static inline void consume_answers(tab_ent_ptr tab_ent,ans_node_ptr ans_node,sg_
   PREFETCH_OP(PREG);                                    
   load_answer_trie(ans_node, YENV);                     
   YENV = ENV;                                           
-  GONext();                                             
 }
 
 
 
 
 
-static inline void table_try_single_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI){
+inline void table_try_single_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI){
 #ifdef DUMMY_PRINT
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i3: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
@@ -369,12 +329,11 @@ static inline void table_try_single_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI){
   PREG = PREG_CI;                          
   PREFETCH_OP(PREG);
   allocate_environment();
-  GONext();
 }
 
 
 
-static inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* PREG_NI){
+inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* PREG_NI){
 #ifdef DUMMY_PRINT
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i3: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
@@ -403,12 +362,11 @@ static inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* 
   allocate_environment();
   INFO_LINEAR_TABLING(" inside  B=%p",B);
   INFO_LINEAR_TABLING("ola 2");
-  GONext();
 }
 
 
 
-static inline void table_try_with_looping_ready(sg_fr_ptr sg_fr){
+inline void table_try_with_looping_ready(sg_fr_ptr sg_fr){
 #ifdef DUMMY_PRINT
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i3: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
@@ -426,11 +384,10 @@ static inline void table_try_with_looping_ready(sg_fr_ptr sg_fr){
   PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
   PREFETCH_OP(PREG);
   allocate_environment();
-  GONext();
 }
 
 
-static inline void table_try_with_completed(sg_fr_ptr sg_fr,ans_node_ptr ans_node,tab_ent_ptr tab_ent){
+inline void table_try_with_completed(sg_fr_ptr sg_fr,ans_node_ptr ans_node,tab_ent_ptr tab_ent){
     /* answers -> get first answer */
     if (IsMode_LoadAnswers(TabEnt_mode(tab_ent))) {
       /* load answers from the trie */
@@ -446,7 +403,6 @@ static inline void table_try_with_completed(sg_fr_ptr sg_fr,ans_node_ptr ans_nod
       PREFETCH_OP(PREG);
       load_answer_trie(ans_node, YENV);
       YENV = ENV;
-      GONext();
     } else {
       /* execute compiled code from the trie */
       if (SgFr_state(sg_fr) < compiled)
@@ -456,12 +412,11 @@ static inline void table_try_with_completed(sg_fr_ptr sg_fr,ans_node_ptr ans_nod
       PREFETCH_OP(PREG);
       *--YENV = 0;  /* vars_arity */
       *--YENV = 0;  /* heap_arity */
-      GONext();
     }
 }
 
 #ifdef LINEAR_TABLING_DRE
-static inline void DRE_table_try_with_evaluating(sg_fr_ptr sg_fr){
+inline void DRE_table_try_with_evaluating(sg_fr_ptr sg_fr){
   if (SgFr_next_alt(sg_fr)!=NULL){
     INFO_LINEAR_TABLING("follower");
     DUMMY_LOCAL_nr_followers_inc();
@@ -472,12 +427,11 @@ static inline void DRE_table_try_with_evaluating(sg_fr_ptr sg_fr){
     PREG = SgFr_next_alt(sg_fr);
     PREFETCH_OP(PREG);
     allocate_environment();
-    GONext();
   }            
 }
 
 
-static inline void DRE_table_try_with_looping_evaluating(sg_fr_ptr sg_fr){
+inline void DRE_table_try_with_looping_evaluating(sg_fr_ptr sg_fr){
   yamop **follower_alt=SgFr_current_loop_alt(sg_fr)+1;
   if (IS_JUMP_CELL(follower_alt))
     ALT_JUMP_NEXT_CELL(follower_alt);	  
@@ -496,9 +450,60 @@ static inline void DRE_table_try_with_looping_evaluating(sg_fr_ptr sg_fr){
     PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
     PREFETCH_OP(PREG);
     allocate_environment();
-    GONext();
   }
 }
 #endif /*LINEAR_TABLING_DRE */
+
+
+inline void table_retry(yamop* PREG_CI, yamop* PREG_NI){
+#ifdef DUMMY_PRINT
+    LOCAL_nr_consumed_alternatives++;
+    INFO_LINEAR_TABLING("i8: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
+#endif /* DUMMY_PRINT */
+    sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;
+#ifdef LINEAR_TABLING_DRE
+    restore_generator_node(PREG->u.Otapl.s, COMPLETION);
+    SgFr_next_alt(sg_fr)=PREG_NI;
+#else
+    restore_generator_node(PREG->u.Otapl.s, PREG_NI);
+#endif  /*LINEAR_TABLING_DRE */
+
+#ifdef LINEAR_TABLING_DRA
+    SgFr_current_alt(sg_fr) = PREG_CI;
+#else
+     add_alternative(sg_fr,PREG_CI); 
+#endif /*LINEAR_TABLING_DRA*/
+    YENV = (CELL *) PROTECT_FROZEN_B(B);
+    set_cut(YENV, B->cp_b);
+    SET_BB(NORM_CP(YENV));
+    PREG = PREG_CI;
+    allocate_environment();
+}
+
+
+inline void table_trust(yamop* PREG_CI){
+/*------------------------------------------------LINEAR TABLING------------------------------*/
+#ifdef DUMMY_PRINT
+  LOCAL_nr_consumed_alternatives++;
+  INFO_LINEAR_TABLING("i10: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
+#endif /* DUMMY_PRINT */
+    sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr; 
+#ifdef LINEAR_TABLING_DRE
+    SgFr_next_alt(sg_fr)= NULL;
+#endif /* LINEAR_TABLING_DRE */
+
+#ifdef LINEAR_TABLING_DRA
+    SgFr_current_alt(sg_fr) = PREG_CI;
+#else 
+    add_alternative(sg_fr,PREG_CI);
+#endif /*LINEAR_TABLING_DRA */ 
+    restore_generator_node(PREG->u.Otapl.s, COMPLETION);
+    YENV = (CELL *) PROTECT_FROZEN_B(B);
+    set_cut(YENV, B->cp_b);
+    SET_BB(NORM_CP(YENV));
+    PREG = PREG_CI;
+    allocate_environment();
+}
+
 
 #endif /*LINEAR_TAB_INSTS_H */

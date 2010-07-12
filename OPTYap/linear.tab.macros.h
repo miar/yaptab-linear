@@ -268,9 +268,23 @@
 }
 
 
+#ifdef LINEAR_TABLING_DRE
+STD_PROTO(inline void DRE_table_try_with_evaluating, (sg_fr_ptr));
+STD_PROTO(inline void DRE_table_try_with_looping_evaluating, (sg_fr_ptr));
+#else
+#define DRE_table_try_with_evaluating(sg_fr_ptr)
+#define DRE_table_try_with_looping_evaluating(sg_fr_ptr)
+#endif /*LINEAR_TABLING_DRE */
 
-
-			
+          
+STD_PROTO(inline void table_try_single_with_ready, (sg_fr_ptr,yamop*));
+STD_PROTO(inline void table_try_with_ready, (sg_fr_ptr,yamop*,yamop*));
+STD_PROTO(inline void table_try_with_looping_ready, (sg_fr_ptr));
+STD_PROTO(inline void table_try_with_completed,(sg_fr_ptr,ans_node_ptr,tab_ent_ptr));
+STD_PROTO(inline void table_retry,(yamop*,yamop*));
+STD_PROTO(inline void table_trust,(yamop*));
+STD_PROTO(inline void consume_all_answers_on_trie, (tab_ent_ptr,ans_node_ptr,sg_fr_ptr));
+STD_PROTO(inline void propagate_dependencies, (sg_fr_ptr));
 
 
 #endif /*LINEAR_TAB_MACROS_H */

@@ -1038,9 +1038,6 @@
     }
   ENDPBOp();
 
-#endif /*LINEAR_TABLING */
-
-/*------------------------------------------------------------------------------------------------*/
 
   Op(table_retry_me, Otapl)
 /*------------------------------------------------LINEAR TABLING------------------------------*/
@@ -1074,7 +1071,6 @@
   ENDOp();
 
 
-
  Op(table_retry, Otapl)
 /*------------------------------------------------LINEAR TABLING------------------------------*/
 #ifdef LINEAR_TABLING
@@ -1105,6 +1101,7 @@
     PREG = PREG->u.Otapl.d;
     GONext();
   ENDOp();
+
 
 
   Op(table_trust_me, Otapl)
@@ -1196,276 +1193,6 @@
     PREG = PREG->u.Otapl.d;
     GONext();
   ENDOp();
-
-
-
-  PBOp(table_new_answer, s)
-    CELL *subs_ptr;
-    choiceptr gcp;
-    sg_fr_ptr sg_fr;
-    ans_node_ptr ans_node;
-
-    gcp = NORM_CP(YENV[E_B]);
-#ifdef DETERMINISTIC_TABLING
-    if (IS_DET_GEN_CP(gcp)){  
-      sg_fr = DET_GEN_CP(gcp)->cp_sg_fr;
-      subs_ptr = (CELL *)(DET_GEN_CP(gcp) + 1) ; 
-    } else
-#endif /* DETERMINISTIC_TABLING */
-    {
-      sg_fr = GEN_CP(gcp)->cp_sg_fr;
-      subs_ptr = (CELL *)(GEN_CP(gcp) + 1) + PREG->u.s.s;
-    }
-#if defined(TABLING_ERRORS) && !defined(DETERMINISTIC_TABLING)
-    {
-      int i, j, arity_args, arity_subs;
-      CELL *aux_args;
-      CELL *aux_subs;
-
-      arity_args = PREG->u.s.s;
-      arity_subs = *subs_ptr;
-      aux_args = (CELL *)(GEN_CP(gcp) + 1);
-      aux_subs = subs_ptr;
-      for (i = 1; i <= arity_subs; i++) {
-        Term term_subs = Deref(*(aux_subs + i));
-        for (j = 0; j < arity_args; j++) {
-          Term term_arg = Deref(*(aux_args + j));
-          if (term_subs == term_arg) break;
-	}
-        if (j == arity_args)
-          TABLING_ERROR_MESSAGE("j == arity_args (table_new_answer)");
-      }
-    }
-#endif /* TABLING_ERRORS && !DETERMINISTIC_TABLING */
-#ifdef TABLE_LOCK_AT_ENTRY_LEVEL
-    LOCK(SgFr_lock(sg_fr));
-#endif /* TABLE_LOCK_LEVEL */
-    ans_node = answer_search(sg_fr, subs_ptr);
-#if defined(TABLE_LOCK_AT_NODE_LEVEL)
-    LOCK(TrNode_lock(ans_node));
-#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
-    LOCK_TABLE(ans_node);
-#endif /* TABLE_LOCK_LEVEL */
-    if (! IS_ANSWER_LEAF_NODE(ans_node)) {
-      /* new answer */
-#ifdef TABLING_INNER_CUTS
-      /* check for potencial prunings */
-      if (! BITMAP_empty(GLOBAL_bm_pruning_workers)) {
-        int until_depth, depth;
-
-        until_depth = OrFr_depth(SgFr_gen_top_or_fr(sg_fr));
-        depth = OrFr_depth(LOCAL_top_or_fr);
-        if (depth > until_depth) {
-          int i, ltt;
-          bitmap prune_members, members;
-          or_fr_ptr leftmost_or_fr, or_fr, nearest_or_fr;
-
-          BITMAP_copy(prune_members, GLOBAL_bm_pruning_workers);
-          BITMAP_delete(prune_members, worker_id);
-          ltt = BRANCH_LTT(worker_id, depth);
-          BITMAP_intersection(members, prune_members, OrFr_members(LOCAL_top_or_fr));
-          if (members) {
-            for (i = 0; i < number_workers; i++) {
-              if (BITMAP_member(members, i) && 
-                  BRANCH_LTT(i, depth) > ltt && 
-                  EQUAL_OR_YOUNGER_CP(LOCAL_top_cp, REMOTE_pruning_scope(i))) {
-                leftmost_or_fr = LOCAL_top_or_fr;
-  pending_table_new_answer:
-#if defined(TABLE_LOCK_AT_ENTRY_LEVEL)
-                UNLOCK(SgFr_lock(sg_fr));
-#elif defined(TABLE_LOCK_AT_NODE_LEVEL)
-                UNLOCK(TrNode_lock(ans_node));
-#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
-                UNLOCK_TABLE(ans_node);
-#endif /* TABLE_LOCK_LEVEL */
-                LOCK_OR_FRAME(leftmost_or_fr);
-                if (LOCAL_prune_request) {
-                  UNLOCK_OR_FRAME(leftmost_or_fr);
-                  SCHEDULER_GET_WORK();
-                } else {
-                  CUT_store_tg_answer(leftmost_or_fr, ans_node, gcp, ltt);
-                  UNLOCK_OR_FRAME(leftmost_or_fr);
-                }
-		if (IS_BATCHED_GEN_CP(gcp)) {
-                  /* deallocate and procceed */
-                  PREG = (yamop *) YENV[E_CP];
-                  PREFETCH_OP(PREG);
-                  CPREG = PREG;
-                  SREG = YENV;
-                  ENV = YENV = (CELL *) YENV[E_E];
-#ifdef DEPTH_LIMIT
-		  DEPTH = YENV[E_DEPTH];
-#endif /* DEPTH_LIMIT */
-                  GONext();
-		} else {
-                  /* fail */
-                  goto fail;
-		}
-              }
-	    }
-            BITMAP_minus(prune_members, members);
-	  }
-          leftmost_or_fr = OrFr_nearest_leftnode(LOCAL_top_or_fr);
-          depth = OrFr_depth(leftmost_or_fr);
-          if (depth > until_depth) {
-            ltt = BRANCH_LTT(worker_id, depth);
-            BITMAP_intersection(members, prune_members, OrFr_members(leftmost_or_fr));
-            if (members) {
-              for (i = 0; i < number_workers; i++) {
-                if (BITMAP_member(members, i) &&
-                    BRANCH_LTT(i, depth) > ltt &&
-                    EQUAL_OR_YOUNGER_CP(OrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i)))
-                  goto pending_table_new_answer;
-	      }
-              BITMAP_minus(prune_members, members);
-            }
-            /* reaching that point we should update the nearest leftnode data */
-            leftmost_or_fr = OrFr_nearest_leftnode(leftmost_or_fr);
-            depth = OrFr_depth(leftmost_or_fr);
-            while (depth > until_depth) {
-              ltt = BRANCH_LTT(worker_id, depth);
-              BITMAP_intersection(members, prune_members, OrFr_members(leftmost_or_fr));
-              if (members) {
-                for (i = 0; i < number_workers; i++) {
-                  if (BITMAP_member(members, i) &&
-                      BRANCH_LTT(i, depth) > ltt &&
-                      EQUAL_OR_YOUNGER_CP(OrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i))) {
-                    /* update nearest leftnode data */
-                    or_fr = LOCAL_top_or_fr;
-                    nearest_or_fr = OrFr_nearest_leftnode(or_fr);
-                    while (OrFr_depth(nearest_or_fr) > depth) {
-                      LOCK_OR_FRAME(or_fr);
-                      OrFr_nearest_leftnode(or_fr) = leftmost_or_fr;
-                      UNLOCK_OR_FRAME(or_fr);
-                      or_fr = nearest_or_fr;
-                      nearest_or_fr = OrFr_nearest_leftnode(or_fr);
-                    }
-                    goto pending_table_new_answer;
-  	       	  }
-		}
-		BITMAP_minus(prune_members, members);
-              }
-              leftmost_or_fr = OrFr_nearest_leftnode(leftmost_or_fr);
-              depth = OrFr_depth(leftmost_or_fr);
-            }
-            /* update nearest leftnode data */
-            or_fr = LOCAL_top_or_fr;
-            nearest_or_fr = OrFr_nearest_leftnode(or_fr);
-            while (OrFr_depth(nearest_or_fr) > depth) {
-              LOCK_OR_FRAME(or_fr);
-              OrFr_nearest_leftnode(or_fr) = leftmost_or_fr;
-              UNLOCK_OR_FRAME(or_fr);
-              or_fr = nearest_or_fr;
-              nearest_or_fr = OrFr_nearest_leftnode(or_fr);
-            }
-          }
-        }
-      }
-
-      /* check for prune requests */
-      if (LOCAL_prune_request) {
-#if defined(TABLE_LOCK_AT_ENTRY_LEVEL)
-        UNLOCK(SgFr_lock(sg_fr));
-#elif defined(TABLE_LOCK_AT_NODE_LEVEL)
-        UNLOCK(TrNode_lock(ans_node));
-#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
-        UNLOCK_TABLE(ans_node);
-#endif /* TABLE_LOCK_LEVEL */
-        SCHEDULER_GET_WORK();
-      }
-#endif /* TABLING_INNER_CUTS */
-      TAG_AS_ANSWER_LEAF_NODE(ans_node);
-#if defined(TABLE_LOCK_AT_NODE_LEVEL)
-      UNLOCK(TrNode_lock(ans_node));
-      LOCK(SgFr_lock(sg_fr));
-#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
-      UNLOCK_TABLE(ans_node);
-      LOCK(SgFr_lock(sg_fr));
-#endif /* TABLE_LOCK_LEVEL */
-      if (SgFr_first_answer(sg_fr) == NULL)
-	SgFr_first_answer(sg_fr) = ans_node;
-      else
-        TrNode_child(SgFr_last_answer(sg_fr)) = ans_node;
-      SgFr_last_answer(sg_fr) = ans_node;
-#ifdef LINEAR_TABLING
-      //add_answer(sg_fr,ans_node);
-#ifdef LINEAR_TABLING_DRS
-      if (SgFr_new_answer_trie(sg_fr)==NULL){
-	SgFr_new_answer_trie(sg_fr)=ans_node;
-      }
-#endif /*LINEAR_TABLING_DRS*/
-      INFO_LINEAR_TABLING("nova resposta sg_fr=%p  ans_node=%p",sg_fr,ans_node);
-      TAG_NEW_ANSWERS(sg_fr);      
-#endif /* LINEAR_TABLING */
-
-#ifdef TABLING_ERRORS
-      { 
-        ans_node_ptr aux_ans_node = SgFr_first_answer(sg_fr);
-        while (aux_ans_node != SgFr_last_answer(sg_fr)) {
-          if (! IS_ANSWER_LEAF_NODE(aux_ans_node))
-            TABLING_ERROR_MESSAGE("! IS_ANSWER_LEAF_NODE(aux_ans_node) (table_new_answer)");
-          aux_ans_node = TrNode_child(aux_ans_node);
-        }
-      }
-#endif /* TABLING_ERRORS */
-      UNLOCK(SgFr_lock(sg_fr));
-      if (IS_BATCHED_GEN_CP(gcp)) {
-
-
-#if defined(TABLING_EARLY_COMPLETION) && !defined(LINEAR_TABLING) 
-	if (gcp == PROTECT_FROZEN_B(B) && (*subs_ptr == 0 || gcp->cp_ap == COMPLETION)) {
-	  /* if the current generator choice point is the topmost choice point and the current */
-	  /* call is deterministic (i.e., the number of substitution variables is zero or      */
-	  /* there are no more alternatives) then the current answer is deterministic and we   */
-	  /* can perform an early completion and remove the current generator choice point     */
-	  private_completion(sg_fr);
-	  B = B->cp_b;
-	  SET_BB(PROTECT_FROZEN_B(B));
-	} else if (*subs_ptr == 0) {
-	  /* if the number of substitution variables is zero, an answer is sufficient to perform */
-          /* an early completion, but the current generator choice point cannot be removed       */
-	  mark_as_completed(sg_fr);
-	  if (gcp->cp_ap != NULL)
-	    gcp->cp_ap = COMPLETION;
-	}
-#endif /* TABLING_EARLY_COMPLETION */
-
-        /* deallocate and procceed */
-        PREG = (yamop *) YENV[E_CP];
-        PREFETCH_OP(PREG);
-        CPREG = PREG;
-        SREG = YENV;
-        ENV = YENV = (CELL *) YENV[E_E];
-#ifdef DEPTH_LIMIT
-	DEPTH = YENV[E_DEPTH];
-#endif /* DEPTH_LIMIT */
-        GONext();
-      } else {
-#if defined(TABLING_EARLY_COMPLETION)  && !defined(LINEAR_TABLING) 
-	if (*subs_ptr == 0) {
-	  /* if the number of substitution variables is zero, an answer is sufficient to perform */
-          /* an early completion, but the current generator choice point cannot be removed       */
-	  mark_as_completed(sg_fr);
-	  if (gcp->cp_ap != ANSWER_RESOLUTION)
-	    gcp->cp_ap = COMPLETION;
-	}
-#endif /* TABLING_EARLY_COMPLETION */
-        /* fail */
-        goto fail;
-      }
-    } else {
-      /* repeated answer */
-#if defined(TABLE_LOCK_AT_ENTRY_LEVEL)
-      UNLOCK(SgFr_lock(sg_fr));
-#elif defined(TABLE_LOCK_AT_NODE_LEVEL)
-      UNLOCK(TrNode_lock(ans_node));
-#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
-      UNLOCK_TABLE(ans_node);
-#endif /* TABLE_LOCK_LEVEL */
-      goto fail;
-    }
-  ENDPBOp();
-
 
 
   BOp(table_answer_resolution, Otapl)
@@ -1848,6 +1575,283 @@
     }
     END_PREFETCH()
   ENDBOp();
+
+
+#endif /*LINEAR_TABLING */
+
+
+  PBOp(table_new_answer, s)
+    CELL *subs_ptr;
+    choiceptr gcp;
+    sg_fr_ptr sg_fr;
+    ans_node_ptr ans_node;
+
+    gcp = NORM_CP(YENV[E_B]);
+#ifdef DETERMINISTIC_TABLING
+    if (IS_DET_GEN_CP(gcp)){  
+      sg_fr = DET_GEN_CP(gcp)->cp_sg_fr;
+      subs_ptr = (CELL *)(DET_GEN_CP(gcp) + 1) ; 
+    } else
+#endif /* DETERMINISTIC_TABLING */
+    {
+      sg_fr = GEN_CP(gcp)->cp_sg_fr;
+      subs_ptr = (CELL *)(GEN_CP(gcp) + 1) + PREG->u.s.s;
+    }
+#if defined(TABLING_ERRORS) && !defined(DETERMINISTIC_TABLING)
+    {
+      int i, j, arity_args, arity_subs;
+      CELL *aux_args;
+      CELL *aux_subs;
+
+      arity_args = PREG->u.s.s;
+      arity_subs = *subs_ptr;
+      aux_args = (CELL *)(GEN_CP(gcp) + 1);
+      aux_subs = subs_ptr;
+      for (i = 1; i <= arity_subs; i++) {
+        Term term_subs = Deref(*(aux_subs + i));
+        for (j = 0; j < arity_args; j++) {
+          Term term_arg = Deref(*(aux_args + j));
+          if (term_subs == term_arg) break;
+	}
+        if (j == arity_args)
+          TABLING_ERROR_MESSAGE("j == arity_args (table_new_answer)");
+      }
+    }
+#endif /* TABLING_ERRORS && !DETERMINISTIC_TABLING */
+#ifdef TABLE_LOCK_AT_ENTRY_LEVEL
+    LOCK(SgFr_lock(sg_fr));
+#endif /* TABLE_LOCK_LEVEL */
+    ans_node = answer_search(sg_fr, subs_ptr);
+#if defined(TABLE_LOCK_AT_NODE_LEVEL)
+    LOCK(TrNode_lock(ans_node));
+#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
+    LOCK_TABLE(ans_node);
+#endif /* TABLE_LOCK_LEVEL */
+    if (! IS_ANSWER_LEAF_NODE(ans_node)) {
+      /* new answer */
+#ifdef TABLING_INNER_CUTS
+      /* check for potencial prunings */
+      if (! BITMAP_empty(GLOBAL_bm_pruning_workers)) {
+        int until_depth, depth;
+
+        until_depth = OrFr_depth(SgFr_gen_top_or_fr(sg_fr));
+        depth = OrFr_depth(LOCAL_top_or_fr);
+        if (depth > until_depth) {
+          int i, ltt;
+          bitmap prune_members, members;
+          or_fr_ptr leftmost_or_fr, or_fr, nearest_or_fr;
+
+          BITMAP_copy(prune_members, GLOBAL_bm_pruning_workers);
+          BITMAP_delete(prune_members, worker_id);
+          ltt = BRANCH_LTT(worker_id, depth);
+          BITMAP_intersection(members, prune_members, OrFr_members(LOCAL_top_or_fr));
+          if (members) {
+            for (i = 0; i < number_workers; i++) {
+              if (BITMAP_member(members, i) && 
+                  BRANCH_LTT(i, depth) > ltt && 
+                  EQUAL_OR_YOUNGER_CP(LOCAL_top_cp, REMOTE_pruning_scope(i))) {
+                leftmost_or_fr = LOCAL_top_or_fr;
+  pending_table_new_answer:
+#if defined(TABLE_LOCK_AT_ENTRY_LEVEL)
+                UNLOCK(SgFr_lock(sg_fr));
+#elif defined(TABLE_LOCK_AT_NODE_LEVEL)
+                UNLOCK(TrNode_lock(ans_node));
+#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
+                UNLOCK_TABLE(ans_node);
+#endif /* TABLE_LOCK_LEVEL */
+                LOCK_OR_FRAME(leftmost_or_fr);
+                if (LOCAL_prune_request) {
+                  UNLOCK_OR_FRAME(leftmost_or_fr);
+                  SCHEDULER_GET_WORK();
+                } else {
+                  CUT_store_tg_answer(leftmost_or_fr, ans_node, gcp, ltt);
+                  UNLOCK_OR_FRAME(leftmost_or_fr);
+                }
+		if (IS_BATCHED_GEN_CP(gcp)) {
+                  /* deallocate and procceed */
+                  PREG = (yamop *) YENV[E_CP];
+                  PREFETCH_OP(PREG);
+                  CPREG = PREG;
+                  SREG = YENV;
+                  ENV = YENV = (CELL *) YENV[E_E];
+#ifdef DEPTH_LIMIT
+		  DEPTH = YENV[E_DEPTH];
+#endif /* DEPTH_LIMIT */
+                  GONext();
+		} else {
+                  /* fail */
+                  goto fail;
+		}
+              }
+	    }
+            BITMAP_minus(prune_members, members);
+	  }
+          leftmost_or_fr = OrFr_nearest_leftnode(LOCAL_top_or_fr);
+          depth = OrFr_depth(leftmost_or_fr);
+          if (depth > until_depth) {
+            ltt = BRANCH_LTT(worker_id, depth);
+            BITMAP_intersection(members, prune_members, OrFr_members(leftmost_or_fr));
+            if (members) {
+              for (i = 0; i < number_workers; i++) {
+                if (BITMAP_member(members, i) &&
+                    BRANCH_LTT(i, depth) > ltt &&
+                    EQUAL_OR_YOUNGER_CP(OrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i)))
+                  goto pending_table_new_answer;
+	      }
+              BITMAP_minus(prune_members, members);
+            }
+            /* reaching that point we should update the nearest leftnode data */
+            leftmost_or_fr = OrFr_nearest_leftnode(leftmost_or_fr);
+            depth = OrFr_depth(leftmost_or_fr);
+            while (depth > until_depth) {
+              ltt = BRANCH_LTT(worker_id, depth);
+              BITMAP_intersection(members, prune_members, OrFr_members(leftmost_or_fr));
+              if (members) {
+                for (i = 0; i < number_workers; i++) {
+                  if (BITMAP_member(members, i) &&
+                      BRANCH_LTT(i, depth) > ltt &&
+                      EQUAL_OR_YOUNGER_CP(OrFr_node(leftmost_or_fr), REMOTE_pruning_scope(i))) {
+                    /* update nearest leftnode data */
+                    or_fr = LOCAL_top_or_fr;
+                    nearest_or_fr = OrFr_nearest_leftnode(or_fr);
+                    while (OrFr_depth(nearest_or_fr) > depth) {
+                      LOCK_OR_FRAME(or_fr);
+                      OrFr_nearest_leftnode(or_fr) = leftmost_or_fr;
+                      UNLOCK_OR_FRAME(or_fr);
+                      or_fr = nearest_or_fr;
+                      nearest_or_fr = OrFr_nearest_leftnode(or_fr);
+                    }
+                    goto pending_table_new_answer;
+  	       	  }
+		}
+		BITMAP_minus(prune_members, members);
+              }
+              leftmost_or_fr = OrFr_nearest_leftnode(leftmost_or_fr);
+              depth = OrFr_depth(leftmost_or_fr);
+            }
+            /* update nearest leftnode data */
+            or_fr = LOCAL_top_or_fr;
+            nearest_or_fr = OrFr_nearest_leftnode(or_fr);
+            while (OrFr_depth(nearest_or_fr) > depth) {
+              LOCK_OR_FRAME(or_fr);
+              OrFr_nearest_leftnode(or_fr) = leftmost_or_fr;
+              UNLOCK_OR_FRAME(or_fr);
+              or_fr = nearest_or_fr;
+              nearest_or_fr = OrFr_nearest_leftnode(or_fr);
+            }
+          }
+        }
+      }
+
+      /* check for prune requests */
+      if (LOCAL_prune_request) {
+#if defined(TABLE_LOCK_AT_ENTRY_LEVEL)
+        UNLOCK(SgFr_lock(sg_fr));
+#elif defined(TABLE_LOCK_AT_NODE_LEVEL)
+        UNLOCK(TrNode_lock(ans_node));
+#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
+        UNLOCK_TABLE(ans_node);
+#endif /* TABLE_LOCK_LEVEL */
+        SCHEDULER_GET_WORK();
+      }
+#endif /* TABLING_INNER_CUTS */
+      TAG_AS_ANSWER_LEAF_NODE(ans_node);
+#if defined(TABLE_LOCK_AT_NODE_LEVEL)
+      UNLOCK(TrNode_lock(ans_node));
+      LOCK(SgFr_lock(sg_fr));
+#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
+      UNLOCK_TABLE(ans_node);
+      LOCK(SgFr_lock(sg_fr));
+#endif /* TABLE_LOCK_LEVEL */
+      if (SgFr_first_answer(sg_fr) == NULL)
+	SgFr_first_answer(sg_fr) = ans_node;
+      else
+        TrNode_child(SgFr_last_answer(sg_fr)) = ans_node;
+      SgFr_last_answer(sg_fr) = ans_node;
+#ifdef LINEAR_TABLING
+#ifdef LINEAR_TABLING_DRS
+      if (SgFr_new_answer_trie(sg_fr)==NULL){
+	SgFr_new_answer_trie(sg_fr)=ans_node;
+      }
+#endif /*LINEAR_TABLING_DRS*/
+      INFO_LINEAR_TABLING("nova resposta sg_fr=%p  ans_node=%p",sg_fr,ans_node);
+      TAG_NEW_ANSWERS(sg_fr);      
+#endif /* LINEAR_TABLING */
+
+#ifdef TABLING_ERRORS
+      { 
+        ans_node_ptr aux_ans_node = SgFr_first_answer(sg_fr);
+        while (aux_ans_node != SgFr_last_answer(sg_fr)) {
+          if (! IS_ANSWER_LEAF_NODE(aux_ans_node))
+            TABLING_ERROR_MESSAGE("! IS_ANSWER_LEAF_NODE(aux_ans_node) (table_new_answer)");
+          aux_ans_node = TrNode_child(aux_ans_node);
+        }
+      }
+#endif /* TABLING_ERRORS */
+      UNLOCK(SgFr_lock(sg_fr));
+      if (IS_BATCHED_GEN_CP(gcp)) {
+
+
+#if defined(TABLING_EARLY_COMPLETION) && !defined(LINEAR_TABLING) 
+	if (gcp == PROTECT_FROZEN_B(B) && (*subs_ptr == 0 || gcp->cp_ap == COMPLETION)) {
+	  /* if the current generator choice point is the topmost choice point and the current */
+	  /* call is deterministic (i.e., the number of substitution variables is zero or      */
+	  /* there are no more alternatives) then the current answer is deterministic and we   */
+	  /* can perform an early completion and remove the current generator choice point     */
+	  private_completion(sg_fr);
+	  B = B->cp_b;
+	  SET_BB(PROTECT_FROZEN_B(B));
+	} else if (*subs_ptr == 0) {
+	  /* if the number of substitution variables is zero, an answer is sufficient to perform */
+          /* an early completion, but the current generator choice point cannot be removed       */
+	  mark_as_completed(sg_fr);
+	  if (gcp->cp_ap != NULL)
+	    gcp->cp_ap = COMPLETION;
+	}
+#endif /* TABLING_EARLY_COMPLETION */
+
+        /* deallocate and procceed */
+        PREG = (yamop *) YENV[E_CP];
+        PREFETCH_OP(PREG);
+        CPREG = PREG;
+        SREG = YENV;
+        ENV = YENV = (CELL *) YENV[E_E];
+#ifdef DEPTH_LIMIT
+	DEPTH = YENV[E_DEPTH];
+#endif /* DEPTH_LIMIT */
+        GONext();
+      } else {
+#if defined(TABLING_EARLY_COMPLETION)  && !defined(LINEAR_TABLING) 
+	if (*subs_ptr == 0) {
+	  /* if the number of substitution variables is zero, an answer is sufficient to perform */
+          /* an early completion, but the current generator choice point cannot be removed       */
+	  mark_as_completed(sg_fr);
+	  if (gcp->cp_ap != ANSWER_RESOLUTION)
+	    gcp->cp_ap = COMPLETION;
+	}
+#endif /* TABLING_EARLY_COMPLETION */
+        /* fail */
+        goto fail;
+      }
+    } else {
+      /* repeated answer */
+#if defined(TABLE_LOCK_AT_ENTRY_LEVEL)
+      UNLOCK(SgFr_lock(sg_fr));
+#elif defined(TABLE_LOCK_AT_NODE_LEVEL)
+      UNLOCK(TrNode_lock(ans_node));
+#elif defined(TABLE_LOCK_AT_WRITE_LEVEL)
+      UNLOCK_TABLE(ans_node);
+#endif /* TABLE_LOCK_LEVEL */
+      goto fail;
+    }
+  ENDPBOp();
+
+
+
+/*------------------------------------------------------------------------------------------------*/
+
+
+
 
 
 
