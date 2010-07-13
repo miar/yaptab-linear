@@ -506,4 +506,22 @@ inline void table_trust(yamop* PREG_CI){
 }
 
 
+inline void table_completion_launch_next_loop_alt(sg_fr_ptr sg_fr,yamop **next_loop_alt){
+  SgFr_current_loop_alt(sg_fr) = next_loop_alt;
+  restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
+  YENV = (CELL *) PROTECT_FROZEN_B(B);
+  set_cut(YENV, B->cp_b);
+  SET_BB(NORM_CP(YENV));
+  allocate_environment();
+  PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+  INFO_LINEAR_TABLING("current_alt=%p",PREG);
+  PREFETCH_OP(PREG);
+#ifdef DUMMY_PRINT
+  LOCAL_nr_consumed_alternatives++;
+  INFO_LINEAR_TABLING("i2: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
+#endif /* DUMMY_PRINT */
+
+}
+
+
 #endif /*LINEAR_TAB_INSTS_H */

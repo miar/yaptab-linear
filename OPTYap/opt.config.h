@@ -32,7 +32,7 @@
 **      linear tabling? (optional)     **
 ** ----------------------------------- */
 
-#define DEBUG_LINEAR_TABLING 1  
+//#define DEBUG_LINEAR_TABLING 1  
 //#define DUMMY_PRINT        1
 
 

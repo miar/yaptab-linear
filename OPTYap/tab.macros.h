@@ -1168,10 +1168,3 @@ tg_sol_fr_ptr CUT_prune_tg_solution_frames(tg_sol_fr_ptr solutions, int ltt) {
 }
 #endif /* TABLING_INNER_CUTS */
 
-
-
-
-
-//#ifdef LINEAR_TABLING
-//#include "linear.tab.insts.h"
-//#endif /*LINEAR_TABLING*/

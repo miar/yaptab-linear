@@ -150,34 +150,6 @@ typedef struct answer_hash {
 
 
 
-/* ----------------------------- **
-**      Struct looping_alts      **
-** ----------------------------- */
-/*
-#ifdef LINEAR_TABLING
-
-typedef struct alternatives {
-  yamop               *alt; 
-  struct alternatives *next;
-} *alternatives_ptr;
-
-#define Alt_alt(X)    ((X)->alt)
-#define Alt_next(X)   ((X)->next)
-
-
-typedef struct loop_answers{
-  struct answer_trie_node *ans; 
-  struct loop_answers     *next;
-} *loop_answers_ptr;
-
-#define Loop_ans(X)   ((X)->ans)
-#define Loop_next(X)  ((X)->next)
-
-#endif  LINEAR_TABLING  
-
-*/
-
-
 /* ------------------------------ **
 **      Struct subgoal_frame      **
 ** ------------------------------ */
@@ -277,8 +249,6 @@ typedef struct subgoal_frame {
 #define SgFr_stop_loop_alt(X)          ((X)->stop_looping_alt)
 
 #define SgFr_consuming_answers(X)      ((X)->consuming_answers)
-
-//#define SgFr_first_loop_ans(X)         ((X)->first_looping_ans)
 
 #define SgFr_cp(X)                     ((X)->continuation_point)
 

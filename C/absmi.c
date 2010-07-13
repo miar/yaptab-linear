@@ -608,11 +608,6 @@ char *Yap_op_names[_std_top + 1] =
 #endif
 
 
-//#ifdef LINEAR_TABLING
-//#include "../OPTYap/linear.tab.insts.h"
-//#endif /* LINEAR_TABLING */
-
-
 
 Int 
 Yap_absmi(int inp)
