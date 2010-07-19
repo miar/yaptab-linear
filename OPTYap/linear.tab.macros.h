@@ -268,14 +268,6 @@
 }
 
 
-#ifdef LINEAR_TABLING_DRE
-STD_PROTO(inline void DRE_table_try_with_evaluating, (sg_fr_ptr));
-STD_PROTO(inline void DRE_table_try_with_looping_evaluating, (sg_fr_ptr));
-#else
-#define DRE_table_try_with_evaluating(sg_fr_ptr)
-#define DRE_table_try_with_looping_evaluating(sg_fr_ptr)
-#endif /*LINEAR_TABLING_DRE */
-
           
 STD_PROTO(inline void table_try_single_with_ready, (sg_fr_ptr,yamop*));
 STD_PROTO(inline void table_try_with_ready, (sg_fr_ptr,yamop*,yamop*));

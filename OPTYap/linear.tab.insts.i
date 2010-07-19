@@ -62,15 +62,19 @@
       GONext();
     } else if (SgFr_state(sg_fr) == evaluating) {
       propagate_dependencies(sg_fr);
-      DRE_table_try_with_evaluating(sg_fr);
-      fail_or_yes_answer(tab_ent,sg_fr);
-      consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
+      DRE_table_try_with_evaluating(sg_fr)
+      {
+	fail_or_yes_answer(tab_ent,sg_fr);
+	consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
+      }
       GONext();
     } else if (SgFr_state(sg_fr) == looping_evaluating) {
       propagate_dependencies(sg_fr);
-      DRE_table_try_with_looping_evaluating(sg_fr);
-      fail_or_yes_answer(tab_ent,sg_fr);
-      consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
+      DRE_table_try_with_looping_evaluating(sg_fr)
+      {
+	fail_or_yes_answer(tab_ent,sg_fr);
+	consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
+      }
       GONext();
     } else {
       /* subgoal completed */
@@ -94,15 +98,19 @@
       GONext();
     } else if (SgFr_state(sg_fr) == evaluating) {
       propagate_dependencies(sg_fr);
-      DRE_table_try_with_evaluating(sg_fr);
-      fail_or_yes_answer(tab_ent,sg_fr);
-      consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
+      DRE_table_try_with_evaluating(sg_fr)
+      {
+	fail_or_yes_answer(tab_ent,sg_fr);
+	consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
+      }
       GONext();
     } else if (SgFr_state(sg_fr) == looping_evaluating) {
       propagate_dependencies(sg_fr);
-      DRE_table_try_with_looping_evaluating(sg_fr);
-      fail_or_yes_answer(tab_ent,sg_fr);
-      consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
+      DRE_table_try_with_looping_evaluating(sg_fr)
+      {
+	fail_or_yes_answer(tab_ent,sg_fr);
+	consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
+      }
       GONext();
     } else {
       /* subgoal completed */
@@ -311,7 +319,7 @@ BOp(table_completion, Otapl)
       PREFETCH_OP(PREG);
       GONext();    
    }
-  /* check for follower node and state still evaluating */
+  /* check for follower node , not pioneer and state still evaluating */
   if (SgFr_state(sg_fr)==evaluating && SgFr_pioneer(sg_fr)!=B)
     goto answer_resolution;
 #endif /*LINEAR_TABLING_DRE*/
@@ -379,12 +387,10 @@ BOp(table_completion, Otapl)
 
 #ifdef LINEAR_TABLING_DRE
     if (SgFr_pioneer(sg_fr)!=B){
-      if (!IS_LEADER(sg_fr)){
-	if (HAS_NEW_ANSWERS(sg_fr)) {
+      if (HAS_NEW_ANSWERS(sg_fr)) {
 	  UNTAG_NEW_ANSWERS(sg_fr);
 	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
 	}	
-      }
       /* consume all answers */
       goto answer_resolution;
     } 
@@ -400,7 +406,7 @@ BOp(table_completion, Otapl)
       goto answer_resolution;      
     }
 
-    /*if DRE is present then not leader */
+    /*if DRE is present then (it is pioneer and not leader) */
 #ifdef LINEAR_TABLING_DRS
       if(SgFr_cp(sg_fr)!=B->cp_cp){
         INFO_LINEAR_TABLING("drs- SgFr_cp=%p  B->cp=%p",SgFr_cp(sg_fr),B->cp_cp);

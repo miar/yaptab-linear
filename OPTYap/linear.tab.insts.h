@@ -34,6 +34,18 @@
 
 #define	DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc() (LOCAL_nr_is_leader_and_has_new_answers++)
 
+
+
+#ifdef LINEAR_TABLING_DRE
+#DUMMY_DRE_table_try_with_looping_evaluating()                                                    \
+    DUMMY_LOCAL_nr_followers_inc();                                                               \
+    LOCAL_nr_consumed_alternatives++;                                                             \
+    INFO_LINEAR_TABLING("i7: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);  
+
+#endif /*LINEAR_TABLING_DRE */
+
+
+
 #else
 
 #define store_loader_node(TAB_ENT, ANSWER)	              \
@@ -63,6 +75,11 @@
 #define DUMMY_LOCAL_nr_consumers_inc()
 #define	DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc()
 #define DUMMY_LOCAL_nr_propagate_depen_cicles_inc()
+
+#ifdef LINEAR_TABLING_DRE
+#define DUMMY_DRE_table_try_with_looping_evaluating()
+#endif /*LINEAR_TABLING_DRE */
+
 
 #endif /*DUMMY_PRINT*/
 
@@ -205,10 +222,50 @@
         YENV[E_B] = (CELL) B;         \
         ENV = YENV
 #endif /* DEPTH_LIMIT */
+/*-------------------------------------AUX TO COMMOM TABLING INSTRUCTIONS ------------------------*/
+
+#ifdef LINEAR_TABLING_DRE
+
+
+#define DRE_table_try_with_evaluating(sg_fr)                              \
+  if (SgFr_next_alt(sg_fr)!=NULL){                                        \
+    INFO_LINEAR_TABLING("follower");                                      \
+    DUMMY_LOCAL_nr_followers_inc();                                       \
+    register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);                       \
+    store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);    \
+    add_next_follower(sg_fr);                                             \
+    SgFr_gen_cp(sg_fr)=gcp_temp;                                          \
+    PREG = SgFr_next_alt(sg_fr);                                          \
+    PREFETCH_OP(PREG);                                                    \
+    allocate_environment();                                               \
+  }else
+
+
+#define DRE_table_try_with_looping_evaluating(sg_fr)                     \
+  yamop **follower_alt=SgFr_current_loop_alt(sg_fr)+1;                   \
+  if (IS_JUMP_CELL(follower_alt))                                        \
+    ALT_JUMP_NEXT_CELL(follower_alt);	                                 \
+  if (follower_alt != SgFr_stop_loop_alt(sg_fr)){                        \
+    INFO_LINEAR_TABLING("follower");                                     \
+    DUMMY_DRE_table_try_with_looping_evaluating(); 			 \
+    register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);                      \
+    store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);   \
+    add_next_follower(sg_fr);                                            \
+    SgFr_gen_cp(sg_fr)=gcp_temp;                                         \
+    SgFr_current_loop_alt(sg_fr)=follower_alt;                           \
+    PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));                 \
+    PREFETCH_OP(PREG);                                                   \
+    allocate_environment();                                              \
+  } else
 
 
 
-/*-------------------------------------COMMOM ON SLDT INSTRUCTIONS ------------------------*/
+#else
+#define DRE_table_try_with_evaluating(sg_fr)
+#define DRE_table_try_with_looping_evaluating(sg_fr)
+#endif /*LINEAR_TABLING_DRE */
+
+
 #define table_try_begin(void)	 		 		 	      \
     tab_ent_ptr tab_ent;                                                      \
     sg_fr_ptr sg_fr;                                                          \
@@ -338,9 +395,7 @@ inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* PREG_NI
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i3: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
-
   init_subgoal_frame(sg_fr);
-  INFO_LINEAR_TABLING("ola 1");
   UNLOCK(SgFr_lock(sg_fr));
 #ifdef LINEAR_TABLING_DRE
   store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
@@ -360,8 +415,6 @@ inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* PREG_NI
   PREG = PREG_CI;                          
   PREFETCH_OP(PREG);
   allocate_environment();
-  INFO_LINEAR_TABLING(" inside  B=%p",B);
-  INFO_LINEAR_TABLING("ola 2");
 }
 
 
@@ -415,44 +468,6 @@ inline void table_try_with_completed(sg_fr_ptr sg_fr,ans_node_ptr ans_node,tab_e
     }
 }
 
-#ifdef LINEAR_TABLING_DRE
-inline void DRE_table_try_with_evaluating(sg_fr_ptr sg_fr){
-  if (SgFr_next_alt(sg_fr)!=NULL){
-    INFO_LINEAR_TABLING("follower");
-    DUMMY_LOCAL_nr_followers_inc();
-    register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
-    store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
-    add_next_follower(sg_fr);
-    SgFr_gen_cp(sg_fr)=gcp_temp;
-    PREG = SgFr_next_alt(sg_fr);
-    PREFETCH_OP(PREG);
-    allocate_environment();
-  }            
-}
-
-
-inline void DRE_table_try_with_looping_evaluating(sg_fr_ptr sg_fr){
-  yamop **follower_alt=SgFr_current_loop_alt(sg_fr)+1;
-  if (IS_JUMP_CELL(follower_alt))
-    ALT_JUMP_NEXT_CELL(follower_alt);	  
-  if (follower_alt != SgFr_stop_loop_alt(sg_fr)){
-    INFO_LINEAR_TABLING("follower");
-#ifdef DUMMY_PRINT
-    DUMMY_LOCAL_nr_followers_inc();
-    LOCAL_nr_consumed_alternatives++;
-    INFO_LINEAR_TABLING("i7: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
-#endif /* DUMMY_PRINT */
-    register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);
-    store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
-    add_next_follower(sg_fr);
-    SgFr_gen_cp(sg_fr)=gcp_temp;
-    SgFr_current_loop_alt(sg_fr)=follower_alt;
-    PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
-    PREFETCH_OP(PREG);
-    allocate_environment();
-  }
-}
-#endif /*LINEAR_TABLING_DRE */
 
 
 inline void table_retry(yamop* PREG_CI, yamop* PREG_NI){
