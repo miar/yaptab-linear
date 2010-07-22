@@ -180,11 +180,6 @@
       }							      \
 
 
-
-
-
-
-
 #define add_next(SG_FR)                                            \
 {                                                                  \
        if(SG_FR!=LOCAL_top_sg_fr){                                 \

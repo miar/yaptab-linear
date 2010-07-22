@@ -310,13 +310,9 @@ BOp(table_completion, Otapl)
    if (SgFr_next_alt(sg_fr)!=NULL){
       PREG = SgFr_next_alt(sg_fr);
       INFO_LINEAR_TABLING("next alt != null");
-      INFO_LINEAR_TABLING("1-B is %p",B);
       PREFETCH_OP(PREG);
-      INFO_LINEAR_TABLING("2-B is %p",B);
       GONext();    
    }
-   INFO_LINEAR_TABLING("sgfr_pioneer= %p  B= %p",SgFr_pioneer(sg_fr),B);
-
   /* check for follower node , not pioneer and state still evaluating */
    if (SgFr_state(sg_fr)==evaluating && SgFr_pioneer(sg_fr)!=B){
      if (HAS_NEW_ANSWERS(sg_fr)) {

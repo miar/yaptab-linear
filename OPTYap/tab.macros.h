@@ -602,7 +602,7 @@ void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
 static inline
 void abolish_incomplete_subgoals(choiceptr prune_cp) {
   //  INFO_LINEAR_TABLING("abolish_incomplete_subgoals");
-  return;
+  //  return;
 #ifdef LINEAR_TABLING_BATCHED
     return;
 #endif /*LINEAR_TABLING_BATCHED */

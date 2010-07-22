@@ -366,8 +366,6 @@ inline void consume_all_answers_on_trie(tab_ent_ptr tab_ent,ans_node_ptr ans_nod
 
 
 
-
-
 inline void table_try_single_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI){
 #ifdef DUMMY_PRINT
   LOCAL_nr_consumed_alternatives++;
@@ -405,14 +403,10 @@ inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* PREG_NI
   add_branch(sg_fr);
   add_max_scc(sg_fr);
   add_next(sg_fr);
-  INFO_LINEAR_TABLING("2- local_top=%p",LOCAL_top_sg_fr); 
   UNLOCK(SgFr_lock(sg_fr));
 #ifdef LINEAR_TABLING_DRE
-  INFO_LINEAR_TABLING("B before store generator node = %p",B);
   store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
-  INFO_LINEAR_TABLING("B after store generator node/pioneer  = %p",B);
   SgFr_pioneer(sg_fr)=B;
-  INFO_LINEAR_TABLING("pioneer  = %p",SgFr_pioneer(sg_fr));
   SgFr_next_alt(sg_fr)= PREG_NI;
 #else
   store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, PREG_NI);
@@ -525,18 +519,12 @@ inline void table_trust(yamop* PREG_CI){
 #else 
     add_alternative(sg_fr,PREG_CI);
 #endif /*LINEAR_TABLING_DRA */ 
-    INFO_LINEAR_TABLING("1-B is %p",B);
     restore_generator_node(PREG->u.Otapl.s, COMPLETION);
-    INFO_LINEAR_TABLING("2-B is %p",B);
     YENV = (CELL *) PROTECT_FROZEN_B(B);
-    INFO_LINEAR_TABLING("3-B is %p",B);
     set_cut(YENV, B->cp_b);
-    INFO_LINEAR_TABLING("4-B is %p",B);
     SET_BB(NORM_CP(YENV));
-    INFO_LINEAR_TABLING("5-B is %p",B);
     PREG = PREG_CI;
     allocate_environment();
-    INFO_LINEAR_TABLING("6-B is %p",B);
     return;
 }
 
