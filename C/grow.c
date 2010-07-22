@@ -1233,9 +1233,9 @@ fix_tabling_info(void)
   sg = LOCAL_top_sg_fr;
   while (sg) {
     SgFr_gen_cp(sg)  = GeneratorChoicePtrAdjust(SgFr_gen_cp(sg));
-#ifdef LINEAR_TABLING_FOLLOWER
+#ifdef LINEAR_TABLING_DRE
     SgFr_pioneer(sg) = GeneratorChoicePtrAdjust(SgFr_pioneer(sg));
-#endif /*LINEAR_TABLING_FOLLOWER */
+#endif /*LINEAR_TABLING_DRE */
     sg = SgFr_next(sg);
   }
 }

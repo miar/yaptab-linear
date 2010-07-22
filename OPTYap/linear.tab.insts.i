@@ -62,19 +62,15 @@
       GONext();
     } else if (SgFr_state(sg_fr) == evaluating) {
       propagate_dependencies(sg_fr);
-      DRE_table_try_with_evaluating(sg_fr)
-      {
-	fail_or_yes_answer(tab_ent,sg_fr);
-	consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
-      }
+      DRE_table_try_with_evaluating(sg_fr);
+      fail_or_yes_answer(tab_ent,sg_fr);
+      consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);      
       GONext();
     } else if (SgFr_state(sg_fr) == looping_evaluating) {
       propagate_dependencies(sg_fr);
-      DRE_table_try_with_looping_evaluating(sg_fr)
-      {
-	fail_or_yes_answer(tab_ent,sg_fr);
-	consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
-      }
+      DRE_table_try_with_looping_evaluating(sg_fr);
+      fail_or_yes_answer(tab_ent,sg_fr);
+      consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);      
       GONext();
     } else {
       /* subgoal completed */
@@ -90,7 +86,6 @@
     table_try_begin();
     if (SgFr_state(sg_fr) == ready) {
       /* subgoal new */
-      INFO_LINEAR_TABLING(" outside  B=%p",B);
       table_try_with_ready(sg_fr,PREG->u.Otapl.d, NEXTOP(PREG,Otapl));
       GONext();
     } else if (SgFr_state(sg_fr) == looping_ready) {
@@ -98,19 +93,15 @@
       GONext();
     } else if (SgFr_state(sg_fr) == evaluating) {
       propagate_dependencies(sg_fr);
-      DRE_table_try_with_evaluating(sg_fr)
-      {
-	fail_or_yes_answer(tab_ent,sg_fr);
-	consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
-      }
+      DRE_table_try_with_evaluating(sg_fr);      
+      fail_or_yes_answer(tab_ent,sg_fr);
+      consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);      
       GONext();
     } else if (SgFr_state(sg_fr) == looping_evaluating) {
       propagate_dependencies(sg_fr);
-      DRE_table_try_with_looping_evaluating(sg_fr)
-      {
-	fail_or_yes_answer(tab_ent,sg_fr);
-	consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);
-      }
+      DRE_table_try_with_looping_evaluating(sg_fr);
+      fail_or_yes_answer(tab_ent,sg_fr);
+      consume_all_answers_on_trie(tab_ent,ans_node,sg_fr);      
       GONext();
     } else {
       /* subgoal completed */
@@ -247,7 +238,7 @@
 #endif /* LINEAR_TABLING_DRS */
   answer_resolution:
     {
-      INFO_LINEAR_TABLING("--------------------- goto consume_all ---------------\n");
+      INFO_LINEAR_TABLING("--------------------- goto answer_resolution ---------------\n");
       /* consume all */
       sg_fr_ptr sg_fr;
       sg_fr = GEN_CP(B)->cp_sg_fr; 
@@ -274,6 +265,7 @@
 	    remove_next(sg_fr);
 	    B = B->cp_b;
 	    SET_BB(PROTECT_FROZEN_B(B));
+	    INFO_LINEAR_TABLING("no answers--fail. actual B is %p",B);
 	    goto fail;
 	  }
 	  remove_next(sg_fr);
@@ -286,6 +278,7 @@
 	    GONext();
 	  } else  {
 	    /* answers -> get first answer */
+	    //	    if(TrNode_child(ans_node) != NULL) {
 #ifdef DUMMY_PRINT
 #ifdef LINEAR_TABLING_DRE
 	    store_loader_node(tab_ent, ans_node,type_of_node);
@@ -295,6 +288,7 @@
 #else /*!DUMMY_PRINT */
 	    store_loader_node(tab_ent, ans_node);
 #endif /*DUMMY_PRINT */
+	    //	    }
 	    PREG = (yamop *) CPREG;
 	    PREFETCH_OP(PREG);
 	    load_answer_trie(ans_node, YENV);
@@ -316,12 +310,21 @@ BOp(table_completion, Otapl)
    if (SgFr_next_alt(sg_fr)!=NULL){
       PREG = SgFr_next_alt(sg_fr);
       INFO_LINEAR_TABLING("next alt != null");
+      INFO_LINEAR_TABLING("1-B is %p",B);
       PREFETCH_OP(PREG);
+      INFO_LINEAR_TABLING("2-B is %p",B);
       GONext();    
    }
+   INFO_LINEAR_TABLING("sgfr_pioneer= %p  B= %p",SgFr_pioneer(sg_fr),B);
+
   /* check for follower node , not pioneer and state still evaluating */
-  if (SgFr_state(sg_fr)==evaluating && SgFr_pioneer(sg_fr)!=B)
-    goto answer_resolution;
+   if (SgFr_state(sg_fr)==evaluating && SgFr_pioneer(sg_fr)!=B){
+     if (HAS_NEW_ANSWERS(sg_fr)) {
+       UNTAG_NEW_ANSWERS(sg_fr);
+       TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
+     }	
+     goto answer_resolution;
+  }
 #endif /*LINEAR_TABLING_DRE*/
 
 #ifdef LINEAR_TABLING_DRA
@@ -334,12 +337,12 @@ BOp(table_completion, Otapl)
 	  /*first time on table completion */	   
 	  SgFr_state(sg_fr) = looping_evaluating;  
 	  if (!IS_LEADER(sg_fr)) 
-	    remove_branch(sg_fr);
+	    remove_branch(sg_fr);	  
 	  ALT_TAG_AS_JUMP_CELL(next_loop_alt,sg_fr->loop_alts);
 	  next_loop_alt = SgFr_stop_loop_alt(sg_fr) = sg_fr->loop_alts;
-	  SgFr_first_loop_alt(sg_fr)=SgFr_stop_loop_alt(sg_fr);
+	  SgFr_first_loop_alt(sg_fr)=SgFr_stop_loop_alt(sg_fr); 
 	} else { 
-	  /*get next alternative  */
+	  /*get next alternative  */	  
 	  if (IS_JUMP_CELL(next_loop_alt)) 
 	    ALT_JUMP_NEXT_CELL(next_loop_alt);	  
 	}
@@ -348,16 +351,16 @@ BOp(table_completion, Otapl)
 	  INFO_LINEAR_TABLING("is_leader and has new answers");
 	  DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc();	
 #ifdef LINEAR_TABLING_DRE
-	  if( SgFr_pioneer(sg_fr)==B)
-#endif /*LINEAR_TABLING_DRE */
-	  {
+	   if( SgFr_pioneer(sg_fr)==B)
+#endif /*LINEAR_TABLING_DRE*/
+	     { 
 #ifdef LINEAR_TABLING_DSLA
 	      while(LOCAL_max_scc !=sg_fr){                        
 		SgFr_state(LOCAL_max_scc) = looping_ready;
 		INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
 		LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
 	      }
-	  } 
+	     } 
 	  SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr) = next_loop_alt;
 	  UNTAG_NEW_ANSWERS(sg_fr);
 #else  /*!LINEAR_TABLING_DSLA --- TO REMOVE*/
@@ -383,12 +386,11 @@ BOp(table_completion, Otapl)
       }
    }
    /*---------- no more alternatives to consume  ----------------------------*/
-	
 
 #ifdef LINEAR_TABLING_DRE
     if (SgFr_pioneer(sg_fr)!=B){
       if (HAS_NEW_ANSWERS(sg_fr)) {
-	  UNTAG_NEW_ANSWERS(sg_fr);
+       	  UNTAG_NEW_ANSWERS(sg_fr);
 	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
 	}	
       /* consume all answers */
@@ -397,8 +399,10 @@ BOp(table_completion, Otapl)
     
 #endif /*LINEAR_TABLING_DRE */    
 
-    if(sg_fr==LOCAL_top_sg_fr_on_branch)
-      remove_branch(sg_fr);
+
+   if(sg_fr==LOCAL_top_sg_fr_on_branch)
+     remove_branch(sg_fr);
+
 
     if (IS_LEADER(sg_fr)){
       INFO_LINEAR_TABLING("is leader");

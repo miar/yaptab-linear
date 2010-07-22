@@ -129,7 +129,7 @@
           gcp->cp_h  = H;                                             \
           gcp->cp_b  = B;                                             \
           gcp->cp_env = ENV;                                          \
-          gcp->cp_cp = CPREG;                                         \
+          gcp->cp_cp = CPREG;		                              \
           GEN_CP(gcp)->cp_sg_fr = SG_FR;                              \
           store_low_level_trace_info(GEN_CP(gcp), TAB_ENT);           \
           set_cut((CELL *)gcp, B);                                    \
@@ -138,7 +138,6 @@
           SET_BB(B);                                                  \
           TABLING_ERRORS_check_stack;                                 \
         }
-
 
 
 
@@ -222,6 +221,8 @@
         YENV[E_B] = (CELL) B;         \
         ENV = YENV
 #endif /* DEPTH_LIMIT */
+
+
 /*-------------------------------------AUX TO COMMOM TABLING INSTRUCTIONS ------------------------*/
 
 #ifdef LINEAR_TABLING_DRE
@@ -238,7 +239,8 @@
     PREG = SgFr_next_alt(sg_fr);                                          \
     PREFETCH_OP(PREG);                                                    \
     allocate_environment();                                               \
-  }else
+    GONext();                                                             \
+  }
 
 
 #define DRE_table_try_with_looping_evaluating(sg_fr)                     \
@@ -256,7 +258,8 @@
     PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));                 \
     PREFETCH_OP(PREG);                                                   \
     allocate_environment();                                              \
-  } else
+    GONext();                                                            \
+  }
 
 
 
@@ -302,10 +305,10 @@
 
 
 
-inline void propagate_dependencies(sg_fr_ptr SG_FR){
+inline void propagate_dependencies(sg_fr_ptr sg_fr){
   sg_fr_ptr sf_aux=LOCAL_top_sg_fr_on_branch;                                        
-  int dfn=GET_SGFR_DFN(SG_FR);                                                       
-  INFO_LINEAR_TABLING("propagate dependencies upto to sg_fr=%p",SG_FR);
+  int dfn=GET_SGFR_DFN(sg_fr);                                                       
+  INFO_LINEAR_TABLING("propagate dependencies upto to sg_fr=%p",sg_fr);
   while(sf_aux && (GET_SGFR_DFN(sf_aux) >dfn 
 #ifdef LINEAR_TABLING_DRS
 	||SgFr_consuming_answers(sf_aux)==2)){
@@ -340,7 +343,8 @@ inline void propagate_dependencies(sg_fr_ptr SG_FR){
 #ifdef LINEAR_TABLING_DRA
    add_alternative(sf_aux, SgFr_current_alt(sf_aux));			     
 #endif /*LINEAR_TABLING_DRA*/
-  }                                                                              
+  }
+  return;
 }							                             
 
 
@@ -356,7 +360,8 @@ inline void consume_all_answers_on_trie(tab_ent_ptr tab_ent,ans_node_ptr ans_nod
   PREG = (yamop *) CPREG;                             
   PREFETCH_OP(PREG);                                    
   load_answer_trie(ans_node, YENV);                     
-  YENV = ENV;                                           
+  YENV = ENV;                                
+  return;
 }
 
 
@@ -369,15 +374,15 @@ inline void table_try_single_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI){
   INFO_LINEAR_TABLING("i3: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
   init_subgoal_frame(sg_fr);
+  add_branch(sg_fr);
+  add_max_scc(sg_fr);
+  add_next(sg_fr);
   UNLOCK(SgFr_lock(sg_fr));
   store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
 #ifdef LINEAR_TABLING_DRE
   SgFr_pioneer(sg_fr)=B;
   SgFr_next_alt(sg_fr)= NULL;
 #endif /*LINEAR_TABLING_DRE */
-  add_branch(sg_fr);
-  add_max_scc(sg_fr);
-  add_next(sg_fr);
 #ifdef LINEAR_TABLING_DRA
   SgFr_current_alt(sg_fr) =  PREG_CI;
 #else 
@@ -386,6 +391,7 @@ inline void table_try_single_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI){
   PREG = PREG_CI;                          
   PREFETCH_OP(PREG);
   allocate_environment();
+  return;
 }
 
 
@@ -396,17 +402,21 @@ inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* PREG_NI
   INFO_LINEAR_TABLING("i3: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
   init_subgoal_frame(sg_fr);
+  add_branch(sg_fr);
+  add_max_scc(sg_fr);
+  add_next(sg_fr);
+  INFO_LINEAR_TABLING("2- local_top=%p",LOCAL_top_sg_fr); 
   UNLOCK(SgFr_lock(sg_fr));
 #ifdef LINEAR_TABLING_DRE
+  INFO_LINEAR_TABLING("B before store generator node = %p",B);
   store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
+  INFO_LINEAR_TABLING("B after store generator node/pioneer  = %p",B);
   SgFr_pioneer(sg_fr)=B;
+  INFO_LINEAR_TABLING("pioneer  = %p",SgFr_pioneer(sg_fr));
   SgFr_next_alt(sg_fr)= PREG_NI;
 #else
   store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, PREG_NI);
 #endif /*LINEAR_TABLING_DRE */
-  add_branch(sg_fr);
-  add_max_scc(sg_fr);
-  add_next(sg_fr);
 #ifdef LINEAR_TABLING_DRA
   SgFr_current_alt(sg_fr) =  PREG_CI;
 #else 
@@ -415,6 +425,7 @@ inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* PREG_NI
   PREG = PREG_CI;                          
   PREFETCH_OP(PREG);
   allocate_environment();
+  return;
 }
 
 
@@ -433,10 +444,11 @@ inline void table_try_with_looping_ready(sg_fr_ptr sg_fr){
   SgFr_state(sg_fr) = looping_evaluating; 
   //  batched_consume_first_answer(sg_fr);
   /*else */
-  SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr)= SgFr_first_loop_alt(sg_fr);
+  SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr) /*= SgFr_first_loop_alt(sg_fr)*/;
   PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
   PREFETCH_OP(PREG);
   allocate_environment();
+  return;
 }
 
 
@@ -466,6 +478,7 @@ inline void table_try_with_completed(sg_fr_ptr sg_fr,ans_node_ptr ans_node,tab_e
       *--YENV = 0;  /* vars_arity */
       *--YENV = 0;  /* heap_arity */
     }
+    return;
 }
 
 
@@ -486,13 +499,14 @@ inline void table_retry(yamop* PREG_CI, yamop* PREG_NI){
 #ifdef LINEAR_TABLING_DRA
     SgFr_current_alt(sg_fr) = PREG_CI;
 #else
-     add_alternative(sg_fr,PREG_CI); 
+    add_alternative(sg_fr,PREG_CI); 
 #endif /*LINEAR_TABLING_DRA*/
     YENV = (CELL *) PROTECT_FROZEN_B(B);
     set_cut(YENV, B->cp_b);
     SET_BB(NORM_CP(YENV));
     PREG = PREG_CI;
     allocate_environment();
+    return;
 }
 
 
@@ -506,18 +520,24 @@ inline void table_trust(yamop* PREG_CI){
 #ifdef LINEAR_TABLING_DRE
     SgFr_next_alt(sg_fr)= NULL;
 #endif /* LINEAR_TABLING_DRE */
-
 #ifdef LINEAR_TABLING_DRA
     SgFr_current_alt(sg_fr) = PREG_CI;
 #else 
     add_alternative(sg_fr,PREG_CI);
 #endif /*LINEAR_TABLING_DRA */ 
+    INFO_LINEAR_TABLING("1-B is %p",B);
     restore_generator_node(PREG->u.Otapl.s, COMPLETION);
+    INFO_LINEAR_TABLING("2-B is %p",B);
     YENV = (CELL *) PROTECT_FROZEN_B(B);
+    INFO_LINEAR_TABLING("3-B is %p",B);
     set_cut(YENV, B->cp_b);
+    INFO_LINEAR_TABLING("4-B is %p",B);
     SET_BB(NORM_CP(YENV));
+    INFO_LINEAR_TABLING("5-B is %p",B);
     PREG = PREG_CI;
     allocate_environment();
+    INFO_LINEAR_TABLING("6-B is %p",B);
+    return;
 }
 
 
@@ -527,7 +547,6 @@ inline void table_completion_launch_next_loop_alt(sg_fr_ptr sg_fr,yamop **next_l
   YENV = (CELL *) PROTECT_FROZEN_B(B);
   set_cut(YENV, B->cp_b);
   SET_BB(NORM_CP(YENV));
-  allocate_environment();
   PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
   INFO_LINEAR_TABLING("current_alt=%p",PREG);
   PREFETCH_OP(PREG);
@@ -535,7 +554,8 @@ inline void table_completion_launch_next_loop_alt(sg_fr_ptr sg_fr,yamop **next_l
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i2: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
-
+  allocate_environment();
+  return;
 }
 
 

@@ -602,7 +602,7 @@ void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
 static inline
 void abolish_incomplete_subgoals(choiceptr prune_cp) {
   //  INFO_LINEAR_TABLING("abolish_incomplete_subgoals");
-
+  return;
 #ifdef LINEAR_TABLING_BATCHED
     return;
 #endif /*LINEAR_TABLING_BATCHED */
@@ -626,7 +626,7 @@ void abolish_incomplete_subgoals(choiceptr prune_cp) {
     } while (EQUAL_OR_YOUNGER_CP(DepFr_cons_cp(LOCAL_top_dep_fr), prune_cp));
     adjust_freeze_registers();
   }
-#endif /*LINEAR_TABLING */
+#endif /*! LINEAR_TABLING */
 
   while (LOCAL_top_sg_fr && EQUAL_OR_YOUNGER_CP(SgFr_gen_cp(LOCAL_top_sg_fr), prune_cp)) {
     sg_fr_ptr sg_fr;
