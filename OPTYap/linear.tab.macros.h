@@ -180,8 +180,7 @@
       }							      \
 
 
-#define add_next(SG_FR)                                            \
-{                                                                  \
+#define add_next(SG_FR){                                           \
        if(SG_FR!=LOCAL_top_sg_fr){                                 \
 	 SgFr_next(SG_FR) = LOCAL_top_sg_fr;   		           \
          LOCAL_top_sg_fr = SG_FR;				   \
@@ -190,40 +189,41 @@
 
 
 
-#define remove_next(SG_FR)                                         \
-{                                                                  \
-     if(B !=SgFr_gen_cp(LOCAL_top_sg_fr)){	                   \
-        printf("nao pode acontecer\n"); 			   \
-     }else{							   \
+#define remove_next(SG_FR){                                        \
+     if(B ==SgFr_gen_cp(LOCAL_top_sg_fr)){	                   \
        LOCAL_top_sg_fr= SgFr_next(LOCAL_top_sg_fr);		   \
+     }else{							   \
+        printf("nao pode acontecer\n"); 			   \
      }								   \
 }
 
 
 
-#define add_max_scc(SG_FR)                                 \
-{                                                          \
-     SgFr_next_on_scc(SG_FR)=LOCAL_max_scc;                \
-     LOCAL_max_scc = SG_FR;                                \
+#define add_max_scc(SG_FR){                                        \
+     if(SG_FR!=LOCAL_max_scc){				           \
+         SgFr_next_on_scc(SG_FR)=LOCAL_max_scc;                    \
+         LOCAL_max_scc = SG_FR;                                    \
+     }                                                             \
 }
 
 
-#define add_branch(SG_FR)                                                             \
-{                                                                                     \
-    SgFr_next_on_branch(SG_FR) = LOCAL_top_sg_fr_on_branch;                           \
-    LOCAL_top_sg_fr_on_branch =SG_FR;                                                 \
+#define add_branch(SG_FR){                                               \
+       if(SG_FR!=LOCAL_top_sg_fr_on_branch){                             \
+          SgFr_next_on_branch(SG_FR) = LOCAL_top_sg_fr_on_branch;        \
+          LOCAL_top_sg_fr_on_branch =SG_FR;                              \
+       }                                                                 \
 }
 
-#define remove_branch(SG_FR)                                                         \
-{                                                                                    \
-      LOCAL_top_sg_fr_on_branch = SgFr_next_on_branch(SG_FR);		             \
+#define remove_branch(SG_FR){	   				         \
+  if (SG_FR==LOCAL_top_sg_fr_on_branch){                                 \
+      LOCAL_top_sg_fr_on_branch = SgFr_next_on_branch(SG_FR);		 \
+  }                                                                      \
 }
 
 
 
 
-#define free_alternatives(sg_fr)                  \
-{    		                                  \
+#define free_alternatives(sg_fr){                 \
   if (SgFr_current_loop_alt(sg_fr)!=NULL){        \
     yamop **next=NULL;                            \
     yamop **curr=NULL;                            \

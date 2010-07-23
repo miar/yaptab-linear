@@ -311,7 +311,7 @@ inline void propagate_dependencies(sg_fr_ptr sg_fr){
   INFO_LINEAR_TABLING("propagate dependencies upto to sg_fr=%p",sg_fr);
   while(sf_aux && (GET_SGFR_DFN(sf_aux) >dfn 
 #ifdef LINEAR_TABLING_DRS
-	||SgFr_consuming_answers(sf_aux)==2)){
+	||SgFr_consuming_answers(sf_aux)==1)){
 #else  
        )){
 #endif /*LINEAR_TABLING_DRS */
@@ -319,7 +319,7 @@ inline void propagate_dependencies(sg_fr_ptr sg_fr){
        INFO_LINEAR_TABLING("sgfr_aux=%p",sf_aux);                                       
        TAG_AS_NO_LEADER(sf_aux);
 #ifdef LINEAR_TABLING_DRS
-   if(SgFr_consuming_answers(sf_aux)==2){
+   if(SgFr_consuming_answers(sf_aux)==1){
        add_answer(sf_aux,SgFr_new_answer_trie(sf_aux))
     }
 #endif /*LINEAR_TABLING_DRS */
@@ -333,7 +333,7 @@ inline void propagate_dependencies(sg_fr_ptr sg_fr){
   }	                                                                             
   if (sf_aux) {	
 #ifdef LINEAR_TABLING_DRS
-   if(SgFr_consuming_answers(sf_aux)==2){
+   if(SgFr_consuming_answers(sf_aux)==1){
        add_answer(sf_aux,SgFr_new_answer_trie(sf_aux))
     }
 #endif /*LINEAR_TABLING_DRS */
@@ -438,7 +438,7 @@ inline void table_try_with_looping_ready(sg_fr_ptr sg_fr){
   SgFr_state(sg_fr) = looping_evaluating; 
   //  batched_consume_first_answer(sg_fr);
   /*else */
-  SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr) /*= SgFr_first_loop_alt(sg_fr)*/;
+  SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr) = SgFr_first_loop_alt(sg_fr);
   PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
   PREFETCH_OP(PREG);
   allocate_environment();
