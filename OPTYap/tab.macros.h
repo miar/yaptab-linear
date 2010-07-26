@@ -299,10 +299,10 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 
 #endif /* LINEAR_TABLING */
 
-#define init_subgoal_frame(SG_FR)                                  \
+#define init_subgoal_frame(SG_FR,TAB_ENT) 		           \
         { SgFr_init_yapor_fields(SG_FR);                           \
           SgFr_state(SG_FR) = evaluating;                          \
-	  SgFr_init_linear_tabling_fields(SG_FR);		   \
+	  SgFr_init_linear_tabling_fields(SG_FR,TAB_ENT);          \
 	}
 
 

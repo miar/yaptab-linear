@@ -366,12 +366,12 @@ inline void consume_all_answers_on_trie(tab_ent_ptr tab_ent,ans_node_ptr ans_nod
 
 
 
-inline void table_try_single_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI){
+inline void table_try_single_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, tab_ent_ptr tab_ent){
 #ifdef DUMMY_PRINT
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i3: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
-  init_subgoal_frame(sg_fr);
+  init_subgoal_frame(sg_fr,tab_ent);
   add_branch(sg_fr);
   add_max_scc(sg_fr);
   add_next(sg_fr);
@@ -394,12 +394,12 @@ inline void table_try_single_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI){
 
 
 
-inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* PREG_NI){
+inline void table_try_with_ready(sg_fr_ptr sg_fr, yamop* PREG_CI, yamop* PREG_NI,tab_ent_ptr tab_ent){
 #ifdef DUMMY_PRINT
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i3: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
-  init_subgoal_frame(sg_fr);
+  init_subgoal_frame(sg_fr,tab_ent);
   add_branch(sg_fr);
   add_max_scc(sg_fr);
   add_next(sg_fr);

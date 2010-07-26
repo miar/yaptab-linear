@@ -232,7 +232,11 @@ ENDPBOp();
       }
 #endif /* TABLING_ERRORS */
       UNLOCK(SgFr_lock(sg_fr));
+#ifdef LINEAR_TABLING
+      if(!IS_LOCAL_SF(sg_fr)){
+#else
       if (IS_BATCHED_GEN_CP(gcp)) {
+#endif /*LINEAR_TABLING */
 
 
 #if defined(TABLING_EARLY_COMPLETION) && !defined(LINEAR_TABLING) 

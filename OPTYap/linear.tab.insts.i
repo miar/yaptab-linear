@@ -30,7 +30,7 @@
     table_try_begin();
     if (SgFr_state(sg_fr) == ready) {
       /* subgoal new */
-      table_try_single_with_ready(sg_fr,PREG->u.Otapl.d);
+      table_try_single_with_ready(sg_fr,PREG->u.Otapl.d,tab_ent);
       GONext();
     } else if (SgFr_state(sg_fr) == looping_ready) {
       table_try_with_looping_ready(sg_fr);
@@ -55,7 +55,7 @@
     table_try_begin();
     if (SgFr_state(sg_fr) == ready) {
       /* subgoal new */
-      table_try_with_ready(sg_fr,NEXTOP(PREG,Otapl),PREG->u.Otapl.d);
+      table_try_with_ready(sg_fr,NEXTOP(PREG,Otapl),PREG->u.Otapl.d,tab_ent);
       GONext();
     } else if (SgFr_state(sg_fr) == looping_ready) {
       table_try_with_looping_ready(sg_fr);
@@ -86,7 +86,7 @@
     table_try_begin();
     if (SgFr_state(sg_fr) == ready) {
       /* subgoal new */
-      table_try_with_ready(sg_fr,PREG->u.Otapl.d, NEXTOP(PREG,Otapl));
+      table_try_with_ready(sg_fr,PREG->u.Otapl.d, NEXTOP(PREG,Otapl),tab_ent);
       GONext();
     } else if (SgFr_state(sg_fr) == looping_ready) {
       table_try_with_looping_ready(sg_fr);
@@ -239,54 +239,51 @@
 	type_of_node=1;
 #endif /*DUMMY_PRINT && LINEAR_TABLING_DRE*/
       INFO_LINEAR_TABLING("sgfr(%p)->state=%d\n",sg_fr,SgFr_state(sg_fr));
-#ifdef LINEAR_TABLING_BATCHED
-      if (IS_BATCHED_GEN_CP(B)) {
-        /* backtrack */
+      if (IS_LOCAL_SF(sg_fr)) {
+	/* consume_answers*/	
+	ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
+	if (ans_node == NULL) {
+	  /* no answers --> fail */
+	  remove_next(sg_fr);
+	  B = B->cp_b;
+	  SET_BB(PROTECT_FROZEN_B(B));
+	  INFO_LINEAR_TABLING("no answers--fail. actual B is %p",B);
+	  goto fail;
+	}
+	remove_next(sg_fr);
+	pop_generator_node(SgFr_arity(sg_fr));
+	if (ans_node == SgFr_answer_trie(sg_fr)) {
+	  /* yes answer --> procceed */
+	  PREG = (yamop *) CPREG;
+	  PREFETCH_OP(PREG);
+	  YENV = ENV;
+	  GONext();
+	} else  {
+	  /* answers -> get first answer */
+	  //	    if(TrNode_child(ans_node) != NULL) {
+#ifdef DUMMY_PRINT
+#ifdef LINEAR_TABLING_DRE
+	  store_loader_node(tab_ent, ans_node,type_of_node);
+#else
+	  store_loader_node(tab_ent, ans_node,1);
+#endif /*LINEAR_TABLING_DRE*/
+#else /*!DUMMY_PRINT */
+	  store_loader_node(tab_ent, ans_node);
+#endif /*DUMMY_PRINT */
+	  //	    }
+	  PREG = (yamop *) CPREG;
+	  PREFETCH_OP(PREG);
+	  load_answer_trie(ans_node, YENV);
+	  YENV = ENV;
+	  GONext();
+	}
+      }else{ /*is batched sf*/
+	/*backtrack */
 	remove_next(sg_fr);
         B = B->cp_b;
         SET_BB(PROTECT_FROZEN_B(B));
         goto fail;
-      } else
-#endif /*LINEAR_TABLING_BATCHED */
-	{	
-	  /* consume_answers*/	
-	  ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
-	  if (ans_node == NULL) {
-	    /* no answers --> fail */
-	    remove_next(sg_fr);
-	    B = B->cp_b;
-	    SET_BB(PROTECT_FROZEN_B(B));
-	    INFO_LINEAR_TABLING("no answers--fail. actual B is %p",B);
-	    goto fail;
-	  }
-	  remove_next(sg_fr);
-	  pop_generator_node(SgFr_arity(sg_fr));
-	  if (ans_node == SgFr_answer_trie(sg_fr)) {
-	    /* yes answer --> procceed */
-	    PREG = (yamop *) CPREG;
-	    PREFETCH_OP(PREG);
-	    YENV = ENV;
-	    GONext();
-	  } else  {
-	    /* answers -> get first answer */
-	    //	    if(TrNode_child(ans_node) != NULL) {
-#ifdef DUMMY_PRINT
-#ifdef LINEAR_TABLING_DRE
-	    store_loader_node(tab_ent, ans_node,type_of_node);
-#else
-	    store_loader_node(tab_ent, ans_node,1);
-#endif /*LINEAR_TABLING_DRE*/
-#else /*!DUMMY_PRINT */
-	    store_loader_node(tab_ent, ans_node);
-#endif /*DUMMY_PRINT */
-	    //	    }
-	    PREG = (yamop *) CPREG;
-	    PREFETCH_OP(PREG);
-	    load_answer_trie(ans_node, YENV);
-	    YENV = ENV;
-	    GONext();
-	  }
-	}
+      }
     }
 ENDBOp();
 

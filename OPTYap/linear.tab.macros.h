@@ -25,18 +25,26 @@
 
 #define UNTAG_NEW_ANSWERS(SG_FR)                  (SgFr_dfn(SG_FR)=(SgFr_dfn(SG_FR) & ~(0x1)))
 #define TAG_AS_NO_LEADER(SG_FR)                   (SgFr_dfn(SG_FR)=(SgFr_dfn(SG_FR) & ~(0x2)))
-#define HAS_NEW_ANSWERS(SG_FR)                    (SgFr_dfn(SG_FR) & 0x1)
 
+#define HAS_NEW_ANSWERS(SG_FR)                    (SgFr_dfn(SG_FR) & 0x1)
 #define IS_LEADER(SG_FR)                          (SgFr_dfn(SG_FR) & 0x2)
-#define GET_SGFR_DFN(SG_FR)                       (SgFr_dfn(SG_FR)>>2)
-#define SET_SGFR_DFN(SG_FR,NR)                    (SgFr_dfn(SG_FR)=(NR<<2))
+
+#define GET_SGFR_DFN(SG_FR)                       (SgFr_dfn(SG_FR)>>3)
+#define SET_SGFR_DFN(SG_FR,NR)                    (SgFr_dfn(SG_FR)=(NR<<3))
+
+
+/*--------------------------------------**
+**  definition of strategy:             **    
+**        0- batched sheduling          **
+**        1- local scheduling           **
+**--------------------------------------*/
+
+#define IS_LOCAL_SF(SG_FR)                       (SgFr_dfn(SG_FR) & 0x4)
+#define TAG_AS_LOCAL_SF(SG_FR)                   (SgFr_dfn(SG_FR)=(SgFr_dfn(SG_FR)| 0x4))
 
 /* -------------------- **
 **      Prototypes      **
 ** -------------------- */
-
-
-
 
 /*------------------------------------------------LINEAR TABLING DRA------------------------------*/
 #ifdef LINEAR_TABLING_DRA
@@ -249,10 +257,12 @@
 }
 
 
-#define SgFr_init_linear_tabling_fields(SG_FR)                              \
-{	   								    \
+#define SgFr_init_linear_tabling_fields(SG_FR,TAB_ENT){     		    \
         SET_SGFR_DFN(SG_FR,LOCAL_dfn++);			            \
 	TAG_AS_LEADER(SG_FR);                                               \
+	if (IsMode_Local(TabEnt_mode(TAB_ENT))){			    \
+	  TAG_AS_LOCAL_SF(SG_FR);                                           \
+        }                                                                   \
         SgFr_stop_loop_alt(SG_FR) = NULL;                                   \
         SgFr_first_loop_alt(SG_FR) = NULL;                                  \
 	SgFr_current_loop_alt(SG_FR) = NULL;                                \
