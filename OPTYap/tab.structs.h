@@ -206,18 +206,16 @@ typedef struct subgoal_frame {
   struct choicept *pioneer;
 #endif /* LINEAR_TABLING_DRE */
   yamop  *loop_alts;
-#ifdef LINEAR_TABLING_BATCHED 
-  struct answer_trie_node *batched_ans;
-  int batched_consuming_answers;
-#endif /*LINEAR_TABLING_BATCHED */
+  struct answer_trie_node *batched_answer;
+  //  int batched_consuming_answers;
 #endif /* LINEAR_TABLING */
   struct subgoal_frame *next;
 } *sg_fr_ptr;
 
 
-#define SgFr_batched_consuming_answers(X)  ((X)->batched_consuming_answers)
+//#define SgFr_batched_consuming_answers(X)  ((X)->batched_consuming_answers)
 
-#define SgFr_batched_ans(X)                ((X)->batched_ans)
+#define SgFr_current_batched_answer(X)                ((X)->batched_answer)
 
 #define SgFr_loop_alts(X)      ((X)->loop_alts)
 

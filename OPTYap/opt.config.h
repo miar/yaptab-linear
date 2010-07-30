@@ -38,8 +38,6 @@
 
 #define LINEAR_TABLING 1 
 
-//#define LINEAR_TABLING_BATCHED 1
-
 /* ------------------------------------------------------ **
 **      linear tabling strategy                           **
 **            (suported modes:                            **
@@ -53,7 +51,7 @@
 
 /*DSLA- Dynamic Stop Looping Alternative */
 
-#define LINEAR_TABLING_DSLA 1
+//#define LINEAR_TABLING_DSLA 1
 //#define LINEAR_TABLING_DRA 1  
 //#define LINEAR_TABLING_DRE 1 
 

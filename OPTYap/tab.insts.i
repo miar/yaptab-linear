@@ -16,10 +16,6 @@
 #ifdef LINEAR_TABLING
 #include "linear.tab.insts.i"
 
-PBOp(table_try_answer, Otapl)
-  return(0);
-ENDPBOp();
-
 #endif /*LINEAR_TABLING */
 
 /*---------------------------------COMMON TO BOTH --BEGIN -------------------------------------------*/
@@ -233,7 +229,7 @@ ENDPBOp();
 #endif /* TABLING_ERRORS */
       UNLOCK(SgFr_lock(sg_fr));
 #ifdef LINEAR_TABLING
-      if(!IS_LOCAL_SF(sg_fr)){
+      if(IS_BATCHED_SF(sg_fr)){
 #else
       if (IS_BATCHED_GEN_CP(gcp)) {
 #endif /*LINEAR_TABLING */

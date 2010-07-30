@@ -286,19 +286,6 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
           SgFr_last_answer(SG_FR) = NULL;                          \
 	}
 
-#ifdef LINEAR_TABLING
-
-
-#ifdef LINEAR_TABLING_BATCHED
-#define SgFr_init_batched_fields(SG_FR)                         \
-        SgFr_batched_ans(SG_FR)= NULL;                          \
-        SgFr_batched_consuming_answers(SG_FR)=0;                
-#else
-#define SgFr_init_batched_fields(SG_FR)
-#endif /* LINEAR_TABLING_BATCHED */
-
-#endif /* LINEAR_TABLING */
-
 #define init_subgoal_frame(SG_FR,TAB_ENT) 		           \
         { SgFr_init_yapor_fields(SG_FR);                           \
           SgFr_state(SG_FR) = evaluating;                          \
@@ -603,9 +590,10 @@ static inline
 void abolish_incomplete_subgoals(choiceptr prune_cp) {
   //  INFO_LINEAR_TABLING("abolish_incomplete_subgoals");
   //  return;
-#ifdef LINEAR_TABLING_BATCHED
-    return;
-#endif /*LINEAR_TABLING_BATCHED */
+
+
+
+
 
 #ifndef LINEAR_TABLING
 
@@ -627,6 +615,10 @@ void abolish_incomplete_subgoals(choiceptr prune_cp) {
     adjust_freeze_registers();
   }
 #endif /*! LINEAR_TABLING */
+
+
+
+
 
   while (LOCAL_top_sg_fr && EQUAL_OR_YOUNGER_CP(SgFr_gen_cp(LOCAL_top_sg_fr), prune_cp)) {
     sg_fr_ptr sg_fr;

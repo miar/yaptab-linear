@@ -429,19 +429,35 @@ inline void table_try_with_looping_ready(sg_fr_ptr sg_fr){
   LOCAL_nr_consumed_alternatives++;
   INFO_LINEAR_TABLING("i3: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 #endif /* DUMMY_PRINT */
+  INFO_LINEAR_TABLING("table_try_with_looping_ready");
   add_max_scc(sg_fr);
   add_next(sg_fr);
+  SgFr_state(sg_fr) = looping_evaluating; 
+  SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr) = SgFr_first_loop_alt(sg_fr);
   store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);
 #ifdef LINEAR_TABLING_DRE
   SgFr_pioneer(sg_fr)=B;
 #endif  /*LINEAR_TABLING_DRE*/
-  SgFr_state(sg_fr) = looping_evaluating; 
-  //  batched_consume_first_answer(sg_fr);
-  /*else */
-  SgFr_stop_loop_alt(sg_fr)=SgFr_current_loop_alt(sg_fr) = SgFr_first_loop_alt(sg_fr);
-  PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
-  PREFETCH_OP(PREG);
-  allocate_environment();
+  if(IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){
+    B->cp_ap= (yamop *)TRY_ANSWER;
+    allocate_environment();
+    /*goto table_try_answer instruction */
+    if (SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr)) {
+     /* yes answer --> procceed*/
+     INFO_LINEAR_TABLING("yes answer -->proceed");
+     PREG = (yamop *) CPREG;
+     PREFETCH_OP(PREG);
+     YENV = ENV;
+    }else{ 
+      INFO_LINEAR_TABLING("table_try_with_looping_ready answer");
+      SgFr_current_batched_answer(sg_fr) = SgFr_first_answer(sg_fr);
+      PREG= (yamop *) TRY_ANSWER; 
+    }
+  } else{     
+    PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+    PREFETCH_OP(PREG);
+    allocate_environment();
+  }
   return;
 }
 

@@ -40,6 +40,8 @@
 **--------------------------------------*/
 
 #define IS_LOCAL_SF(SG_FR)                       (SgFr_dfn(SG_FR) & 0x4)
+#define IS_BATCHED_SF(SG_FR)                     (!(IS_LOCAL_SF(SG_FR)))
+
 #define TAG_AS_LOCAL_SF(SG_FR)                   (SgFr_dfn(SG_FR)=(SgFr_dfn(SG_FR)| 0x4))
 
 /* -------------------- **
@@ -266,10 +268,10 @@
         SgFr_stop_loop_alt(SG_FR) = NULL;                                   \
         SgFr_first_loop_alt(SG_FR) = NULL;                                  \
 	SgFr_current_loop_alt(SG_FR) = NULL;                                \
+        SgFr_current_batched_answer(SG_FR)=NULL;			    \
 	SgFr_init_follower_fields(SG_FR);                                   \
     	SgFr_init_drs_fields(SG_FR);                                        \
 	SgFr_init_dra_fields(SG_FR);                                        \
-	SgFr_init_batched_fields(SG_FR);	                            \
 }
 
 
