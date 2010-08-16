@@ -71,6 +71,7 @@
         DRS_add_next_follower_fields(sgfr_aux);                    \
         SgFr_stop_loop_alt(sgfr_aux) = NULL;                       \
 	SgFr_current_loop_alt(sgfr_aux) = NULL;                    \
+	SgFr_current_batched_answer(sgfr_aux)=NULL;		   \
         SgFr_next_alt(sgfr_aux) = NULL; 			   \
 	SgFr_pioneer(sgfr_aux)=NULL;                               \
         SgFr_gen_cp(sgfr_aux)=SgFr_gen_cp(SG_FR);                  \

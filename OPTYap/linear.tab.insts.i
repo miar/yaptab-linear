@@ -2,6 +2,56 @@
 /* ------------------------------ **
 **      Tabling instructions      **
 ** ------------------------------ */  
+#ifdef LINEAR_TABLING_DRE
+
+#define DRE_table_try_with_evaluating(sg_fr)                                    \
+  if (SgFr_next_alt(sg_fr)!=NULL){                                              \
+    INFO_LINEAR_TABLING("follower");                                            \
+    DUMMY_LOCAL_nr_followers_inc();                                             \
+    register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);                             \
+    store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);          \
+    add_next_follower(sg_fr);                                                   \
+    SgFr_gen_cp(sg_fr)=gcp_temp;                                                \
+    if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){                      \
+      SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);  \
+      goto try_answer;                                                          \
+    }                                                                           \
+    PREG = SgFr_next_alt(sg_fr);                                                \
+    PREFETCH_OP(PREG);                                                          \
+    allocate_environment();                                                     \
+    GONext();                                                                   \
+  }
+
+
+#define DRE_table_try_with_looping_evaluating(sg_fr)                            \
+  yamop **follower_alt=SgFr_current_loop_alt(sg_fr)+1;                          \
+  if (IS_JUMP_CELL(follower_alt))                                               \
+    ALT_JUMP_NEXT_CELL(follower_alt);	                                        \
+  if (follower_alt != SgFr_stop_loop_alt(sg_fr)){                               \
+    INFO_LINEAR_TABLING("follower");                                            \
+    DUMMY_DRE_table_try_with_looping_evaluating(); 			        \
+    register choiceptr gcp_temp=SgFr_gen_cp(sg_fr);                             \
+    store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);          \
+    add_next_follower(sg_fr);                                                   \
+    SgFr_gen_cp(sg_fr)=gcp_temp;                                                \
+    SgFr_current_loop_alt(sg_fr)=follower_alt;                                  \
+    if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){                      \
+      SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);  \
+      goto try_answer;                                                          \
+    }                                                                           \
+    PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));		        \
+    PREFETCH_OP(PREG);                                                          \
+    allocate_environment();                                                     \
+    GONext();                                                                   \
+  }
+
+
+
+#else
+#define DRE_table_try_with_evaluating(sg_fr)
+#define DRE_table_try_with_looping_evaluating(sg_fr)
+#endif /*LINEAR_TABLING_DRE */
+
 
 
   PBOp(table_load_answer, Otapl)
@@ -145,7 +195,7 @@
    {
      INFO_LINEAR_TABLING("table_try_answer");
      sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;
-     if (SgFr_current_batched_answer(sg_fr)){
+     if (SgFr_current_batched_answer(LOCAL_top_sg_fr)){
        restore_generator_node(SgFr_arity(sg_fr), TRY_ANSWER);
        INFO_LINEAR_TABLING("consume next batched answer");
        PREG = (yamop *) CPREG;
@@ -153,8 +203,8 @@
        CELL *subs_ptr;
        subs_ptr = (CELL *) (GEN_CP(B) + 1);
        subs_ptr += SgFr_arity(GEN_CP(B)->cp_sg_fr);
-       load_answer_trie(SgFr_current_batched_answer(sg_fr), subs_ptr);
-       SgFr_current_batched_answer(sg_fr)=TrNode_child(SgFr_current_batched_answer(sg_fr));     
+       load_answer_trie(SgFr_current_batched_answer(LOCAL_top_sg_fr), subs_ptr);
+       SgFr_current_batched_answer(LOCAL_top_sg_fr)=TrNode_child(SgFr_current_batched_answer(LOCAL_top_sg_fr));     
        YENV = ENV;
        GONext();
      } else{
@@ -163,7 +213,10 @@
        YENV = (CELL *) PROTECT_FROZEN_B(B);
        set_cut(YENV, B->cp_b);
        SET_BB(NORM_CP(YENV));
-       PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
+       if (SgFr_next_alt(sg_fr)!=NULL)
+	 PREG = SgFr_next_alt(sg_fr);
+       else
+	 PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
        PREFETCH_OP(PREG);
        allocate_environment();
        GONext();
@@ -374,11 +427,12 @@ BOp(table_completion, Otapl)
 	if (IS_LEADER(sg_fr) && HAS_NEW_ANSWERS(sg_fr) ) {  
 	  INFO_LINEAR_TABLING("is_leader and has new answers");
 	  DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc();	
+#ifdef LINEAR_TABLING_DSLA
+
 #ifdef LINEAR_TABLING_DRE
 	   if( SgFr_pioneer(sg_fr)==B)
 #endif /*LINEAR_TABLING_DRE*/
 	     { 
-#ifdef LINEAR_TABLING_DSLA
 	      while(LOCAL_max_scc !=sg_fr){                        
 		SgFr_state(LOCAL_max_scc) = looping_ready;
 		INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
@@ -389,15 +443,20 @@ BOp(table_completion, Otapl)
 	  UNTAG_NEW_ANSWERS(sg_fr);
 #else  /*!LINEAR_TABLING_DSLA --- TO REMOVE*/
 	      if(next_loop_alt == SgFr_first_loop_alt(sg_fr)){
-	         while(LOCAL_max_scc !=sg_fr){                        
-		   SgFr_state(LOCAL_max_scc) = looping_ready;
-		   INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
-		   LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
-		 }
-		 UNTAG_NEW_ANSWERS(sg_fr);
-		 if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){
-		   SgFr_current_loop_alt(sg_fr) = next_loop_alt;
-		   B->cp_ap= (yamop *)TRY_ANSWER;
+#ifdef LINEAR_TABLING_DRE
+   	        if( SgFr_pioneer(sg_fr)==B)
+#endif /*LINEAR_TABLING_DRE*/
+		  { 
+		    while(LOCAL_max_scc !=sg_fr){                        
+		      SgFr_state(LOCAL_max_scc) = looping_ready;
+		      INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
+		      LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
+		    }
+		  }
+		  UNTAG_NEW_ANSWERS(sg_fr);
+		  if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){
+		     SgFr_current_loop_alt(sg_fr) = next_loop_alt;
+		   //B->cp_ap= (yamop *)TRY_ANSWER;
 		   if (SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr)) {
 		     /* yes answer --> procceed*/
 		     INFO_LINEAR_TABLING("yes answer -->proceed");
@@ -406,13 +465,12 @@ BOp(table_completion, Otapl)
 		     YENV = ENV;
 		     GONext() ;
 		   }else{
-		     INFO_LINEAR_TABLING("table_completion answer");         
-		     SgFr_current_batched_answer(sg_fr) = SgFr_first_answer(sg_fr);
+		     INFO_LINEAR_TABLING("table_completion answer");
+		     SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);  
 		     goto try_answer;
 		   }
 		 }
-	      }
-	    }		 
+	      }	    		 
    	    SgFr_current_loop_alt(sg_fr) = next_loop_alt;	    	
 #endif /*LINEAR_TABLING_DSLA*/
 	    table_completion_launch_next_loop_alt(sg_fr,next_loop_alt);	  
