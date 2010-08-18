@@ -223,7 +223,7 @@
 #endif /* DEPTH_LIMIT */
 
 
-/*-------------------------------------AUX TO COMMOM TABLING INSTRUCTIONS ------------------------*/
+/*-------------------------------------AUX TO COMMOM TABLING INSTRUCTIONS ----------------------*/
 
 
 
@@ -398,19 +398,18 @@ inline void table_try_with_looping_ready(sg_fr_ptr sg_fr){
 #endif  /*LINEAR_TABLING_DRE*/
   if(IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){
     B->cp_ap= (yamop *)TRY_ANSWER;
-    allocate_environment();
     /*goto table_try_answer instruction */
     if (SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr)) {
-     /* yes answer --> procceed*/
+      /* yes answer --> procceed */
      INFO_LINEAR_TABLING("yes answer -->proceed");
      PREG = (yamop *) CPREG;
      PREFETCH_OP(PREG);
      YENV = ENV;
-    }else{ 
+     }else{ 
       INFO_LINEAR_TABLING("table_try_with_looping_ready answer");
-      SgFr_current_batched_answer(sg_fr) = SgFr_first_answer(sg_fr);
+      SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);
       PREG= (yamop *) TRY_ANSWER; 
-    }
+     }
   } else{     
     PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
     PREFETCH_OP(PREG);

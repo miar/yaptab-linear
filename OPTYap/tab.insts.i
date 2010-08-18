@@ -233,8 +233,6 @@
 #else
       if (IS_BATCHED_GEN_CP(gcp)) {
 #endif /*LINEAR_TABLING */
-
-
 #if defined(TABLING_EARLY_COMPLETION) && !defined(LINEAR_TABLING) 
 	if (gcp == PROTECT_FROZEN_B(B) && (*subs_ptr == 0 || gcp->cp_ap == COMPLETION)) {
 	  /* if the current generator choice point is the topmost choice point and the current */
@@ -278,6 +276,7 @@
       }
     } else {
       /* repeated answer */
+	INFO_LINEAR_TABLING("repeated answer ans_node=%p",ans_node);
 #if defined(TABLE_LOCK_AT_ENTRY_LEVEL)
       UNLOCK(SgFr_lock(sg_fr));
 #elif defined(TABLE_LOCK_AT_NODE_LEVEL)

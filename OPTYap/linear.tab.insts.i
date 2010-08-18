@@ -12,10 +12,10 @@
     store_generator_node(tab_ent, sg_fr, PREG->u.Otapl.s, COMPLETION);          \
     add_next_follower(sg_fr);                                                   \
     SgFr_gen_cp(sg_fr)=gcp_temp;                                                \
-    if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){                      \
+    if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){	    	        \
       SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);  \
-      goto try_answer;                                                          \
-    }                                                                           \
+      goto try_answer;						                \
+    }								                \
     PREG = SgFr_next_alt(sg_fr);                                                \
     PREFETCH_OP(PREG);                                                          \
     allocate_environment();                                                     \
@@ -35,10 +35,10 @@
     add_next_follower(sg_fr);                                                   \
     SgFr_gen_cp(sg_fr)=gcp_temp;                                                \
     SgFr_current_loop_alt(sg_fr)=follower_alt;                                  \
-    if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){                      \
+    if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){	    	        \
       SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);  \
-      goto try_answer;                                                          \
-    }                                                                           \
+      goto try_answer;						                \
+    }								                \
     PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));		        \
     PREFETCH_OP(PREG);                                                          \
     allocate_environment();                                                     \
@@ -213,9 +213,11 @@
        YENV = (CELL *) PROTECT_FROZEN_B(B);
        set_cut(YENV, B->cp_b);
        SET_BB(NORM_CP(YENV));
+#ifdef LINEAR_TABLING_DRE
        if (SgFr_next_alt(sg_fr)!=NULL)
 	 PREG = SgFr_next_alt(sg_fr);
-       else
+       else 
+#endif /*LINEAR_TABLING_DRE */
 	 PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
        PREFETCH_OP(PREG);
        allocate_environment();
@@ -333,7 +335,11 @@ ENDPBOp();
 	type_of_node=1;
 #endif /*DUMMY_PRINT && LINEAR_TABLING_DRE*/
       INFO_LINEAR_TABLING("sgfr(%p)->state=%d\n",sg_fr,SgFr_state(sg_fr));
-      if (IS_LOCAL_SF(sg_fr)) {
+      if (IS_LOCAL_SF(sg_fr)
+#ifdef LINEAR_TABLING_DRE
+          || (IS_BATCHED_SF(sg_fr) && IS_LEADER(sg_fr) && SgFr_pioneer(sg_fr)==B)
+#endif /*LINEAR_TABLING_DRE */
+      ) {
 	/* consume_answers*/	
 	ans_node_ptr ans_node = SgFr_first_answer(sg_fr);
 	if (ans_node == NULL) {
@@ -386,7 +392,7 @@ ENDBOp();
 BOp(table_completion, Otapl)
    INFO_LINEAR_TABLING("-------------------------table_completion ---------------");
    sg_fr_ptr sg_fr = GEN_CP(B)->cp_sg_fr;       
-   INFO_LINEAR_TABLING("sg_fr=%p",sg_fr);
+   INFO_LINEAR_TABLING("sg_fr=%p state=%d",sg_fr, SgFr_state(sg_fr));
 #ifdef LINEAR_TABLING_DRE
    if (SgFr_next_alt(sg_fr)!=NULL){
       PREG = SgFr_next_alt(sg_fr);
@@ -399,7 +405,7 @@ BOp(table_completion, Otapl)
      if (HAS_NEW_ANSWERS(sg_fr)) {
        UNTAG_NEW_ANSWERS(sg_fr);
        TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
-     }	
+     }    
      goto answer_resolution;
   }
 #endif /*LINEAR_TABLING_DRE*/
@@ -421,7 +427,7 @@ BOp(table_completion, Otapl)
 	} else { 
 	  /*get next alternative  */	  
 	  if (IS_JUMP_CELL(next_loop_alt)) 
-	    ALT_JUMP_NEXT_CELL(next_loop_alt);	  
+	    ALT_JUMP_NEXT_CELL(next_loop_alt);
 	}
 	/*----------launch alternative (if any) ----------------------------*/
 	if (IS_LEADER(sg_fr) && HAS_NEW_ANSWERS(sg_fr) ) {  
@@ -453,58 +459,44 @@ BOp(table_completion, Otapl)
 		      LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
 		    }
 		  }
-		  UNTAG_NEW_ANSWERS(sg_fr);
+		  UNTAG_NEW_ANSWERS(sg_fr);		  
 		  if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){
 		     SgFr_current_loop_alt(sg_fr) = next_loop_alt;
-		   //B->cp_ap= (yamop *)TRY_ANSWER;
-		   if (SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr)) {
-		     /* yes answer --> procceed*/
-		     INFO_LINEAR_TABLING("yes answer -->proceed");
-		     PREG = (yamop *) CPREG;
-		     PREFETCH_OP(PREG);
-		     YENV = ENV;
-		     GONext() ;
-		   }else{
 		     INFO_LINEAR_TABLING("table_completion answer");
 		     SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);  
-		     goto try_answer;
-		   }
-		 }
+		     goto try_answer;		     
+		  }
 	      }	    		 
-   	    SgFr_current_loop_alt(sg_fr) = next_loop_alt;	    	
+	      SgFr_current_loop_alt(sg_fr) = next_loop_alt;	    	
 #endif /*LINEAR_TABLING_DSLA*/
-	    table_completion_launch_next_loop_alt(sg_fr,next_loop_alt);	  
-	    GONext();          	
+	      table_completion_launch_next_loop_alt(sg_fr,next_loop_alt);	  
+	      GONext();          	
 	}
 
-      if (next_loop_alt != SgFr_stop_loop_alt(sg_fr) ) {  
+	if (next_loop_alt != SgFr_stop_loop_alt(sg_fr) ) {  
 	  INFO_LINEAR_TABLING("next loop alt!= stop loop alt");	  
 	  table_completion_launch_next_loop_alt(sg_fr,next_loop_alt);	  
 	  GONext();     
+	}
       }
-   }
    /*---------- no more alternatives to consume  ----------------------------*/
-
 #ifdef LINEAR_TABLING_DRE
     if (SgFr_pioneer(sg_fr)!=B){
       if (HAS_NEW_ANSWERS(sg_fr)) {
        	  UNTAG_NEW_ANSWERS(sg_fr);
 	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
 	}	
-      /* consume all answers */
-      goto answer_resolution;
+     goto answer_resolution;
     } 
     
 #endif /*LINEAR_TABLING_DRE */    
-
-
-   if(sg_fr==LOCAL_top_sg_fr_on_branch)
+     
      remove_branch(sg_fr);
-
 
     if (IS_LEADER(sg_fr)){
       INFO_LINEAR_TABLING("is leader");
       private_completion(sg_fr);
+      /*dre and batched - leader and pioneer consumes all answers*/ 
       goto answer_resolution;      
     }
 
@@ -525,10 +517,16 @@ BOp(table_completion, Otapl)
     }
     
 #endif /*LINEAR_TABLING_DRS */
-
       if (HAS_NEW_ANSWERS(sg_fr)) {
-	UNTAG_NEW_ANSWERS(sg_fr);
-	TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
+        /* bprolog test_cs_r (dra+dre+batched) leaves the system in a inconsistent state 
+           because it has a cut, which cuts several subgoals, but one is not on 
+           LOCAL_top_sg_fr chain and it is not reset and
+           gets here like a pioneer and non lider state and no subgoals on 
+           LOCAL_top_sg_fr_on_branch chain */
+	if (LOCAL_top_sg_fr_on_branch){
+	  UNTAG_NEW_ANSWERS(sg_fr);
+	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
+	}
       }
       goto answer_resolution;    
 

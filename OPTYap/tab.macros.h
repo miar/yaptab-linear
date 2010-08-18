@@ -589,11 +589,38 @@ void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
 static inline
 void abolish_incomplete_subgoals(choiceptr prune_cp) {
   //  INFO_LINEAR_TABLING("abolish_incomplete_subgoals");
-  //  return;
+  //return;
 
-
-
-
+#ifdef LINEAR_TABLING
+  while (LOCAL_top_sg_fr && EQUAL_OR_YOUNGER_CP(SgFr_gen_cp(LOCAL_top_sg_fr), prune_cp)) {
+    sg_fr_ptr sg_fr;
+    sg_fr = LOCAL_top_sg_fr;
+    LOCAL_top_sg_fr = SgFr_next(sg_fr);
+    if(sg_fr==LOCAL_max_scc)
+      LOCAL_max_scc=SgFr_next_on_scc(LOCAL_max_scc);
+    if(sg_fr==LOCAL_top_sg_fr_on_branch)
+      LOCAL_top_sg_fr_on_branch=SgFr_next_on_branch(LOCAL_top_sg_fr_on_branch);
+    free_alternatives(sg_fr);
+    free_drs_answers(sg_fr);
+    if (SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr)) {
+      /* yes answer --> complete */
+      SgFr_state(sg_fr) = complete;
+      continue;
+    }
+    SgFr_state(sg_fr) = incomplete;
+    free_answer_hash_chain(SgFr_hash_chain(sg_fr));
+    SgFr_hash_chain(sg_fr) = NULL;
+    SgFr_first_answer(sg_fr) = NULL;
+    SgFr_last_answer(sg_fr) = NULL;
+    ans_node_ptr node;
+    node = TrNode_child(SgFr_answer_trie(sg_fr));
+    TrNode_child(SgFr_answer_trie(sg_fr)) = NULL;
+    UNLOCK(SgFr_lock(sg_fr));
+    free_answer_trie_branch(node, TRAVERSE_POSITION_FIRST);
+  }
+  return;
+}
+#endif /*LINEAR_TABLING */
 
 #ifndef LINEAR_TABLING
 
@@ -614,11 +641,7 @@ void abolish_incomplete_subgoals(choiceptr prune_cp) {
     } while (EQUAL_OR_YOUNGER_CP(DepFr_cons_cp(LOCAL_top_dep_fr), prune_cp));
     adjust_freeze_registers();
   }
-#endif /*! LINEAR_TABLING */
-
-
-
-
+/*#endif ! LINEAR_TABLING */
 
   while (LOCAL_top_sg_fr && EQUAL_OR_YOUNGER_CP(SgFr_gen_cp(LOCAL_top_sg_fr), prune_cp)) {
     sg_fr_ptr sg_fr;
@@ -674,6 +697,7 @@ void abolish_incomplete_subgoals(choiceptr prune_cp) {
   }
   return;
 }
+#endif /*! LINEAR_TABLING */
 
 
 static inline
