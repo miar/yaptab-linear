@@ -18,12 +18,13 @@ BINDIR = $(EROOTDIR)/bin
 #
 # where YAP should look for libraries
 #
-LIBDIR=@libdir@/Yap
+LIBDIR=@libdir@
+YAPLIBDIR=@libdir@/Yap
 #
 #
 CC=@CC@
 MPI_CC=mpicc
-CFLAGS= @CFLAGS@ $(YAP_EXTRAS) $(DEFS) -I$(srcdir) -I../.. -I$(srcdir)/../../include
+CFLAGS= @SHLIB_CFLAGS@ $(YAP_EXTRAS) $(DEFS) -I$(srcdir) -I../.. -I$(srcdir)/../../include
 #
 #
 # You shouldn't need to change what follows.
@@ -34,31 +35,30 @@ INSTALL_PROGRAM=@INSTALL_PROGRAM@
 SHELL=/bin/sh
 RANLIB=@RANLIB@
 srcdir=@srcdir@
-SHLIB_CFLAGS=@SHLIB_CFLAGS@
-SHLIB_SUFFIX=@SHLIB_SUFFIX@
+SO=@SO@
 #
 
 OBJS=yaprl.o range_list.o
-SOBJS=yap_rl@SHLIB_SUFFIX@
+SOBJS=yap_rl.@SO@
 
 #in some systems we just create a single object, in others we need to
 # create a libray
 all: $(SOBJS)
 
 range_list.o: $(srcdir)/range_list.c $(srcdir)/range_list.h
-	$(CC) -c $(CFLAGS) $(SHLIB_CFLAGS) $(srcdir)/range_list.c -o range_list.o
+	$(CC) -c $(CFLAGS) $(srcdir)/range_list.c -o range_list.o
 
 yaprl.o: $(srcdir)/yap_rl.c
-	$(CC) -c $(CFLAGS) $(SHLIB_CFLAGS) $(srcdir)/yap_rl.c -o yaprl.o
+	$(CC) -c $(CFLAGS) $(srcdir)/yap_rl.c -o yaprl.o
 
-@DO_SECOND_LD@%@SHLIB_SUFFIX@: %.o
-@DO_SECOND_LD@	@SHLIB_LD@ -o $@ $<
+@DO_SECOND_LD@%.@SO@: %.o
+@DO_SECOND_LD@	@SHLIB_LD@ -o $@ $< @EXTRA_LIBS_FOR_DLLS@
 
-@DO_SECOND_LD@yap_rl@SHLIB_SUFFIX@: $(OBJS)
-@DO_SECOND_LD@	@SHLIB_LD@  -o yap_rl@SHLIB_SUFFIX@ $(OBJS)
+@DO_SECOND_LD@yap_rl.@SO@: $(OBJS)
+@DO_SECOND_LD@	@SHLIB_LD@  -o yap_rl.@SO@ $(OBJS) @EXTRA_LIBS_FOR_DLLS@
 
 install: all
-	@if test "$(SOBJS)" = "no"; then echo ""; else $(INSTALL_PROGRAM) $(SOBJS) $(DESTDIR)$(LIBDIR); fi
+	@if test "$(SOBJS)" = "no"; then echo ""; else $(INSTALL_PROGRAM) $(SOBJS) $(DESTDIR)$(YAPLIBDIR); fi
 
 clean:
 	rm -f *.o *~ $(OBJS) $(SOBJS) *.BAK

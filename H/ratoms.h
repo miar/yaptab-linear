@@ -1,3 +1,7 @@
+
+  /* This file, ratoms.h, was generated automatically by "yap -L misc/buildatoms"
+     please do not update, update misc/ATOMS instead */
+
   Atom3Dots = AtomAdjust(Atom3Dots);
   AtomAbol = AtomAdjust(AtomAbol);
   AtomAccess = AtomAdjust(AtomAccess);
@@ -44,6 +48,7 @@
   AtomCleanCall = AtomAdjust(AtomCleanCall);
   AtomColomn = AtomAdjust(AtomColomn);
   AtomCodeSpace = AtomAdjust(AtomCodeSpace);
+  AtomCodes = AtomAdjust(AtomCodes);
   AtomComma = AtomAdjust(AtomComma);
   AtomCompound = AtomAdjust(AtomCompound);
   AtomConsistencyError = AtomAdjust(AtomConsistencyError);
@@ -85,10 +90,12 @@
   AtomError = AtomAdjust(AtomError);
   AtomEvaluable = AtomAdjust(AtomEvaluable);
   AtomEvaluationError = AtomAdjust(AtomEvaluationError);
+  AtomExecute = AtomAdjust(AtomExecute);
   AtomExecAnswers = AtomAdjust(AtomExecAnswers);
   AtomExecuteInMod = AtomAdjust(AtomExecuteInMod);
   AtomExecuteWithin = AtomAdjust(AtomExecuteWithin);
   AtomExecuteWoMod = AtomAdjust(AtomExecuteWoMod);
+  AtomExist = AtomAdjust(AtomExist);
   AtomExistenceError = AtomAdjust(AtomExistenceError);
   AtomExpectedNumber = AtomAdjust(AtomExpectedNumber);
   AtomExtendFileSearchPath = AtomAdjust(AtomExtendFileSearchPath);
@@ -114,7 +121,8 @@
   AtomGeneratePredInfo = AtomAdjust(AtomGeneratePredInfo);
   AtomGetwork = AtomAdjust(AtomGetwork);
   AtomGetworkSeq = AtomAdjust(AtomGetworkSeq);
-  AtomGlobal = AtomAdjust(AtomGlobal);
+  AtomGlobalSp = AtomAdjust(AtomGlobalSp);
+  AtomGlobalTrie = AtomAdjust(AtomGlobalTrie);
   AtomGoalExpansion = AtomAdjust(AtomGoalExpansion);
   AtomHERE = AtomAdjust(AtomHERE);
   AtomHandleThrow = AtomAdjust(AtomHandleThrow);
@@ -143,7 +151,8 @@
   AtomLive = AtomAdjust(AtomLive);
   AtomLoadAnswers = AtomAdjust(AtomLoadAnswers);
   AtomLocal = AtomAdjust(AtomLocal);
-  AtomLocalA = AtomAdjust(AtomLocalA);
+  AtomLocalSp = AtomAdjust(AtomLocalSp);
+  AtomLocalTrie = AtomAdjust(AtomLocalTrie);
   AtomMaxArity = AtomAdjust(AtomMaxArity);
   AtomMaxFiles = AtomAdjust(AtomMaxFiles);
   AtomMegaClause = AtomAdjust(AtomMegaClause);
@@ -165,6 +174,7 @@
   AtomNbTerm = AtomAdjust(AtomNbTerm);
   AtomNew = AtomAdjust(AtomNew);
   AtomNoMemory = AtomAdjust(AtomNoMemory);
+  AtomNone = AtomAdjust(AtomNone);
   AtomNonEmptyList = AtomAdjust(AtomNonEmptyList);
   AtomNot = AtomAdjust(AtomNot);
   AtomNotImplemented = AtomAdjust(AtomNotImplemented);
@@ -178,6 +188,7 @@
   AtomOnline = AtomAdjust(AtomOnline);
   AtomOpen = AtomAdjust(AtomOpen);
   AtomOperatingSystemError = AtomAdjust(AtomOperatingSystemError);
+  AtomOperatingSystemSupport = AtomAdjust(AtomOperatingSystemSupport);
   AtomOperator = AtomAdjust(AtomOperator);
   AtomOperatorPriority = AtomAdjust(AtomOperatorPriority);
   AtomOperatorSpecifier = AtomAdjust(AtomOperatorSpecifier);
@@ -219,6 +230,7 @@
   AtomRepeatSpace = AtomAdjust(AtomRepeatSpace);
   AtomReposition = AtomAdjust(AtomReposition);
   AtomRepresentationError = AtomAdjust(AtomRepresentationError);
+  AtomRDiv = AtomAdjust(AtomRDiv);
   AtomResize = AtomAdjust(AtomResize);
   AtomResourceError = AtomAdjust(AtomResourceError);
   AtomRestoreRegs = AtomAdjust(AtomRestoreRegs);
@@ -318,6 +330,7 @@
   FunctorChangeModule = FuncAdjust(FunctorChangeModule);
   FunctorCleanCall = FuncAdjust(FunctorCleanCall);
   FunctorClist = FuncAdjust(FunctorClist);
+  FunctorCodes = FuncAdjust(FunctorCodes);
   FunctorComma = FuncAdjust(FunctorComma);
   FunctorContext2 = FuncAdjust(FunctorContext2);
   FunctorConsistencyError = FuncAdjust(FunctorConsistencyError);
@@ -382,6 +395,7 @@
   FunctorPrologConstraint = FuncAdjust(FunctorPrologConstraint);
   FunctorQuery = FuncAdjust(FunctorQuery);
   FunctorRecordedWithKey = FuncAdjust(FunctorRecordedWithKey);
+  FunctorRDiv = FuncAdjust(FunctorRDiv);
   FunctorRedoFreeze = FuncAdjust(FunctorRedoFreeze);
   FunctorRepresentationError = FuncAdjust(FunctorRepresentationError);
   FunctorResourceError = FuncAdjust(FunctorResourceError);

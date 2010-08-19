@@ -34,6 +34,16 @@ yap_flag(fast,on) :- set_value('$fast',true).
 yap_flag(fast,off) :- !, set_value('$fast',[]).
 
 % do or do not machine code
+yap_flag(autoload,V) :-
+	var(V), !,
+	( autoloader:autoload -> V = true ; V = false ).
+yap_flag(autoload,true) :-
+	'$ensure_autoload',
+	assert(autoloader:autoload).
+yap_flag(autoload,false) :-
+	retract(autoloader:autoload).
+
+% do or do not machine code
 yap_flag(argv,L) :- '$argv'(L).
 
 % do or do not machine code
@@ -155,11 +165,20 @@ yap_flag(dollar_as_lower_case,off) :-
 yap_flag(call_counting,X) :- (var(X); X = on; X = off), !,
 	'$is_call_counted'(X).
 
+yap_flag(open_shared_object,X) :-
+	var(X), !,
+	('$open_shared_objects' -> X = true ; X = false).
+yap_flag(open_shared_object,X) :-
+	(X = true ; X = false), !,
+	'$do_error'(permission_error(modify,flag,open_shared_object),yap_flag(open_shared_object,X)).
+yap_flag(open_shared_object,X) :-
+	'$do_error'(domain_error(flag_value,open_shared_object+X),yap_flag(open_shared_object,X)).
+
 yap_flag(bounded,X) :-
 	var(X), !,
 	'$access_yap_flags'(0, X1),
 	'$transl_to_true_false'(X1,X).
-yap_flag(bounded,X) :- !,
+yap_flag(bounded,X) :-
 	(X = true ; X = false), !,
 	'$do_error'(permission_error(modify,flag,bounded),yap_flag(bounded,X)).
 yap_flag(bounded,X) :-
@@ -190,25 +209,25 @@ yap_flag(home,X) :-
 yap_flag(tabling_mode,Options) :- 
    var(Options), !,
    '$access_yap_flags'(20,Options).
-yap_flag(tabling_mode,[]) :- !.
+yap_flag(tabling_mode,[]) :- !,
+   yap_flag(tabling_mode,default).
 yap_flag(tabling_mode,[HOption|TOption]) :- !,
-   yap_flag(tabling_mode,HOption),
-   yap_flag(tabling_mode,TOption).
-yap_flag(tabling_mode,(Option1,Option2)) :- !,
-   yap_flag(tabling_mode,Option1),
-   yap_flag(tabling_mode,Option2).
+   yap_flag(tabling_mode,TOption),
+   yap_flag(tabling_mode,HOption).
 yap_flag(tabling_mode,Option) :-
-   '$transl_to_tabling_mode'(Flag,Option),
+   '$transl_to_yap_flag_tabling_mode'(Flag,Option), !,
    '$set_yap_flags'(20,Flag).
 yap_flag(tabling_mode,Options) :-
    '$do_error'(domain_error(flag_value,tabling_mode+Options),yap_flag(tabling_mode,Options)).
 
 % should match with code in stdpreds.c
-'$transl_to_tabling_mode'(0,default).
-'$transl_to_tabling_mode'(1,batched).
-'$transl_to_tabling_mode'(2,local).
-'$transl_to_tabling_mode'(3,exec_answers).
-'$transl_to_tabling_mode'(4,load_answers).
+'$transl_to_yap_flag_tabling_mode'(0,default).
+'$transl_to_yap_flag_tabling_mode'(1,batched).
+'$transl_to_yap_flag_tabling_mode'(2,local).
+'$transl_to_yap_flag_tabling_mode'(3,exec_answers).
+'$transl_to_yap_flag_tabling_mode'(4,load_answers).
+'$transl_to_yap_flag_tabling_mode'(5,local_trie).
+'$transl_to_yap_flag_tabling_mode'(6,global_trie).
 
 yap_flag(informational_messages,X) :- var(X), !,
 	 get_value('$verbose',X).
@@ -268,10 +287,10 @@ yap_flag(version_data,X) :-
 
 '$get_version_codes'(Major,Minor,Patch) :-
 	get_value('$version_name',X),
-	atom_codes(X,VersionTag), %'
+	atom_codes(X,[_,_,_,_|VersionTag]), %'
 	'$fetch_num_code'(VersionTag,0,Major,L1),
 	'$fetch_num_code'(L1,0,Minor,L2),
-	'$fetch_num_code'(L2,0,Patch,[]).
+	'$fetch_num_code'(L2,0,Patch,_).
 
 '$fetch_num_code'([],Code,Code,[]).
 '$fetch_num_code'([C|Cs],Code0,CodeF,L) :-
@@ -530,7 +549,7 @@ yap_flag(system_options,X) :-
 '$system_options'(low_level_tracer) :-
 	\+ '$undefined'(start_low_level_trace, prolog).
 '$system_options'(or_parallelism) :-
-	\+ '$undefined'('$yapor_on', prolog).
+	\+ '$undefined'('$c_yapor_on', prolog).
 '$system_options'(rational_trees) :-
 	'$yap_has_rational_trees'.
 '$system_options'(readline) :-
@@ -720,7 +739,7 @@ yap_flag(verbose_load,false) :- !,
 	set_value('$lf_verbose',silent),
 	'$set_yap_flags'(7,1).
 yap_flag(verbose_load,X) :-
-	'$do_error'(domain_error(flag_value,verbose_auto_load+X),yap_flag(verbose_auto_load,X)).
+	'$do_error'(domain_error(flag_value,verbose_load+X),yap_flag(verbose_load,X)).
 
 yap_flag(verbose_auto_load,X) :-
 	var(X), !,
@@ -775,6 +794,7 @@ yap_flag(dialect,yap).
 '$yap_system_flag'(agc_margin).
 '$yap_system_flag'(answer_format).
 '$yap_system_flag'(argv).
+'$yap_system_flag'(autoload).
 '$yap_system_flag'(bounded).
 '$yap_system_flag'(char_conversion).
 '$yap_system_flag'(character_escapes).
@@ -815,6 +835,7 @@ yap_flag(dialect,yap).
 '$yap_system_flag'(min_tagged_integer).
 '$yap_system_flag'(n_of_integer_keys_in_db).
 '$yap_system_flag'(open_expands_filename).
+'$yap_system_flag'(open_shared_object).
 '$yap_system_flag'(profiling).
 '$yap_system_flag'(prompt_alternatives_on).
 '$yap_system_flag'(redefine_warnings).
@@ -837,6 +858,7 @@ yap_flag(dialect,yap).
 '$yap_system_flag'(user_output).
 '$yap_system_flag'(variable_names_may_end_with_quotes).
 '$yap_system_flag'(verbose).
+'$yap_system_flag'(verbose_load).
 '$yap_system_flag'(verbose_auto_load).
 '$yap_system_flag'(version).
 '$yap_system_flag'(version_data).
@@ -1100,4 +1122,9 @@ create_prolog_flag(Name, Value, Options) :-
 '$flag_domain_from_value'(_, term).
 
 
+'$ensure_autoload' :-
+	load_files([library(autoloader),
+		    autoloader:library('INDEX'),
+		    swi:library('dialect/swi/INDEX')],
+		   [silent(true),if(not_loaded)]).
 

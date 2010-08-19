@@ -122,15 +122,8 @@ static char * my_realloc(char *ptr, UInt sz, UInt osz, int safe)
 long long unsigned int mallocs, reallocs, frees;
 long long unsigned int tmalloc;
 
-#if INSTRUMENT_MALLOC
-static void
-minfo(char mtype)
-{
-  struct mallinfo minfo = mallinfo();
+#undef INSTRUMENT_MALLOC
 
-  fprintf(stderr,"%c %lld (%lld), %lld, %lld %d/%d/%d\n", mtype, mallocs, tmalloc, reallocs, frees,minfo.arena,minfo.ordblks,minfo.fordblks);
-}
-#endif
 
 static inline char *
 call_malloc(unsigned long int size)
@@ -140,13 +133,16 @@ call_malloc(unsigned long int size)
   LOCK(DLMallocLock);
 #endif
 #if INSTRUMENT_MALLOC
-  if (mallocs % 1024*4 == 0) 
-    minfo('A');
   mallocs++;
   tmalloc += size;
+  size += sizeof(CELL);
 #endif
   Yap_PrologMode |= MallocMode;
   out = (char *) my_malloc(size);
+#if INSTRUMENT_MALLOC
+  *(CELL*)out = size-sizeof(CELL);
+  out += sizeof(CELL);
+#endif
   Yap_PrologMode &= ~MallocMode;
 #if USE_DL_MALLOC
   UNLOCK(DLMallocLock);
@@ -168,13 +164,18 @@ call_realloc(char *p, unsigned long int size)
   LOCK(DLMallocLock);
 #endif
 #if INSTRUMENT_MALLOC
-  if (mallocs % 1024*4 == 0) 
-    minfo('A');
-  mallocs++;
+  reallocs++;
   tmalloc += size;
+  size += sizeof(CELL);
+  p -= sizeof(CELL);
+  tmalloc -= *(CELL*)p;
 #endif
   Yap_PrologMode |= MallocMode;
   out = (char *) my_realloc0(p, size);
+#if INSTRUMENT_MALLOC
+  *(CELL*)out = size-sizeof(CELL);
+  out += sizeof(CELL);
+#endif
   Yap_PrologMode &= ~MallocMode;
 #if USE_DL_MALLOC
   UNLOCK(DLMallocLock);
@@ -195,10 +196,9 @@ Yap_FreeCodeSpace(char *p)
   LOCK(DLMallocLock);
 #endif
   Yap_PrologMode |= MallocMode;
-
 #if INSTRUMENT_MALLOC
-  if (frees % 1024*4 == 0) 
-    minfo('F');
+  p -= sizeof(CELL);
+  tmalloc -= *(CELL*)p;
   frees++;
 #endif
   my_free (p);
@@ -222,8 +222,8 @@ Yap_FreeAtomSpace(char *p)
 #endif
   Yap_PrologMode |= MallocMode;
 #if INSTRUMENT_MALLOC
-  if (frees % 1024*4 == 0) 
-    minfo('F');
+  p -= sizeof(CELL);
+  tmalloc -= *(CELL*)p;
   frees++;
 #endif
   my_free (p);
@@ -247,6 +247,11 @@ Yap_InitPreAllocCodeSpace(void)
     LOCK(DLMallocLock);
 #endif
     Yap_PrologMode |= MallocMode;
+#if INSTRUMENT_MALLOC
+    mallocs++;
+    tmalloc += sz;
+    sz += sizeof(CELL);
+#endif
     while (!(ptr = my_malloc(sz))) {
       Yap_PrologMode &= ~MallocMode;
 #if USE_DL_MALLOC
@@ -256,6 +261,11 @@ Yap_InitPreAllocCodeSpace(void)
 	Yap_Error(OUT_OF_HEAP_ERROR, TermNil, Yap_ErrorMessage);
 	return(NULL);
       }
+#if INSTRUMENT_MALLOC
+      sz -= sizeof(CELL);
+      *(CELL*)ptr = sz;
+      ptr += sizeof(CELL);
+#endif
 #if USE_DL_MALLOC
       LOCK(DLMallocLock);
 #endif
@@ -290,12 +300,12 @@ Yap_ExpandPreAllocCodeSpace(UInt sz0, void *cip, int safe)
 #if USE_DL_MALLOC
   LOCK(DLMallocLock);
 #endif
-#if INSTRUMENT_MALLOC
-  if (reallocs % 1024*4 == 0) 
-    minfo('R');
-  reallocs++;
-#endif
   Yap_PrologMode |= MallocMode;
+#if INSTRUMENT_MALLOC
+  reallocs++;
+  tmalloc -= ScratchPad.sz;
+  tmalloc += sz;
+#endif
   if (!(ptr = my_realloc(ScratchPad.ptr, sz, ScratchPad.sz, safe))) {
     Yap_PrologMode &= ~MallocMode;
 #if USE_DL_MALLOC
@@ -794,7 +804,7 @@ Yap_AllocCodeSpace(unsigned long int size)
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 
-#undef DEBUG_WIN32_ALLOC
+#undef DEBUG_WIN32_ALLOC 
 
 #include "windows.h"
 
@@ -811,7 +821,7 @@ ExtendWorkSpace(Int s, int fixed_allocation)
   Yap_PrologMode = ExtendStackMode;
 
 #if DEBUG_WIN32_ALLOC
-  fprintf(stderr,"trying: %p--%x %d\n",b, s, fixed_allocation);
+  fprintf(stderr,"trying: %p (" Int_FORMAT "K) %d\n",b, s/1024, fixed_allocation);
 #endif
   if (fixed_allocation) {
     b = VirtualAlloc(b, s, MEM_RESERVE, PAGE_NOACCESS);
@@ -830,7 +840,7 @@ ExtendWorkSpace(Int s, int fixed_allocation)
 		    NULL, GetLastError(), 
 		    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), msg, 256,
 		    NULL);
-      fprintf(stderr,"NOT OK1: %p--%p %s\n",b, brk, msg);
+      fprintf(stderr,"NOT OK1: %p %p %s\n", brk, b, msg);
     }
 #endif
     return FALSE;
@@ -859,11 +869,12 @@ static MALLOC_T
 InitWorkSpace(Int s)
 {
   SYSTEM_INFO si;
+  Int psz;
 
   GetSystemInfo(&si);
-  Yap_page_size = si.dwPageSize;
+  psz = Yap_page_size = si.dwPageSize;
   s = ((s+ (YAP_ALLOC_SIZE-1))/YAP_ALLOC_SIZE)*YAP_ALLOC_SIZE;
-  brk = (LPVOID)Yap_page_size;
+  brk = (LPVOID)psz;
   if (!ExtendWorkSpace(s,0))
     return FALSE;
   return (MALLOC_T)brk-s;
@@ -1490,14 +1501,12 @@ Yap_InitMemory(UInt Trail, UInt Heap, UInt Stack)
 #if RANDOMIZE_START_ADDRESS
   srand(time(NULL));
   UInt x = (rand()% 100)*YAP_ALLOC_SIZE ;
-  fprintf(stderr,"x=%lx\n", (unsigned long int)x);
   pm += x;
 #endif
   addr = InitWorkSpace(pm);
 #if RANDOMIZE_START_ADDRESS
   addr = (char *)addr+x;
   pm -= x;
-  fprintf(stderr,"addr=%p\n", addr);
 #endif
 
   InitHeap(addr);
@@ -1525,13 +1534,8 @@ Yap_InitMemory(UInt Trail, UInt Heap, UInt Stack)
 	       (UInt) Yap_LocalBase, (UInt) Yap_TrailTop);
 #endif
 
-#if !SHORT_INTS
-    fprintf(stderr, "Heap+Aux: %d\tLocal+Global: %d\tTrail: %d\n",
+    fprintf(stderr, "Heap+Aux: " UInt_FORMAT "\tLocal+Global: " UInt_FORMAT "\tTrail: " UInt_FORMAT "\n",
 	       pm - sa - ta, sa, ta);
-#else /* SHORT_INTS */
-    fprintf(stderr, "Heap+Aux: %ld\tLocal+Global: %ld\tTrail: %ld\n",
-	       pm - sa - ta, sa, ta);
-#endif /* SHORT_INTS */
   }
 #endif /* DEBUG */
 }

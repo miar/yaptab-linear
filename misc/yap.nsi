@@ -56,8 +56,6 @@ Section "Base system (required)"
   File c:\Yap\lib\Yap\*.dll
 
   SetOutPath $INSTDIR\lib
-; SYSTEM STUFF
-  File c:\Yap\lib\Yap\libWYap.a
 
   SetOutPath $INSTDIR\lib
 ; SYSTEM STUFF
@@ -268,4 +266,4 @@ Function .onInstFailed
 		    installer, please contact yap-users@sf.net"
 FunctionEnd
 
-outfile "yap-6.0.4-installer.exe"
+outfile "yap-6.0.7-installer.exe"

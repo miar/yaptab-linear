@@ -29,7 +29,7 @@
 
 #undef _export
 #if defined(_UXNT_KERNEL) && !defined(__LCC__)
-#define _export _declspec(dllexport)
+#define _export __declspec(dllexport)
 #else
 #define _export extern
 #endif

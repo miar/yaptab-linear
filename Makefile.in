@@ -61,9 +61,10 @@ YAPSTARTUP=startup.yss
 CC=@CC@
 MPI_CC=@MPI_CC@
 CPPFLAGS=@CPPFLAGS@  -I. -I$(srcdir)/H -I$(srcdir)/OPTYap -I$(srcdir)/BEAM -I$(srcdir)/MYDDAS
-CFLAGS= @CFLAGS@ $(YAP_EXTRAS) $(DEFS) $(CPPFLAGS)
-C_INTERF_FLAGS= @C_INTERF_FLAGS@ $(YAP_EXTRAS) $(DEFS) $(CPPFLAGS) -I$(srcdir)/include
-C_PARSER_FLAGS= @C_PARSER_FLAGS@ $(YAP_EXTRAS) $(DEFS) $(CPPFLAGS)
+EXECUTABLE_CFLAGS= @CFLAGS@ $(YAP_EXTRAS) $(DEFS) $(CPPFLAGS)
+CFLAGS=  @YAPLIB_CFLAGS@ $(YAP_EXTRAS) $(DEFS) $(CPPFLAGS)
+C_INTERF_FLAGS= @YAPLIB_CFLAGS@ $(YAP_EXTRAS) $(DEFS) $(CPPFLAGS) -I$(srcdir)/include
+C_PARSER_FLAGS= @YAPLIB_CFLAGS@ $(YAP_EXTRAS) $(DEFS) $(CPPFLAGS)
 #
 #
 # You shouldn't need to change what follows.
@@ -89,7 +90,7 @@ RANLIB=@RANLIB@
 AR=@AR@
 srcdir=@srcdir@
 abs_top_builddir=@abs_top_builddir@
-SHLIB_SUFFIX=@SHLIB_SUFFIX@
+SO=@SO@
 MAKEINFO=makeinfo
 TEXI2DVI=texi2dvi
 TEXI2HTML=texi2html
@@ -99,13 +100,14 @@ YAPLIB=@YAPLIB@
 #4.1VPATH=@srcdir@:@srcdir@/OPTYap
 CWD=$(PWD)
 #
-VERSION=6.0.4
+VERSION=6.0.7
 MYDDAS_VERSION=MYDDAS-0.9.1
 #
 
 INTERFACE_HEADERS = \
 	$(srcdir)/include/c_interface.h \
 	$(srcdir)/include/clause_list.h \
+	$(srcdir)/include/dswiatoms.h \
 	$(srcdir)/include/udi.h \
 	$(srcdir)/include/rtree_udi.h \
 	$(srcdir)/include/yap_structs.h \
@@ -114,26 +116,41 @@ INTERFACE_HEADERS = \
 	$(srcdir)/include/SWI-Stream.h
 
 HEADERS = \
-	$(srcdir)/H/TermExt.h $(srcdir)/H/Atoms.h \
-	$(srcdir)/H/Tags_32bits.h $(srcdir)/H/Tags_32Ops.h \
-	$(srcdir)/H/Tags_32LowTag.h $(srcdir)/H/Tags_64bits.h \
-	$(srcdir)/H/Tags_24bits.h $(srcdir)/H/sshift.h \
-	$(srcdir)/H/Yap.h $(srcdir)/H/Yatom.h \
+	$(srcdir)/H/TermExt.h \
+	$(srcdir)/H/Atoms.h \
+	$(srcdir)/H/Tags_32bits.h \
+	$(srcdir)/H/Tags_32Ops.h \
+	$(srcdir)/H/Tags_32LowTag.h \
+	$(srcdir)/H/Tags_64bits.h \
+	$(srcdir)/H/Tags_24bits.h \
+	$(srcdir)/H/sshift.h \
+	$(srcdir)/H/Yap.h \
+	$(srcdir)/H/Yatom.h \
 	$(srcdir)/H/YapHeap.h \
-	$(srcdir)/H/Regs.h $(srcdir)/H/Yapproto.h \
-	$(srcdir)/H/absmi.h  $(srcdir)/H/alloc.h \
-	$(srcdir)/H/amidefs.h $(srcdir)/H/amiops.h $(srcdir)/H/arrays.h \
-	$(srcdir)/H/arith2.h $(srcdir)/H/attvar.h \
-	$(srcdir)/H/clause.h $(srcdir)/H/compile.h \
-	$(srcdir)/H/corout.h $(srcdir)/H/dlmalloc.h \
+	$(srcdir)/H/Regs.h \
+	$(srcdir)/H/Yapproto.h \
+	$(srcdir)/H/absmi.h  \
+	$(srcdir)/H/alloc.h \
+	$(srcdir)/H/amidefs.h \
+	$(srcdir)/H/amiops.h \
+	$(srcdir)/H/arrays.h \
+	$(srcdir)/H/arith2.h \
+	$(srcdir)/H/attvar.h \
+	$(srcdir)/H/clause.h \
+	$(srcdir)/H/compile.h \
+	$(srcdir)/H/corout.h \
+	$(srcdir)/H/dlmalloc.h \
 	$(srcdir)/H/dglobals.h \
 	$(srcdir)/H/dhstruct.h \
-	$(srcdir)/H/eval.h $(srcdir)/H/heapgc.h   \
+	$(srcdir)/H/eval.h \
+	$(srcdir)/H/heapgc.h   \
 	$(srcdir)/H/hglobals.h \
 	$(srcdir)/H/hstruct.h \
 	$(srcdir)/H/iglobals.h \
 	$(srcdir)/H/ihstruct.h \
-	$(srcdir)/H/index.h $(srcdir)/H/iopreds.h \
+	$(srcdir)/H/index.h \
+	$(srcdir)/H/iopreds.h \
+	$(srcdir)/H/iswiatoms.h \
 	$(srcdir)/H/rclause.h \
 	$(srcdir)/H/rglobals.h \
 	$(srcdir)/H/rheap.h \
@@ -146,12 +163,12 @@ HEADERS = \
 	$(srcdir)/OPTYap/opt.config.h \
 	$(srcdir)/OPTYap/opt.proto.h $(srcdir)/OPTYap/opt.structs.h \
 	$(srcdir)/OPTYap/opt.macros.h $(srcdir)/OPTYap/or.macros.h \
-	$(srcdir)/OPTYap/sbaamiops.h $(srcdir)/OPTYap/sbaunify.h \
-	$(srcdir)/OPTYap/tab.structs.h $(srcdir)/OPTYap/x86_locks.h \
-	$(srcdir)/OPTYap/sparc_locks.h $(srcdir)/OPTYap/mips_locks.h \
-	$(srcdir)/OPTYap/mips_locks_funcs.h $(srcdir)/OPTYap/alpha_locks.h \
-	$(srcdir)/OPTYap/alpha_locks_funcs.h \
-	$(srcdir)/OPTYap/pthread_locks.h \
+	$(srcdir)/OPTYap/or.sbaamiops.h $(srcdir)/OPTYap/or.sbaunify.h \
+	$(srcdir)/OPTYap/tab.structs.h $(srcdir)/OPTYap/locks_x86.h \
+	$(srcdir)/OPTYap/locks_sparc.h $(srcdir)/OPTYap/locks_mips.h \
+	$(srcdir)/OPTYap/locks_mips_funcs.h $(srcdir)/OPTYap/locks_alpha.h \
+	$(srcdir)/OPTYap/locks_alpha_funcs.h \
+	$(srcdir)/OPTYap/locks_pthread.h \
 	$(srcdir)/H/cut_c.h \
 	$(srcdir)/H/iatoms.h $(srcdir)/H/ratoms.h $(srcdir)/H/tatoms.h \
 	$(srcdir)/MYDDAS/myddas.h $(srcdir)/MYDDAS/myddas_structs.h \
@@ -197,13 +214,12 @@ C_SOURCES= \
 	$(srcdir)/BEAM/eam_am.c $(srcdir)/BEAM/eam_showcode.c \
 	$(srcdir)/BEAM/eamindex.c $(srcdir)/BEAM/eamamasm.c \
 	$(srcdir)/BEAM/eam_gc.c $(srcdir)/BEAM/eam_split.c \
-	$(srcdir)/OPTYap/opt.memory.c $(srcdir)/OPTYap/opt.misc.c \
-        $(srcdir)/OPTYap/opt.init.c \
+	$(srcdir)/OPTYap/opt.memory.c $(srcdir)/OPTYap/opt.init.c \
 	$(srcdir)/OPTYap/opt.preds.c $(srcdir)/OPTYap/or.engine.c \
 	$(srcdir)/OPTYap/or.cowengine.c $(srcdir)/OPTYap/or.sbaengine.c \
 	$(srcdir)/OPTYap/or.threadengine.c \
 	$(srcdir)/OPTYap/or.scheduler.c $(srcdir)/OPTYap/or.cut.c \
-	$(srcdir)/OPTYap/tab.tries.c $(srcdir)/OPTYap/tab.suspend.c \
+	$(srcdir)/OPTYap/tab.tries.c $(srcdir)/OPTYap/tab.completion.c \
 	$(srcdir)/library/mpi/mpi.c $(srcdir)/library/mpi/mpe.c \
 	$(srcdir)/library/lammpi/yap_mpi.c $(srcdir)/library/lammpi/hash.c $(srcdir)/library/lammpi/prologterms2c.c  \
 	$(srcdir)/C/cut_c.c \
@@ -228,6 +244,7 @@ PL_SOURCES= \
 	$(srcdir)/pl/control.yap \
 	$(srcdir)/pl/corout.yap $(srcdir)/pl/debug.yap \
 	$(srcdir)/pl/depth_bound.yap \
+	$(srcdir)/pl/dialect.yap \
 	$(srcdir)/pl/directives.yap \
 	$(srcdir)/pl/eam.yap \
 	$(srcdir)/pl/eval.yap \
@@ -238,6 +255,7 @@ PL_SOURCES= \
 	$(srcdir)/pl/hacks.yap \
 	$(srcdir)/pl/init.yap \
 	$(srcdir)/pl/listing.yap \
+	$(srcdir)/pl/lists.yap \
 	$(srcdir)/pl/messages.yap \
 	$(srcdir)/pl/load_foreign.yap \
 	$(srcdir)/pl/modules.yap $(srcdir)/pl/preds.yap \
@@ -280,16 +298,16 @@ C_INTERFACE_OBJECTS = \
 	c_interface.o clause_list.o
 
 OR_OBJECTS = \
-	opt.memory.o opt.misc.o opt.init.o opt.preds.o   \
+	opt.memory.o opt.init.o opt.preds.o   \
 	or.engine.o or.cowengine.o or.sbaengine.o or.threadengine.o \
 	or.scheduler.o or.cut.o      \
-	tab.tries.o tab.suspend.o
+	tab.tries.o tab.completion.o
 
 BEAM_OBJECTS = \
 	eamamasm.o eam_showcode.o eamindex.o eam_am.o
 
 STATIC_OBJECTS = \
-	@STATIC_MODE@sys.o random.o regexp.o  @NO_BUILTIN_REGEXP@ regcomp.o regerror.o regfree.o regexec.o
+	@STATIC_MODE@sys.o yap_random.o regexp.o  @NO_BUILTIN_REGEXP@ regcomp.o regerror.o regfree.o regexec.o
 
 LIB_OBJECTS = $(ENGINE_OBJECTS) $(C_INTERFACE_OBJECTS) $(OR_OBJECTS) $(BEAM_OBJECTS) $(STATIC_OBJECTS)
 
@@ -312,7 +330,6 @@ parms.h:	Makefile
 		@echo "#define YAP_SHAREDIR	    \"$(SHAREDIR)\""   >> $@%
 		@echo "#define YAP_PL_SRCDIR	    \"$(SHAREDIR)/Yap/pl\""   >> $@%
 		@echo "#define YAP_STARTUP   \"$(YAPSTARTUP)\"" >> $@%
-		@echo "#define YAP_SVERSION   \"$(VERSION)\"" >> $@%
 		@echo $(VERSION) | $(AWK) -F. '{ printf("#define YAP_VERSION %d\n", $$1 * 10000 + $$2 * 100 + $$3); }' >> $@%
 		@echo "#define MYDDAS_VERSION	    \"$(MYDDAS_VERSION)\""       >> $@%
 		@echo "#define YAP_ARCH	    \"$(ARCH)\""       >> $@%
@@ -321,8 +338,9 @@ parms.h:	Makefile
 		@echo "#define YAP_CC	    \"$(CC)\""	       >> $@%
 		@echo "#define YAP_CFLAGS	    \"$(CFLAGS)\"" >> $@%
 		@echo "#define YAP_LDFLAGS    \"$(LDFLAGS)\""    >> $@%
-		@echo "#define YAP_SHLIB_SUFFIX    \"$(SHLIB_SUFFIX)\""    >> $@%
+		@echo "#define YAP_SHLIB_SUFFIX    \".\" \"$(SO)\""    >> $@%
 		@echo "#define YAP_TIMESTAMP \"`date +%s`\"" >> $@%
+		@echo "#define YAP_SVERSION   \"YAP $(VERSION) ($(ARCH)): `date`\"" >> $@%
 		@if cmp -s $@% $@; then rm $@%; else mv $@% $@; fi
 
 
@@ -391,9 +409,6 @@ myddas_statistics.o: $(srcdir)/MYDDAS/myddas_statistics.c config.h
 opt.memory.o: $(srcdir)/OPTYap/opt.memory.c config.h
 	$(CC) -c $(CFLAGS) $(srcdir)/OPTYap/opt.memory.c -o $@
 
-opt.misc.o: $(srcdir)/OPTYap/opt.misc.c config.h
-	$(CC) -c $(CFLAGS) $(srcdir)/OPTYap/opt.misc.c -o $@
-
 opt.init.o: $(srcdir)/OPTYap/opt.init.c config.h
 	$(CC) -c $(CFLAGS) $(srcdir)/OPTYap/opt.init.c -o $@
 
@@ -421,8 +436,8 @@ or.scheduler.o: $(srcdir)/OPTYap/or.scheduler.c config.h
 tab.tries.o: $(srcdir)/OPTYap/tab.tries.c config.h
 	$(CC) -c $(CFLAGS) $(srcdir)/OPTYap/tab.tries.c -o $@
 
-tab.suspend.o: $(srcdir)/OPTYap/tab.suspend.c config.h
-	$(CC) -c $(CFLAGS) $(srcdir)/OPTYap/tab.suspend.c -o $@
+tab.completion.o: $(srcdir)/OPTYap/tab.completion.c config.h
+	$(CC) -c $(CFLAGS) $(srcdir)/OPTYap/tab.completion.c -o $@
 
 eam_showcode.o:  $(srcdir)/BEAM/eam_showcode.c config.h
 	$(CC) -c $(CFLAGS) $(srcdir)/BEAM/eam_showcode.c -o $@
@@ -442,8 +457,8 @@ sys.o: $(srcdir)/library/system/sys.c config.h
 yap2swi.o: $(srcdir)/library/yap2swi/yap2swi.c config.h
 	$(CC) -c $(CFLAGS) -I$(srcdir)/include  $(srcdir)/library/yap2swi/yap2swi.c  -o $@
 
-random.o: $(srcdir)/library/random/random.c config.h
-	$(CC) -c $(CFLAGS) -I$(srcdir)/include  $(srcdir)/library/random/random.c  -o $@
+yap_random.o: $(srcdir)/library/random/yap_random.c config.h
+	$(CC) -c $(CFLAGS) -I$(srcdir)/include  $(srcdir)/library/random/yap_random.c  -o $@
 
 regexp.o: $(srcdir)/library/regex/regexp.c  @NO_BUILTIN_REGEXP@ $(srcdir)/library/regex/regex2.h  $(srcdir)/library/regex/engine.c config.h
 	$(CC) -c $(CFLAGS) -I$(srcdir)/include -I$(srcdir)/library/regex $(srcdir)/library/regex/regexp.c -o regexp.o
@@ -482,29 +497,33 @@ mycb: $(srcdir)/mycb.c
 
 all: startup.yss
 	@INSTALL_DLLS@ (cd packages/PLStream; $(MAKE))
+	@INSTALL_DLLS@ (cd library/lammpi; $(MAKE))
+	@INSTALL_MATLAB@ (cd library/matlab; $(MAKE))
+	@INSTALL_DLLS@ (cd library/matrix; $(MAKE))
 	@INSTALL_DLLS@ (cd library/random; $(MAKE))
 	@INSTALL_DLLS@ (cd library/regex; $(MAKE))
 	@INSTALL_DLLS@ (cd library/rltree; $(MAKE))
 	@INSTALL_DLLS@ (cd library/system; $(MAKE))
 	@INSTALL_DLLS@ (cd library/tries; $(MAKE))
-	@INSTALL_DLLS@ (cd library/rltree; $(MAKE))
-	@INSTALL_DLLS@ (cd library/lammpi; $(MAKE))
-	@INSTALL_DLLS@ (cd library/matrix; $(MAKE))
-	@INSTALL_DLLS@ (cd packages/sgml; $(MAKE))
+	@INSTALL_DLLS@ (cd packages/clib; $(MAKE))
+	@INSTALL_DLLS@ (cd packages/http; $(MAKE))
 	@INSTALL_DLLS@ (cd packages/plunit; $(MAKE))
+	@INSTALL_DLLS@ (cd packages/RDF; $(MAKE))
+	@INSTALL_DLLS@ (cd packages/semweb; $(MAKE))
+	@INSTALL_DLLS@ (cd packages/sgml; $(MAKE))
 	@USE_MINISAT@ (cd packages/swi-minisat2/C; $(MAKE))
-	@INSTALL_MATLAB@ (cd library/matlab; $(MAKE))
-	@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/jpl; $(MAKE))
+	@INSTALL_DLLS@ (cd packages/tai; $(MAKE))
+	@INSTALL_DLLS@ (cd packages/zlib; $(MAKE))
 	@ENABLE_CPLINT@ (cd packages/cplint/approx/simplecuddLPADs; $(MAKE))
 	@ENABLE_CPLINT@ (cd packages/cplint; $(MAKE))
 	@USE_CUDD@ (cd packages/ProbLog/simplecudd; $(MAKE))
 
 startup.yss: yap@EXEC_SUFFIX@ $(PL_SOURCES)
 	-rm -f startup.yss
-	echo "bootstrap('$(srcdir)/pl/init.yap'). module(user). save_program('startup.yss')." |  @PRE_DYNLOADER_PATH@ ./yap -b $(srcdir)/pl/boot.yap
+	echo "bootstrap('$(srcdir)/pl/init.yap'). module(user). save_program('startup.yss')." |  @PRE_INSTALL_ENV@ ./yap -b $(srcdir)/pl/boot.yap
 
 yap@EXEC_SUFFIX@: $(HEADERS) yap.o @YAPLIB@
-	$(MPI_CC) $(STANDARD_CFLAGS) $(LDFLAGS) -o yap yap.o @YAPLIB@ $(LIBS) @MPI_LIBS@
+	$(MPI_CC) $(EXECUTABLE_CFLAGS) $(LDFLAGS) -o yap yap.o @YAPLIB@ $(LIBS) @MPI_LIBS@
 
 libYap.a: $(LIB_OBJECTS)
 	-rm -f libYap.a
@@ -512,7 +531,7 @@ libYap.a: $(LIB_OBJECTS)
 	$(RANLIB) libYap.a
 
 @DYNYAPLIB@: $(LIB_OBJECTS)
-	@DYNLIB_LD@ -o @YAPLIB@ $(LIB_OBJECTS) $(LIBS) $(LDFLAGS)
+	@YAPLIB_LD@ -o @YAPLIB@ $(LIB_OBJECTS) $(LIBS) $(LDFLAGS)
 
 install: install_bin install_data
 
@@ -532,24 +551,33 @@ install_unix: startup.yss libYap.a
 	$(INSTALL) $(srcdir)/COPYING $(DESTDIR)$(DOCSDIR)
 	for f in $(PL_SOURCES); do $(INSTALL) $$f $(DESTDIR)$(SHAREDIR)/Yap/pl; done
 	@INSTALL_DLLS@ (cd packages/PLStream; $(MAKE) install)
-	@INSTALL_DLLS@ (cd packages/plunit; $(MAKE) install)
-	@INSTALL_DLLS@ (cd packages/sgml; $(MAKE) install)
-	@USE_MINISAT@ (cd packages/swi-minisat2/C; $(MAKE) install)
+	@INSTALL_DLLS@ (cd library/lammpi; $(MAKE) install)
+	@INSTALL_DLLS@ (cd library/matrix; $(MAKE) install)
 	@INSTALL_DLLS@ (cd library/random; $(MAKE) install)
 	@INSTALL_DLLS@ (cd library/regex; $(MAKE) install)
 	@INSTALL_DLLS@ (cd library/rltree; $(MAKE) install)
 	@INSTALL_DLLS@ (cd library/system; $(MAKE) install)
 	@INSTALL_DLLS@ (cd library/tries; $(MAKE) install)
-	@INSTALL_DLLS@ (cd library/lammpi; $(MAKE) install)
-	@INSTALL_DLLS@ (cd library/matrix; $(MAKE) install)
+	@INSTALL_DLLS@ (cd packages/clib; $(MAKE) install)
+	@INSTALL_DLLS@ (cd packages/http; $(MAKE) install)
+	@INSTALL_DLLS@ (cd packages/plunit; $(MAKE) install)
+	@INSTALL_DLLS@ (cd packages/sgml; $(MAKE) install)
+	@INSTALL_DLLS@ (cd packages/RDF; $(MAKE) install)
+	@INSTALL_DLLS@ (cd packages/semweb; $(MAKE) install)
+	@INSTALL_DLLS@ (cd packages/tai; $(MAKE) install)
+	@INSTALL_DLLS@ (cd packages/zlib; $(MAKE) @ZLIB_INSTALL@)
+	@USE_MINISAT@ (cd packages/swi-minisat2/C; $(MAKE) install)
 	@INSTALL_MATLAB@ (cd library/matlab; $(MAKE) install)
+	@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/jpl; $(MAKE))
 	@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/jpl; $(MAKE) install)
+	#@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/pyswip; $(MAKE) install)
 	mkdir -p $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL) $(HEADERS) $(DESTDIR)$(INCLUDEDIR)
 	for h in $(INTERFACE_HEADERS); do $(INSTALL) $$h $(DESTDIR)$(INCLUDEDIR); done
 	$(INSTALL) config.h $(DESTDIR)$(INCLUDEDIR)/config.h
 	$(INSTALL) parms.h $(DESTDIR)$(INCLUDEDIR)/parms.h
 	@ENABLE_CPLINT@ (cd packages/cplint; $(MAKE) install)
+	@ENABLE_CPLINT@ (cd packages/cplint/simplecuddLPADs; $(MAKE) install)
 	@USE_CUDD@ (cd packages/ProbLog/simplecudd; $(MAKE) install)
 
 
@@ -560,7 +588,7 @@ install_win32: startup.yss
 	mkdir -p $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_PROGRAM) -m 755 yap.exe $(DESTDIR)$(BINDIR)/yap.exe
 	$(INSTALL_PROGRAM) -m 755 yap.dll $(DESTDIR)$(BINDIR)/yap.dll
-	$(INSTALL_PROGRAM) -m 755 libWYap.a $(DESTDIR)$(YAPLIBDIR)/libWYap.a
+	$(INSTALL_PROGRAM) -m 755 @YAPLIB@ $(DESTDIR)$(YAPLIBDIR)/@YAPLIB@
 	$(INSTALL_PROGRAM) -m 755 startup.yss $(DESTDIR)$(YAPLIBDIR)/startup.yss
 	mkdir -p $(DESTDIR)$(SHAREDIR)/Yap
 	mkdir -p $(DESTDIR)$(SHAREDIR)/Yap/pl
@@ -574,19 +602,24 @@ install_win32: startup.yss
 	for h in $(INTERFACE_HEADERS); do $(INSTALL) $$h $(DESTDIR)$(INCLUDEDIR); done
 	$(INSTALL) config.h $(DESTDIR)$(INCLUDEDIR)/config.h
 	$(INSTALL) parms.h $(DESTDIR)$(INCLUDEDIR)/parms.h
-	(cd packages/PLStream; $(MAKE) install)
-	(cd packages/plunit; $(MAKE) install)
-	(cd packages/sgml; $(MAKE) install)
-	@USE_MINISAT@ (cd packages/swi-minisat2/C; $(MAKE) install)
 	(cd library/random; $(MAKE) install)
 	(cd library/matrix; $(MAKE) install)
 	(cd library/regex; $(MAKE) install)
 	(cd library/rltree; $(MAKE) install)
 	(cd library/system; $(MAKE) install)
-	(cd packages/swi-minisat2; $(MAKE) install)
 	@ENABLE_WINCONSOLE@ (cd LGPL/swi_console; $(MAKE) install)
 	@INSTALL_MATLAB@ (cd library/matlab; $(MAKE) install)
 	(cd library/tries; $(MAKE) install)
+	(cd packages/PLStream; $(MAKE) install)
+	(cd packages/tai; $(MAKE) install)
+	(cd packages/clib; $(MAKE) install)
+	(cd packages/plunit; $(MAKE) install)
+	(cd packages/http; $(MAKE) install)
+	(cd packages/RDF; $(MAKE) install)
+	(cd packages/sgml; $(MAKE) install)
+	(cd packages/semweb; $(MAKE) install)
+	(cd packages/zlib; $(MAKE) @ZLIB_INSTALL@)
+	@USE_MINISAT@ (cd packages/swi-minisat2/C; $(MAKE) install)
 	@ENABLE_CPLINT@ (cd packages/cplint; $(MAKE) install)
 	@USE_CUDD@ (cd packages/ProbLog/simplecudd; $(MAKE) install)
 
@@ -624,19 +657,27 @@ depend: $(HEADERS) $(C_SOURCES)
 clean: clean_docs
 	rm -f *.o *~ *.BAK *.a
 	@INSTALL_DLLS@ (cd packages/PLStream; $(MAKE) clean)
-	@INSTALL_DLLS@ (cd packages/plunit; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd library/lammpi; $(MAKE) clean)
+	@INSTALL_MATLAB@ (cd library/matlab; $(MAKE) clean)
 	@INSTALL_DLLS@ (cd library/matrix; $(MAKE) clean)
 	@INSTALL_DLLS@ (cd library/random; $(MAKE) clean)
 	@INSTALL_DLLS@ (cd library/regex; $(MAKE) clean)
-	@INSTALL_DLLS@ (cd library/system; $(MAKE) clean)
 	@INSTALL_DLLS@ (cd library/rltree; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd library/system; $(MAKE) clean)
 	@INSTALL_DLLS@ (cd library/tries; $(MAKE) clean)
-	@INSTALL_DLLS@ (cd library/lammpi; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd packages/clib; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd packages/http; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd packages/plunit; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd packages/RDF; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd packages/semweb; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd packages/sgml; $(MAKE) clean)
 	@USE_MINISAT@ (cd packages/swi-minisat2; $(MAKE) clean)
-	@INSTALL_MATLAB@ (cd library/matlab; $(MAKE) clean)
-	@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/jpl; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd packages/tai; $(MAKE) clean)
+	@INSTALL_DLLS@ (cd packages/zlib; $(MAKE) clean)
+	@ENABLE_CPLINT@ (cd packages/cplint/approx/simplecuddLPADs; $(MAKE) clean)
 	@ENABLE_CPLINT@ (cd packages/cplint; $(MAKE) clean)
 	@USE_CUDD@ (cd packages/ProbLog/simplecudd; $(MAKE) clean)
+	@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/jpl; $(MAKE) clean)
 
 
 

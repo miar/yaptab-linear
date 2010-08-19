@@ -352,6 +352,41 @@ atom_concat(X,Y,At) :-
 atomic_list_concat(L,At) :-
 	atomic_concat(L, At).
 	
+atomic_list_concat(L, El, At) :-
+	var(El), !,
+	'$do_error'(instantiation_error,atom_list_concat(L,El,At)).
+atomic_list_concat(L, El, At) :-
+	nonvar(L), !,
+	'$add_els'(L,El,LEl),
+	atomic_concat(LEl, At).
+atomic_list_concat(L, El, At) :-
+	nonvar(At), !,
+	atom_codes(At, S),
+	atom_codes(El, [ElS]),
+	'$split_elements'(S, ElS, SubS),
+	'$atomify_list'(SubS, L).
+
+'$add_els'([A,B|L],El,[A,El|NL]) :- !,
+	'$add_els'([B|L],El,NL).
+'$add_els'(L,_,L).
+	
+'$split_elements'(E.S, E, SubS) :- !,
+	'$split_elements'(S, E, SubS).
+'$split_elements'(E1.S, E, [E1|L].SubS) :- !,
+	'$split_elements'(S, E, L, SubS).
+'$split_elements'([], _, []).
+
+'$split_elements'([], _, [], []).
+'$split_elements'(E.S, E, [], SubS) :- !,
+	'$split_elements'(S, E, SubS).
+'$split_elements'(E1.S, E, E1.L, SubS) :-
+	'$split_elements'(S, E, L, SubS).
+
+'$atomify_list'([], []).
+'$atomify_list'(S.SubS, A.L) :-
+	atom_codes(A, S),
+	'$atomify_list'(SubS, L).
+	
 atomic_concat(X,Y,At) :-
 	(
 	  nonvar(X),  nonvar(Y)
@@ -553,6 +588,14 @@ atom_to_term(Atom, Term, Bindings) :-
 	close(Stream),
 	T = Term.
 
+term_to_atom(Term,Atom) :-
+	nonvar(Atom), !,
+	atom_codes(Atom,S),
+	charsio:read_from_chars(S,Term).
+term_to_atom(Term,Atom) :-
+	charsio:write_to_chars(Term,S),
+	atom_codes(Atom,S).
+
 simple(V) :- var(V), !.
 simple(A) :- atom(A), !.
 simple(N) :- number(N).
@@ -598,5 +641,9 @@ nb_current(GlobalVariable, Val) :-
 	;
 	 '$do_error'(type_error(atom, Action),Caller)
 	).
+
+
+subsumes_term(A,B) :-
+	\+ \+ terms:subsumes(A,B).
 
 

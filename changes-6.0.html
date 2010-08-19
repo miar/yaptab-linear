@@ -1,0 +1,70 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+        "http://www.w3.org/TR/1999/REC-html401-19991224/strict.dtd">
+
+<html>
+
+<head>
+	<title>YAP change log</title>
+	<link rel=stylesheet href="changes.css" type="text/css">
+</head>
+
+
+<body>
+
+<hr>
+
+<h1>Changes in YAP-6</h1>
+
+<h2>Yap-6.0.7:</h2>
+<ul>
+<li> FIXED: restore from / file should just try that file. </li>
+<li> FIXED: bad things can happen to P when user code is called (obs
+  from Ingo Thon). </li>
+<li> NEW: coinduction.yap. </li>
+<li> FIXED: remove leftover files including two lib*.a (obs from
+  Bernd Gutmann).</li>
+<li> FIXED: Make clean should result in recompiling all *.o (obs from
+  Bernd Gutmann).</li>
+<li> NEW: Ulrich Neumerkel's lambda library.</li>
+<li> DELETE: ^/2 and ^/3 as grammar built-ins.</li>
+<li> FIXED: make install in clpqr was broken if we used local install_sh .</li>
+<li> DELETE: atan/2 arithmetic function, use atan2/2 instead (WG17).</li>
+<li> FIXED: compilation in Solaris was broken because  of conflict in
+  declaration of gethostname.</li>
+<li> FIXED: acyclic_term/1 is now built-in (WG17).</li>
+<li> NEW: subsumes_term/2 (WG17).</li>
+</ul>
+
+<h2>Yap-6.0.6:</h2>
+<ul>
+<li> FIXED: fix problems in indexing compiled bignums (obs from Jos de
+  Roo), center hash computing code in TermExt.h.</li>
+<li> FIXED: similar problem in unify_dbterm.</li>
+<li> FIXED: bug in implementation of unify_bigint instruction (obs
+  from Jos de Roo).</li>
+</ul>
+
+<h2>Yap-6.0.5:</h2>
+<ul>
+<li> FIXED: get rid of L constants (use cast).</li>
+<li> FIXED: outputing inf and nan in WIN32/64 (obs from Paulo Moura).</li>
+<li> NEW: WIN64 port.</li>
+<li> FIXED: improve SWI frame handling.</li>
+<li> FIXED: stack expansion could rewrite doubles and big ints.</li>
+<li> FIXED: unsafe test for attvar could crash.</li>
+<li> FIXED: rbtree doc (from Jan Wielemaker).</li>
+<li> FIXED: trail marking should be careful to reset attvars to attvars.</li>
+<li> FIXED: pl_function_t not function_t.</li>
+<li> NEW: update sgml package to latest SWI.</li>
+<li> FIXED: automatic generation of SWI atoms.</li>
+<li> IMPROVEMENT: better emulation of SWI atom_t and functor_t. Now
+they can be defined to be a constant.</li>
+<li> FIXED: 64 bit complaints in Matlab interface.</li>
+</ul>
+
+
+<hr>
+
+</body>
+
+</html>

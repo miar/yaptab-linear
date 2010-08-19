@@ -14,7 +14,8 @@ BINDIR = $(EROOTDIR)/bin
 #
 # where YAP should look for libraries
 #
-LIBDIR=@libdir@/Yap
+LIBDIR=@libdir@
+YAPLIBDIR=@libdir@/Yap
 #
 #
 CC=@CC@
@@ -28,8 +29,7 @@ INSTALL_PROGRAM=@INSTALL_PROGRAM@
 SHELL=/bin/sh
 RANLIB=@RANLIB@
 srcdir=@srcdir@
-SHLIB_CFLAGS=@SHLIB_CFLAGS@
-SHLIB_SUFFIX=@SHLIB_SUFFIX@
+SO=@SO@
 #4.1VPATH=@srcdir@:@srcdir@/OPTYap
 CWD=$(PWD)
 #
@@ -60,4 +60,4 @@ clean:
 	rm -f *.o ProblogBDD Example
 
 install: default
-	$(INSTALL_PROGRAM) ProblogBDD $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROGRAM) ProblogBDD $(DESTDIR)$(YAPLIBDIR)

@@ -249,10 +249,10 @@ STATIC_PROTO(DBProp find_int_key, (Int));
 static UInt new_trail_size(void)
 {
   UInt sz = (Yap_TrailTop-(ADDR)TR)/2;
-  if (sz < 64 * 1024L)
-    return 64 * 1024L;
-  if (sz > 1024*1024L)
-    return 1024*1024L;
+  if (sz < K64)
+    return K64;
+  if (sz > M1)
+    return M1;
   return sz;
 }
 
@@ -304,14 +304,14 @@ static void create_hash_table(DBProp p, Int hint) {
   if (hint < p->NOfEntries)
     hint = p->NOfEntries;
   while (off) {
-    Int limit = 1L << (off);
+    Int limit = ((CELL)1) << (off);
     if (inp >= limit) {
       out += off;
       inp >>= off;
     }
     off >>= 1;
   }
-  if ((size = 1L << out) < hint)
+  if ((size = ((CELL)1) << out) < hint)
     hint <<= 1;
   /* clean up the table */
   pt = tbl = (hash_db_entry *)AllocDBSpace(hint*sizeof(hash_db_entry));
@@ -1895,7 +1895,7 @@ record_lu_at(int position, LogUpdClause *ocl, Term t)
   PredEntry *pe;
 
   pe = ocl->ClPred;
-  LOCK(pe->PELock);
+  PELOCK(62,pe);
   if ((cl = new_lu_db_entry(t,pe)) == NULL) {
     UNLOCK(pe->PELock);
     return NULL;
@@ -1951,7 +1951,7 @@ p_rcda(void)
   if (pe) {
     LogUpdClause *cl;
 
-    LOCK(pe->PELock);
+    PELOCK(61,pe);
     cl = record_lu(pe, Deref(ARG2), MkFirst);
     if (cl != NULL) {
       TRAIL_CLREF(cl);
@@ -2061,7 +2061,7 @@ p_rcdz(void)
   if (pe) {
     LogUpdClause *cl;
 
-    LOCK(pe->PELock);
+    PELOCK(62,pe);
     cl = record_lu(pe, t2, MkLast);
     if (cl != NULL) {
       TRAIL_CLREF(cl);
@@ -2367,7 +2367,7 @@ copy_attachments(CELL *ts)
 static Term
 GetDBLUKey(PredEntry *ap)
 {
-  LOCK(ap->PELock);
+  PELOCK(63,ap);
   if (ap->PredFlags & NumberDBPredFlag) {
     Int id = ap->src.IndxId;
     UNLOCK(ap->PELock);
@@ -2867,7 +2867,7 @@ FetchDBPropFromKey(Term twork, int flag, int new, char *error_mssg)
 	pp = RepPredProp(Yap_GetPredPropHavingLock(At, arity, dbmod));
 
 	if (!EndOfPAEntr(pp)) {
-	  LOCK(pp->PELock);
+	  PELOCK(64,pp);
 	  if(pp->PredFlags & LogUpdatePredFlag)
 	    UPDATE_MODE = UPDATE_MODE_LOGICAL;
 	  UNLOCK(pp->PELock);
@@ -2909,7 +2909,7 @@ lu_nth_recorded(PredEntry *pe, Int Count)
   if (cl == NULL)
     return FALSE;
 #if defined(YAPOR) || defined(THREADS)
-  LOCK(pe->PELock);
+  PELOCK(65,pe);
   TRAIL_CLREF(cl);		/* So that fail will erase it */
   INC_CLREF_COUNT(cl);
   UNLOCK(pe->PELock);
@@ -2991,7 +2991,7 @@ p_nth_instance(void)
 	Term pred_module;
 
 	pe = cl->ClPred;
-	LOCK(pe->PELock);
+	PELOCK(66,pe);
 	if (cl->ClFlags & ErasedMask) {
 	  UNLOCK(pe->PELock);
 	  return FALSE;
@@ -3436,7 +3436,7 @@ lu_recorded(PredEntry *pe) {
   op_numbers opc = Yap_op_from_opcode(P->opc);
 
 #if defined(YAPOR) || defined(THREADS)
-  LOCK(pe->PELock);
+  PELOCK(66,pe);
   PP = pe;
 #endif
   if (opc == _procceed) {
@@ -4349,7 +4349,7 @@ EraseEntry(DBRef entryref)
   if (entryref->Flags & LogUpdMask &&
       !(entryref->Flags & DBClMask)) {
     LogUpdClause *luclause = (LogUpdClause *)entryref;
-    LOCK(luclause->ClPred->PELock);
+    PELOCK(67,luclause->ClPred);
     EraseLogUpdCl(luclause);
     UNLOCK(luclause->ClPred->PELock);
     return;
@@ -4611,7 +4611,7 @@ p_instance(void)
     LogUpdClause *cl = (LogUpdClause *)dbr;
     PredEntry *ap = cl->ClPred;
 
-    LOCK(ap->PELock);
+    PELOCK(68,ap);
     if (cl->ClFlags & ErasedMask) {
       UNLOCK(ap->PELock);
       return FALSE;
@@ -5386,7 +5386,6 @@ Yap_ReleaseTermFromDB(DBTerm *ref)
 static Int 
 p_install_thread_local(void)
 {				/* '$is_dynamic'(+P)	 */
-#if THREADS
   PredEntry      *pe;
   Term            t = Deref(ARG1);
   Term            mod = Deref(ARG2);
@@ -5413,16 +5412,19 @@ p_install_thread_local(void)
   } else {
     return FALSE;
   }
-  LOCK(pe->PELock);
+  PELOCK(69,pe);
   if (pe->PredFlags & (UserCPredFlag|HiddenPredFlag|CArgsPredFlag|SyncPredFlag|TestPredFlag|AsmPredFlag|StandardPredFlag|CPredFlag|SafePredFlag|IndexedPredFlag|BinaryPredFlag) ||
       pe->cs.p_code.NOfClauses) {
     return FALSE;
   }
+#if THREADS
   pe->PredFlags |= ThreadLocalPredFlag|LogUpdatePredFlag;
   pe->OpcodeOfPred = Yap_opcode(_thread_local);
   pe->CodeOfPred = (yamop *)&pe->OpcodeOfPred;
-  UNLOCK(pe->PELock);
+#else
+  pe->PredFlags |= LogUpdatePredFlag;
 #endif
+  UNLOCK(pe->PELock);
   return TRUE;
 }
 

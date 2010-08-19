@@ -1,4 +1,8 @@
 
+  /* This file, rhstruct.h, was generated automatically by "yap -L misc/buildheap"
+     please do not update, update misc/HEAPFIELDS instead */
+
+
 
 
 
@@ -86,6 +90,7 @@
   Yap_heap_regs->charsio_module = AtomTermAdjust(Yap_heap_regs->charsio_module);
   Yap_heap_regs->terms_module = AtomTermAdjust(Yap_heap_regs->terms_module);
   Yap_heap_regs->system_module = AtomTermAdjust(Yap_heap_regs->system_module);
+  Yap_heap_regs->operating_system_module = AtomTermAdjust(Yap_heap_regs->operating_system_module);
   Yap_heap_regs->readutil_module = AtomTermAdjust(Yap_heap_regs->readutil_module);
   Yap_heap_regs->hacks_module = AtomTermAdjust(Yap_heap_regs->hacks_module);
   Yap_heap_regs->arg_module = AtomTermAdjust(Yap_heap_regs->arg_module);
@@ -289,5 +294,9 @@
 
   RestoreForeignCode();
 
+
+
+
+  RestoreSWIAtoms();
 
 

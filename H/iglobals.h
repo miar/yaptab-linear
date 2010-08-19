@@ -1,4 +1,8 @@
 
+  /* This file, iglobals.h, was generated automatically by "yap -L misc/buildheap"
+     please do not update, update misc/GLOBALS instead */
+
+
 
 
 
@@ -17,6 +21,10 @@
 
 
 static void InitWorker(int wid) {
+
+  FOREIGN_WL(wid)->c_input_stream = 0;
+  FOREIGN_WL(wid)->c_output_stream = 1;
+  FOREIGN_WL(wid)->c_error_stream = 2;
 
   FOREIGN_WL(wid)->rinfo.old_ASP = NULL;
   FOREIGN_WL(wid)->rinfo.old_LCL0 = NULL;
@@ -115,7 +123,7 @@ static void InitWorker(int wid) {
 #endif
   FOREIGN_WL(wid)->conttop0 = NULL;
   FOREIGN_WL(wid)->conttop = NULL;
-  FOREIGN_WL(wid)->disc_trail_entries = NULL;
+  FOREIGN_WL(wid)->disc_trail_entries = 0;
 
   FOREIGN_WL(wid)->Gc_ma_h_top = NULL;
   FOREIGN_WL(wid)->Gc_ma_h_list = NULL;
@@ -131,11 +139,26 @@ static void InitWorker(int wid) {
   FOREIGN_WL(wid)->global_variables = NULL;
   FOREIGN_WL(wid)->allow_restart = FALSE;
 
+  FOREIGN_WL(wid)->cmem_first_block = NULL;
+  FOREIGN_WL(wid)->cmem_first_block_sz = 0L;
+
+  FOREIGN_WL(wid)->label_first_array = NULL;
+  FOREIGN_WL(wid)->label_first_array_sz = 0L;
+
+  FOREIGN_WL(wid)->putc_curp_ = NULL;
+  FOREIGN_WL(wid)->putc_cur_buf_ = NULL;
+  FOREIGN_WL(wid)->putc_cur_lim_ = NULL;
+  FOREIGN_WL(wid)->putc_cur_flags_ = 0L;
+  InitSWIBuffers(wid);
+
+  FOREIGN_WL(wid)->SWI_buf_index_ = 0;
+  FOREIGN_WL(wid)->_execution = NULL;
+
 #if (defined(YAPOR) || defined(TABLING)) && defined(THREADS)
 
 #endif
 #ifdef THREADS
-  InitThreadHandle;
+  InitThreadHandle(wid);
 #define FOREIGN_ThreadHandle(wid)  (Yap_WLocal[(wid)].thread_handle)		       						
 #define MY_ThreadHandle	       (Yap_WLocal[worker_id].thread_handle)
 #endif
@@ -157,6 +180,13 @@ static void InitGlobal(void) {
 
   INIT_LOCK(Yap_global->bgl);
 #endif
+  Yap_global->f_swi_stream = NULL;
+  Yap_global->swi_getc = NULL;
+  Yap_global->swi_putc = NULL;
+  Yap_global->swi_wgetc = NULL;
+  Yap_global->swi_wputc = NULL;
+  Yap_global->swi_close = NULL;
+  Yap_global->swi_flush = NULL;
 
   Yap_global->allow_local_expansion = TRUE;
   Yap_global->allow_global_expansion = TRUE;
@@ -181,4 +211,9 @@ static void InitGlobal(void) {
 
 
 #endif
+
+  Yap_global->initialised = FALSE;
+  Yap_global->initialised_from_pl = FALSE;
+  Yap_global->pl_argc = 0;
+  Yap_global->pl_argv = NULL;
 }

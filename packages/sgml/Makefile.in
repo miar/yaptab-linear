@@ -22,26 +22,25 @@ YAPLIBDIR=@libdir@/Yap
 SHAREDIR=$(ROOTDIR)/share/Yap
 
 SHELL=@SHELL@
-PL=@EXTEND_DYNLOADER_PATH@ $(DESTDIR)$(BINDIR)/yap $(DESTDIR)$(YAPLIBDIR)/startup.yss
+PL=@INSTALL_ENV@ $(DESTDIR)$(BINDIR)/yap $(DESTDIR)$(YAPLIBDIR)/startup.yss
 CHRDIR=$(SHAREDIR)/chr
 EXDIR=$(CHRDIR)/examples/chr
 LN_S=@LN_S@
 #
 #
 CC=@CC@
-CFLAGS= @CFLAGS@ $(YAP_EXTRAS) $(DEFS) -D_YAP_NOT_INSTALLED_=1 -I$(srcdir) -I../.. -I$(srcdir)/../../include
+CFLAGS= @SHLIB_CFLAGS@ $(YAP_EXTRAS) $(DEFS) -D_YAP_NOT_INSTALLED_=1 -I$(srcdir) -I../.. -I$(srcdir)/../../include @CPPFLAGS@
 MKINDEX=true
 
 LD=$(CC)
 PLLD=$(CC)
 
-SHLIB_CFLAGS=@SHLIB_CFLAGS@
-SHLIB_SUFFIX=@SHLIB_SUFFIX@
+SO=@SO@
 #4.1VPATH=@srcdir@:@srcdir@/OPTYap
 CWD=$(PWD)
 #
 
-TARGETS=	sgml2pl@SHLIB_SUFFIX@
+TARGETS=	sgml2pl.@SO@
 
 else	# SWI
 
@@ -101,7 +100,10 @@ ALLCSRC=	$(LIBOBJ:.o=.c) \
 		$(HDRS)
 
 LIBPL=		$(srcdir)/sgml.pl $(srcdir)/xsdp_types.pl \
-		$(srcdir)/iso_639.pl $(srcdir)/sgml_write.pl
+		$(srcdir)/iso_639.pl $(srcdir)/sgml_write.pl \
+		$(srcdir)/xpath.pl\
+		$(srcdir)/pwp.pl \
+		$(srcdir)/pltotex.pl
 PROGRAMS=	dtd2pl sgml
 DTDFILES=	HTML4.dcl HTML4.dtd \
 		HTML4.soc \
@@ -111,10 +113,10 @@ DTDFILES=	HTML4.dcl HTML4.dtd \
 ifeq (@PROLOG_SYSTEM@,yap)
 
 %.o : $(srcdir)/%.c
-	$(CC) $(CFLAGS) $(SHLIB_CFLAGS)  -o $@ -c $<
+	$(CC) $(CFLAGS)  -o $@ -c $<
 
-@DO_SECOND_LD@sgml2pl@SHLIB_SUFFIX@: $(PLOBJ)
-@DO_SECOND_LD@	@SHLIB_SWI_LD@ -o sgml2pl@SHLIB_SUFFIX@ $(PLOBJ)
+@DO_SECOND_LD@sgml2pl.@SO@: $(PLOBJ)
+@DO_SECOND_LD@	@SHLIB_LD@ -o sgml2pl.@SO@ $(PLOBJ) @EXTRA_LIBS_FOR_SWIDLLS@
 
 all:		$(TARGETS) $(PROGRAMS)
 
@@ -168,8 +170,8 @@ html-install::
 		$(INSTALL_DATA) sgml.html $(DESTDIR)$(PKGDOC)
 
 check::
-		$(PL) -f Test/test.pl -g test,halt
-		$(PL) -f Test/wrtest.pl -g test,halt
+		$(PL) -f $(srcdir)/Test/test.pl -g test,halt
+		$(PL) -f $(srcdir)/Test/wrtest.pl -g test,halt
 
 uninstall::
 		(cd $(PLBASE)/lib/$(PLARCH) && rm -f $(TARGETS))

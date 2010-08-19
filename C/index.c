@@ -634,6 +634,7 @@ recover_from_failed_susp_on_cls(struct intermediates *cint, UInt sz)
     }
     cpc = cpc->nextInst;
   }
+  Yap_ReleaseCMem(cint);
   if (cint->code_addr) {
     Yap_FreeCodeSpace((char *)cint->code_addr);
     cint->code_addr = NULL;
@@ -825,30 +826,36 @@ static void
 sort_group(GroupDef *grp, CELL *top, struct intermediates *cint)
 {
   int max = (grp->LastClause-grp->FirstClause)+1, i;
-  CELL *pt = top;
+  CELL *pt, *base;
 
-  while (top+2*max > (CELL *)Yap_TrailTop) {
 #if USE_SYSTEM_MALLOC
-    Yap_Error_Size = 2*max*sizeof(CELL);
-    /* grow stack */
+  if (!(base = (CELL *)Yap_AllocCodeSpace(2*max*sizeof(CELL)))) {
     save_machine_regs();
-    longjmp(cint->CompilerBotch,4);
+    Yap_Error_Size = 2*max*sizeof(CELL);
+    longjmp(cint->CompilerBotch,2);
+  }
 #else
+  base = top;
+  while (top+2*max > (CELL *)Yap_TrailTop) {
     if (!Yap_growtrail(2*max*CellSize, TRUE)) {
       save_machine_regs();
       longjmp(cint->CompilerBotch,4);
       return;
     }
-#endif
   }
+#endif
+  pt = base;
   /* initialise vector */
   for (i=0; i < max; i++) {
     *pt = i;
     pt += 2;
   }
 #define M_EVEN  0
-  msort(grp->FirstClause, top, max, M_EVEN);
-  copy_back(grp->FirstClause, top, max);
+  msort(grp->FirstClause, base, max, M_EVEN);
+  copy_back(grp->FirstClause, base, max);
+#if USE_SYSTEM_MALLOC
+  Yap_FreeCodeSpace((ADDR)base);
+#endif
 }
 
 /* add copy to register stack for original reg */
@@ -956,6 +963,10 @@ has_cut(yamop *pc)
     case _p_cut_by_x:
     case _commit_b_y:
     case _commit_b_x:
+#if CUT_C
+    case _cut_c:
+    case _cut_userc:
+#endif
       return TRUE;
     case _try_me:
     case _retry_me:
@@ -1003,6 +1014,10 @@ has_cut(yamop *pc)
       break;
     case _native_me:
       pc = NEXTOP(pc,aFlp);
+      break;
+      /* instructions type Osbpi */
+    case _ensure_space:
+      pc = NEXTOP(pc,Osbpi);
       break;
       /* instructions type l */
     case _enter_profiling:
@@ -1062,62 +1077,66 @@ has_cut(yamop *pc)
     case _getwork_first_time:
 #endif /* YAPOR */
 #ifdef TABLING
-    case _trie_do_null:
-    case _trie_trust_null:
-    case _trie_try_null:
-    case _trie_retry_null:
-    case _trie_do_null_in_new_pair:
-    case _trie_trust_null_in_new_pair:
-    case _trie_try_null_in_new_pair:
-    case _trie_retry_null_in_new_pair:
     case _trie_do_var:
     case _trie_trust_var:
     case _trie_try_var:
     case _trie_retry_var:
-    case _trie_do_var_in_new_pair:
-    case _trie_trust_var_in_new_pair:
-    case _trie_try_var_in_new_pair:
-    case _trie_retry_var_in_new_pair:
+    case _trie_do_var_in_pair:
+    case _trie_trust_var_in_pair:
+    case _trie_try_var_in_pair:
+    case _trie_retry_var_in_pair:
     case _trie_do_val:
     case _trie_trust_val:
     case _trie_try_val:
     case _trie_retry_val:
-    case _trie_do_val_in_new_pair:
-    case _trie_trust_val_in_new_pair:
-    case _trie_try_val_in_new_pair:
-    case _trie_retry_val_in_new_pair:
+    case _trie_do_val_in_pair:
+    case _trie_trust_val_in_pair:
+    case _trie_try_val_in_pair:
+    case _trie_retry_val_in_pair:
     case _trie_do_atom:
     case _trie_trust_atom:
     case _trie_try_atom:
     case _trie_retry_atom:
-    case _trie_do_atom_in_new_pair:
-    case _trie_trust_atom_in_new_pair:
-    case _trie_try_atom_in_new_pair:
-    case _trie_retry_atom_in_new_pair:
+    case _trie_do_atom_in_pair:
+    case _trie_trust_atom_in_pair:
+    case _trie_try_atom_in_pair:
+    case _trie_retry_atom_in_pair:
+    case _trie_do_null:
+    case _trie_trust_null:
+    case _trie_try_null:
+    case _trie_retry_null:
+    case _trie_do_null_in_pair:
+    case _trie_trust_null_in_pair:
+    case _trie_try_null_in_pair:
+    case _trie_retry_null_in_pair:
     case _trie_do_pair:
     case _trie_trust_pair:
     case _trie_try_pair:
     case _trie_retry_pair:
-    case _trie_do_struct:
-    case _trie_trust_struct:
-    case _trie_try_struct:
-    case _trie_retry_struct:
-    case _trie_do_struct_in_new_pair:
-    case _trie_trust_struct_in_new_pair:
-    case _trie_try_struct_in_new_pair:
-    case _trie_retry_struct_in_new_pair:
+    case _trie_do_appl:
+    case _trie_trust_appl:
+    case _trie_try_appl:
+    case _trie_retry_appl:
+    case _trie_do_appl_in_pair:
+    case _trie_trust_appl_in_pair:
+    case _trie_try_appl_in_pair:
+    case _trie_retry_appl_in_pair:
     case _trie_do_extension:
     case _trie_trust_extension:
     case _trie_try_extension:
     case _trie_retry_extension:
-    case _trie_do_float:
-    case _trie_trust_float:
-    case _trie_try_float:
-    case _trie_retry_float:
-    case _trie_do_long:
-    case _trie_trust_long:
-    case _trie_try_long:
-    case _trie_retry_long:
+    case _trie_do_double:
+    case _trie_trust_double:
+    case _trie_try_double:
+    case _trie_retry_double:
+    case _trie_do_longint:
+    case _trie_trust_longint:
+    case _trie_try_longint:
+    case _trie_retry_longint:
+    case _trie_do_gterm:
+    case _trie_trust_gterm:
+    case _trie_try_gterm:
+    case _trie_retry_gterm:
 #endif /* TABLING */
       pc = NEXTOP(pc,e);
       break;
@@ -1791,14 +1810,11 @@ add_arg_info(ClauseDef *clause, PredEntry *ap, UInt argno)
     case _unify_bigint:
     case _unify_l_bigint:
       if (argno == 1) {
-#ifdef USE_GMP
 	clause->Tag = AbsAppl((CELL *)FunctorBigInt);
-#else
-	clause->Tag = AbsAppl((CELL *)FunctorLongInt);	
-#endif
 	clause->u.t_ptr = cl->u.oc.c;
 	return;
       }
+      cl = NEXTOP(cl,oc);
       argno--;
       break;
     case _unify_n_atoms:
@@ -2615,8 +2631,8 @@ do_consts(GroupDef *grp, Term t, struct intermediates *cint, int compound_term, 
 
     ics = fetch_centry(cs, min->Tag, i, n);
     ics->Tag = min->Tag;
-    while ((max+1)->Tag == min->Tag &&
-	   max != grp->LastClause) max++;
+    while (max != grp->LastClause && (max+1)->Tag == min->Tag)
+      max++;
     if (min != max) {
       if (sreg != NULL) {
 	if (ap->PredFlags & LogUpdatePredFlag && max > min) {
@@ -2655,8 +2671,8 @@ do_blobs(GroupDef *grp, Term t, struct intermediates *cint, UInt argno, int firs
 
     ics = fetch_centry(cs, min->Tag, i, n);
     ics->Tag = min->Tag;
-    while ((max+1)->Tag == min->Tag &&
-	   max != grp->LastClause) max++;
+    while (max != grp->LastClause &&
+	   (max+1)->Tag == min->Tag) max++;
     if (min != max &&
 	(ap->PredFlags & LogUpdatePredFlag)) {
       ics->u.Label = suspend_indexing(min, max, ap, cint);
@@ -2691,8 +2707,8 @@ do_funcs(GroupDef *grp, Term t, struct intermediates *cint, UInt argno, int firs
 
     ifs = fetch_fentry(fs, f, i, n);
     ifs->Tag = f;
-    while ((max+1)->Tag == min->Tag &&
-	   max != grp->LastClause) max++; 
+    while (max != grp->LastClause && (max+1)->Tag == min->Tag)
+      max++; 
     /* delay non-trivial indexing  
        if (min != max &&
        !IsExtensionFunctor(f)) {
@@ -2703,7 +2719,7 @@ do_funcs(GroupDef *grp, Term t, struct intermediates *cint, UInt argno, int firs
     if (IsExtensionFunctor(f)) {
       if (f == FunctorDBRef) 
 	ifs->u.Label = do_dbref_index(min, max, t, cint, argno, nxtlbl, first, clleft, top);
-      else if (f == FunctorLongInt) 
+      else if (f == FunctorLongInt || f == FunctorBigInt) 
 	ifs->u.Label = do_blob_index(min, max, t, cint, argno, nxtlbl, first, clleft, top, FALSE);
       else
 	ifs->u.Label = do_blob_index(min, max, t, cint, argno, nxtlbl, first, clleft, top, TRUE);
@@ -3227,15 +3243,9 @@ do_blob_index(ClauseDef *min, ClauseDef* max, Term t, struct intermediates *cint
     if (cl->u.t_ptr == (CELL)NULL) { /* check whether it is a builtin */
       cl->Tag = Zero;
     } else if (blob) {
-      CELL *pt = RepAppl(cl->u.t_ptr);
-#if SIZEOF_DOUBLE == 2*SIZEOF_LONG_INT
-      cl->Tag = MkIntTerm(pt[1]^pt[2]);
-#else
-      cl->Tag = MkIntTerm(pt[1]);
-#endif
+      cl->Tag = Yap_Double_key(cl->u.t_ptr);
     } else {
-      CELL *pt = RepAppl(cl->u.t_ptr);
-      cl->Tag = MkIntTerm((pt[1] & (MAX_ABS_INT-1)));
+      cl->Tag = Yap_Int_key(cl->u.t_ptr);
     }
     cl++;
   }
@@ -3299,37 +3309,63 @@ compile_index(struct intermediates *cint)
 {
   PredEntry *ap = cint->CurrentPred;
   int NClauses = ap->cs.p_code.NOfClauses;
-  ClauseDef *cls = (ClauseDef *)H;
   CELL *top = (CELL *) TR;
+  UInt res;
 
   /* only global variable I use directly */
   cint->i_labelno = 1;
 
   Yap_Error_Size = 0;
+#if USE_SYSTEM_MALLOC
+  if (!cint->cls) {
+    cint->cls = (ClauseDef *)Yap_AllocCodeSpace(NClauses*sizeof(ClauseDef));
+    if (!cint->cls) {
+      /* tell how much space we need */
+      Yap_Error_Size += NClauses*sizeof(ClauseDef);
+      /* grow stack */
+      save_machine_regs();
+      longjmp(cint->CompilerBotch,2);
+    }
+  }
+  cint->freep = (char *)H;
+#else
   /* reserve double the space for compiler */
-  if (cls+2*NClauses > (ClauseDef *)(ASP-4096)) {
+  cint->cls = (ClauseDef *)H;
+  if (cint->cls+2*NClauses > (ClauseDef *)(ASP-4096)) {
     /* tell how much space we need */
     Yap_Error_Size += NClauses*sizeof(ClauseDef);
     /* grow stack */
     save_machine_regs();
     longjmp(cint->CompilerBotch,3);
   }
-  cint->freep = (char *)(cls+NClauses);
+  cint->freep = (char *)(cint->cls+NClauses);
+#endif
   if (ap->PredFlags & LogUpdatePredFlag) {
     /* throw away a label */
     new_label(cint);
-    init_log_upd_clauses(cls,ap);
+    init_log_upd_clauses(cint->cls,ap);
   } else if (ap->PredFlags & UDIPredFlag) {
     UInt lbl = new_label(cint);
     Yap_emit(user_switch_op, Unsigned(ap), Unsigned(&(ap->cs.p_code.ExpandCode)), cint);
     return lbl;
   } else {
     /* prepare basic data structures */ 
-    init_clauses(cls,ap);
+    init_clauses(cint->cls,ap);
   }
-  return do_index(cls, cls+(NClauses-1), cint, 1, (UInt)FAILCODE, TRUE, 0, top);
+  res = do_index(cint->cls, cint->cls+(NClauses-1), cint, 1, (UInt)FAILCODE, TRUE, 0, top);
+  return res;
 }
 
+static void
+CleanCls(struct intermediates *cint)
+{
+#if USE_SYSTEM_MALLOC
+  if (cint->cls) {
+    Yap_FreeCodeSpace((ADDR)cint->cls);
+  }
+#endif
+  cint->cls = NULL;
+}
 
 yamop *
 Yap_PredIsIndexable(PredEntry *ap, UInt NSlots, yamop *next_pc)
@@ -3341,12 +3377,15 @@ Yap_PredIsIndexable(PredEntry *ap, UInt NSlots, yamop *next_pc)
 
   cint.CurrentPred = ap;
   cint.code_addr = NULL;
+  cint.blks = NULL;
+  cint.cls = NULL;
   Yap_Error_Size = 0;
 
   if ((setjres = setjmp(cint.CompilerBotch)) == 3) {
     restore_machine_regs();
     recover_from_failed_susp_on_cls(&cint, 0);
     if (!Yap_gcl(Yap_Error_Size, ap->ArityOfPE+NSlots, ENV, next_pc)) {
+      CleanCls(&cint);
       Yap_Error(OUT_OF_STACK_ERROR, TermNil, Yap_ErrorMessage);
       return FAILCODE;
     }
@@ -3354,6 +3393,7 @@ Yap_PredIsIndexable(PredEntry *ap, UInt NSlots, yamop *next_pc)
     restore_machine_regs();
     Yap_Error_Size = recover_from_failed_susp_on_cls(&cint, Yap_Error_Size);
     if (!Yap_growheap(FALSE, Yap_Error_Size, NULL)) {
+      CleanCls(&cint);
       Yap_Error(OUT_OF_HEAP_ERROR, TermNil, Yap_ErrorMessage);
       return FAILCODE;
     }
@@ -3361,6 +3401,7 @@ Yap_PredIsIndexable(PredEntry *ap, UInt NSlots, yamop *next_pc)
     restore_machine_regs();
     recover_from_failed_susp_on_cls(&cint, 0);
     if (!Yap_growtrail(Yap_Error_Size, FALSE)) {
+      CleanCls(&cint);
       Yap_Error(OUT_OF_TRAIL_ERROR, TermNil, Yap_ErrorMessage);
       return FAILCODE;
     }
@@ -3369,6 +3410,7 @@ Yap_PredIsIndexable(PredEntry *ap, UInt NSlots, yamop *next_pc)
     recover_from_failed_susp_on_cls(&cint, 0);
     if (!Yap_growheap(FALSE, Yap_Error_Size, NULL)) {
       Yap_Error(OUT_OF_HEAP_ERROR, TermNil, Yap_ErrorMessage);
+      CleanCls(&cint);
       return FAILCODE;
     }
   }
@@ -3376,8 +3418,11 @@ Yap_PredIsIndexable(PredEntry *ap, UInt NSlots, yamop *next_pc)
   Yap_BuildMegaClause(ap);
   cint.CodeStart = cint.BlobsStart = cint.cpc = cint.icpc = NULL;
   cint.expand_block = NULL;
+  cint.label_offset = NULL;
   Yap_ErrorMessage = NULL;
   if (compile_index(&cint) == (UInt)FAILCODE) {
+    Yap_ReleaseCMem(&cint);
+    CleanCls(&cint);
     return FAILCODE;
   }
 #ifdef DEBUG
@@ -3390,16 +3435,22 @@ Yap_PredIsIndexable(PredEntry *ap, UInt NSlots, yamop *next_pc)
   /* globals for assembler */
   IPredArity = ap->ArityOfPE;
   if (cint.CodeStart) {
-    if ((indx_out = Yap_assemble(ASSEMBLING_INDEX, TermNil, ap, FALSE, &cint)) == NULL) {
+    if ((indx_out = Yap_assemble(ASSEMBLING_INDEX, TermNil, ap, FALSE, &cint, cint.i_labelno+1)) == NULL) {
       if (!Yap_growheap(FALSE, Yap_Error_Size, NULL)) {
+	Yap_ReleaseCMem(&cint);
+	CleanCls(&cint);
 	Yap_Error(OUT_OF_HEAP_ERROR, TermNil, Yap_ErrorMessage);
 	return NULL;
       }
       goto restart_index;
     }
   } else {
+    Yap_ReleaseCMem(&cint);
+    CleanCls(&cint);
     return NULL;
   }
+  Yap_ReleaseCMem(&cint);
+  CleanCls(&cint);
   if (ap->PredFlags & LogUpdatePredFlag) {
     LogUpdIndex *cl = ClauseCodeToLogUpdIndex(indx_out);
     cl->ClFlags |= SwitchRootMask;
@@ -3425,10 +3476,7 @@ push_stack(istack_entry *sp, Int arg, Term Tag, Term extra, struct intermediates
 static istack_entry *
 install_clause(ClauseDef *cls, PredEntry *ap, istack_entry *stack)
 {
-  int last_arg = TRUE;
-
   istack_entry *sp = stack;
-  last_arg = TRUE;
   while (sp->pos) {
     if ((Int)(sp->pos) > 0) {
       add_info(cls, sp->pos);
@@ -3449,24 +3497,13 @@ install_clause(ClauseDef *cls, PredEntry *ap, istack_entry *stack)
 	  if (f == FunctorDBRef) {
 	    if (cls->u.t_ptr != sp->extra) break;
 	  } else if (f == FunctorDouble) {
-	    CELL *pt = RepAppl(sp->extra);
-	    if (cls->u.t_ptr) {
-	      CELL *pt1 = RepAppl(cls->u.t_ptr);
-#if SIZEOF_DOUBLE == 2*SIZEOF_LONG_INT
-	      Term t = MkIntTerm(pt[1]^pt[2]),
-		t1 = MkIntTerm(pt1[1]^pt1[2]);
-#else
-	      Term t = MkIntTerm(pt[1]),
-		t1 = MkIntTerm(pt1[1]);
-#endif
-	      if (t != t1) break;
-	    }
+	    if (cls->u.t_ptr &&
+		Yap_Double_key(sp->extra) != Yap_Double_key(cls->u.t_ptr))
+		break;
 	  } else {
-	    CELL *pt = RepAppl(sp->extra);
-	    CELL *pt1 = RepAppl(cls->u.t_ptr);
-	    Term t = MkIntTerm(pt[1] & (MAX_ABS_INT-1)),
-	      t1 = MkIntTerm(pt1[1] & (MAX_ABS_INT-1));
-	    if (t != t1) break;
+	    if (cls->u.t_ptr && 
+		Yap_Int_key(sp->extra) != Yap_Int_key(cls->u.t_ptr))
+		break;
 	  }
 	}
       }
@@ -3475,10 +3512,6 @@ install_clause(ClauseDef *cls, PredEntry *ap, istack_entry *stack)
       } else if (sp->pos) {
 	UInt argno = -sp->pos;
 	skip_to_arg(cls, ap, argno, FALSE);
-	if (ArityOfFunctor((Functor)RepAppl(sp[-1].val))
-	    != argno+1) {
-	  last_arg = FALSE;
-	}
       }
     }
     sp++;
@@ -3617,22 +3650,13 @@ install_log_upd_clause(ClauseDef *cls, PredEntry *ap, istack_entry *stack)
 	  if (f == FunctorDBRef) {
 	    if (cls->u.t_ptr != sp->extra) break;
 	  } else if (f == FunctorDouble) {
-	    CELL *pt = RepAppl(sp->extra);
-	    CELL *pt1 = RepAppl(cls->u.t_ptr);
-#if SIZEOF_DOUBLE == 2*SIZEOF_LONG_INT
-	    Term t = MkIntTerm(pt[1]^pt[2]),
-	      t1 = MkIntTerm(pt1[1]^pt1[2]);
-#else
-	    Term t = MkIntTerm(pt[1]),
-	      t1 = MkIntTerm(pt1[1]);
-#endif
-	    if (t != t1) break;
+	    if (cls->u.t_ptr &&  
+		Yap_Double_key(sp->extra) != Yap_Double_key(cls->u.t_ptr))
+		break;
 	  } else {
-	    CELL *pt = RepAppl(sp->extra);
-	    CELL *pt1 = RepAppl(cls->u.t_ptr);
-	    Term t = MkIntTerm(pt[1] & (MAX_ABS_INT-1)),
-	      t1 = MkIntTerm(pt1[1] & (MAX_ABS_INT-1));
-	    if (t != t1) break;
+	    if (cls->u.t_ptr && 
+		Yap_Int_key(sp->extra) != Yap_Int_key(cls->u.t_ptr))
+		break;
 	  }
 	}
       }
@@ -3640,9 +3664,18 @@ install_log_upd_clause(ClauseDef *cls, PredEntry *ap, istack_entry *stack)
 	move_next(cls, sp->pos);
       } else if (sp->pos) {
 	UInt argno = -sp->pos;
+	UInt arity;
 	skip_to_arg(cls, ap, argno, FALSE);
-	if (ArityOfFunctor((Functor)RepAppl(sp[-1].val))
-	    != argno+1) {
+	if (IsPairTerm(sp[-1].val))
+	  arity = 2;
+	else {
+	  Functor f = (Functor)RepAppl(sp[-1].val);
+	  if (IsExtensionFunctor(f))
+	      arity = 0;
+	  else
+	    arity = ArityOfFunctor((Functor)f);
+	}
+	if (arity != argno+1) {
 	  last_arg = FALSE;
 	}
       }
@@ -3878,7 +3911,7 @@ expand_index(struct intermediates *cint) {
   PredEntry *ap = cint->CurrentPred;
   yamop *first, *last = NULL, *alt = NULL;
   istack_entry *stack, *sp;
-  ClauseDef *cls = (ClauseDef *)H, *max;
+  ClauseDef *max;
   int NClauses;
   /* last clause to experiment with */
   yamop *ipc;
@@ -4055,17 +4088,13 @@ expand_index(struct intermediates *cint) {
       ipc = NEXTOP(ipc,e);
       break;
     case _index_blob:
-#if SIZEOF_DOUBLE == 2*SIZEOF_LONG_INT
-      t = MkIntTerm(s_reg[0]^s_reg[1]);
-#else
-      t = MkIntTerm(s_reg[0]);
-#endif
+      t = Yap_DoubleP_key(s_reg);
       sp[-1].extra = AbsAppl(s_reg-1);
       s_reg = NULL;
       ipc = NEXTOP(ipc,e);
       break;
     case _index_long:
-      t = MkIntTerm((s_reg[0] & (MAX_ABS_INT-1)));
+      t = Yap_IntP_key(s_reg);
       sp[-1].extra = AbsAppl(s_reg-1);
       s_reg = NULL;
       ipc = NEXTOP(ipc,e);
@@ -4312,30 +4341,58 @@ expand_index(struct intermediates *cint) {
     yamop **clp = (yamop **)NEXTOP(ipc,sssllp);
 
     eblk = cint->expand_block = ipc;
-    if (cls+2*nclauses > (ClauseDef *)(ASP-4096)) {
+#if USE_SYSTEM_MALLOC
+    if (!cint->cls) {
+      cint->cls = (ClauseDef *)Yap_AllocCodeSpace(nclauses*sizeof(ClauseDef));
+      if (!cint->cls) {
+	/* tell how much space we need */
+	Yap_Error_Size += NClauses*sizeof(ClauseDef);
+	/* grow stack */
+	save_machine_regs();
+	longjmp(cint->CompilerBotch,2);
+      }
+    }
+#else
+    cint->cls = (ClauseDef *)H;
+    if (cint->cls+2*nclauses > (ClauseDef *)(ASP-4096)) {
       /* tell how much space we need (worst case) */
       Yap_Error_Size += 2*NClauses*sizeof(ClauseDef);
       /* grow stack */
       save_machine_regs();
       longjmp(cint->CompilerBotch,3);
     }
+#endif
     if (ap->PredFlags & LogUpdatePredFlag) {
-      max = install_log_upd_clauseseq(cls, ap, stack, clp, clp+nclauses);
+      max = install_log_upd_clauseseq(cint->cls, ap, stack, clp, clp+nclauses);
     } else {
-      max = install_clauseseq(cls, ap, stack, clp, clp+nclauses);
+      max = install_clauseseq(cint->cls, ap, stack, clp, clp+nclauses);
     }    
   } else {
     cint->expand_block = NULL;
-    if (cls+2*NClauses > (ClauseDef *)(ASP-4096)) {
+#if USE_SYSTEM_MALLOC
+    if (!cint->cls) {
+      cint->cls = (ClauseDef *)Yap_AllocCodeSpace(NClauses*sizeof(ClauseDef));
+      if (!cint->cls) {
+	/* tell how much space we need */
+	Yap_Error_Size += NClauses*sizeof(ClauseDef);
+	/* grow stack */
+	save_machine_regs();
+	longjmp(cint->CompilerBotch,2);
+      }
+    }
+#else
+    cint->cls = (ClauseDef *)H;
+    if (cint->cls+2*NClauses > (ClauseDef *)(ASP-4096)) {
       /* tell how much space we need (worst case) */
       Yap_Error_Size += 2*NClauses*sizeof(ClauseDef);
       save_machine_regs();
       longjmp(cint->CompilerBotch,3);
     }
+#endif
     if (ap->PredFlags & LogUpdatePredFlag) {
-      max = install_log_upd_clauses(cls, ap, stack, first, last);
+      max = install_log_upd_clauses(cint->cls, ap, stack, first, last);
     } else {
-      max = install_clauses(cls, ap, stack, first, last);
+      max = install_clauses(cint->cls, ap, stack, first, last);
     }
 #if DEBUG_EXPAND
     if (ap->PredFlags & LogUpdatePredFlag) {
@@ -4348,24 +4405,28 @@ expand_index(struct intermediates *cint) {
   }
   /* don't count last clause if you don't have to */
   if (alt && max->Code == last) max--;
-  if (max < cls && labp != NULL) {
+  if (max < cint->cls && labp != NULL) {
       *labp = FAILCODE;
     return labp;
   }
+#if USE_SYSTEM_MALLOC
+  cint->freep = (char *)H;
+#else
   cint->freep = (char *)(max+1);
+#endif
   cint->CodeStart = cint->BlobsStart = cint->cpc = cint->icpc = NULL;
   
   if (!IsVarTerm(sp[-1].val)  && sp > stack) {
     if (IsAtomOrIntTerm(sp[-1].val)) {
       if (s_reg == NULL) { /* we have not yet looked into terms */
-	lab = do_index(cls, max, cint, argno+1, fail_l, isfirstcl, clleft, top);
+	lab = do_index(cint->cls, max, cint, argno+1, fail_l, isfirstcl, clleft, top);
       } else {
 	UInt arity = 0;
 
 	if (ap->PredFlags & LogUpdatePredFlag) {
-	  reinstall_log_upd_clauses(cls, max, ap, stack);
+	  reinstall_log_upd_clauses(cint->cls, max, ap, stack);
 	} else {
-	  reinstall_clauses(cls, max, ap, stack);
+	  reinstall_clauses(cint->cls, max, ap, stack);
 	}
 	sp--;
 	while (sp > stack) {
@@ -4385,25 +4446,25 @@ expand_index(struct intermediates *cint) {
 	    sp--;
 	  }
 	}
-	lab = do_compound_index(cls, max, s_reg, cint, i, arity, argno, fail_l, isfirstcl, is_last_arg, clleft, top, FALSE);
+	lab = do_compound_index(cint->cls, max, s_reg, cint, i, arity, argno, fail_l, isfirstcl, is_last_arg, clleft, top, FALSE);
       }
     } else if (IsPairTerm(sp[-1].val) && sp > stack) {
-      lab = do_compound_index(cls, max, s_reg, cint, i, 2, argno, fail_l, isfirstcl, is_last_arg, clleft, top, FALSE);
+      lab = do_compound_index(cint->cls, max, s_reg, cint, i, 2, argno, fail_l, isfirstcl, is_last_arg, clleft, top, FALSE);
     } else {
       Functor f = (Functor)RepAppl(sp[-1].val);
       /* we are continuing within a compound term */
       if (IsExtensionFunctor(f)) {
-	lab = do_index(cls, max, cint, argno+1, fail_l, isfirstcl, clleft, top);
+	lab = do_index(cint->cls, max, cint, argno+1, fail_l, isfirstcl, clleft, top);
       } else {
-	lab = do_compound_index(cls, max, s_reg, cint, i, ArityOfFunctor(f), argno, fail_l, isfirstcl, is_last_arg, clleft, top, FALSE);
+	lab = do_compound_index(cint->cls, max, s_reg, cint, i, ArityOfFunctor(f), argno, fail_l, isfirstcl, is_last_arg, clleft, top, FALSE);
       }
     }
   } else {
     if (argno == ap->ArityOfPE) {
       lab = 
-	do_var_clauses(cls, max, FALSE, cint, isfirstcl, clleft, fail_l, ap->ArityOfPE+1);
+	do_var_clauses(cint->cls, max, FALSE, cint, isfirstcl, clleft, fail_l, ap->ArityOfPE+1);
     } else {
-      lab = do_index(cls, max, cint, argno+1, fail_l, isfirstcl, clleft, top);
+      lab = do_index(cint->cls, max, cint, argno+1, fail_l, isfirstcl, clleft, top);
     }
   }
   if (labp && !(lab & 1)) {
@@ -4420,7 +4481,10 @@ ExpandIndex(PredEntry *ap, int ExtraArgs, yamop *nextop) {
   int cb;
   struct intermediates cint;
 
+  cint.blks = NULL;
+  cint.cls = NULL;
   cint.code_addr = NULL;
+  cint.label_offset = NULL;
   if ((cb = setjmp(cint.CompilerBotch)) == 3) {
     restore_machine_regs();
     /* grow stack */
@@ -4452,10 +4516,12 @@ ExpandIndex(PredEntry *ap, int ExtraArgs, yamop *nextop) {
       }
 #endif
       Yap_Error(OUT_OF_HEAP_ERROR, TermNil, Yap_ErrorMessage);
+      CleanCls(&cint);
       return FAILCODE;
     }
   } else if (cb == 4) {
     restore_machine_regs();
+    Yap_ReleaseCMem(&cint);
     if (!Yap_growtrail(Yap_Error_Size, FALSE)) {
       save_machine_regs();
       if (ap->PredFlags & LogUpdatePredFlag) {
@@ -4466,6 +4532,7 @@ ExpandIndex(PredEntry *ap, int ExtraArgs, yamop *nextop) {
 	cl = ClauseCodeToStaticIndex(ap->cs.p_code.TrueCodeOfPred);
 	Yap_kill_iblock((ClauseUnion *)cl, NULL, ap);
       }
+      CleanCls(&cint);
       return FAILCODE;
     }
   }
@@ -4531,6 +4598,8 @@ ExpandIndex(PredEntry *ap, int ExtraArgs, yamop *nextop) {
       P = FAILCODE;
       recover_ecls_block(expand_clauses);
     }
+    Yap_ReleaseCMem(&cint);
+    CleanCls(&cint);
     return FAILCODE;
   }
   if (*labp == FAILCODE) {
@@ -4538,6 +4607,8 @@ ExpandIndex(PredEntry *ap, int ExtraArgs, yamop *nextop) {
       P = FAILCODE;
       recover_ecls_block(expand_clauses);
     }
+    Yap_ReleaseCMem(&cint);
+    CleanCls(&cint);
     return FAILCODE;
   }
 #ifdef DEBUG
@@ -4550,9 +4621,11 @@ ExpandIndex(PredEntry *ap, int ExtraArgs, yamop *nextop) {
   /* globals for assembler */
   IPredArity = ap->ArityOfPE;
   if (cint.CodeStart) {
-    if ((indx_out = Yap_assemble(ASSEMBLING_EINDEX, TermNil, ap, FALSE, &cint)) == NULL) {
+    if ((indx_out = Yap_assemble(ASSEMBLING_EINDEX, TermNil, ap, FALSE, &cint, cint.i_labelno+1)) == NULL) {
       if (!Yap_growheap(FALSE, Yap_Error_Size, NULL)) {
 	Yap_Error(OUT_OF_HEAP_ERROR, TermNil, Yap_ErrorMessage);
+	Yap_ReleaseCMem(&cint);
+	CleanCls(&cint);
 	return FAILCODE;
       }
       goto restart_index;
@@ -4563,6 +4636,8 @@ ExpandIndex(PredEntry *ap, int ExtraArgs, yamop *nextop) {
       P = *labp;
       recover_ecls_block(expand_clauses);
     }
+    Yap_ReleaseCMem(&cint);
+    CleanCls(&cint);
     return *labp;
   }
   if (indx_out == NULL) {
@@ -4570,8 +4645,12 @@ ExpandIndex(PredEntry *ap, int ExtraArgs, yamop *nextop) {
       P = FAILCODE;
       recover_ecls_block(expand_clauses);
     }
+    Yap_ReleaseCMem(&cint);
+    CleanCls(&cint);
     return FAILCODE;
   }
+  Yap_ReleaseCMem(&cint);
+  CleanCls(&cint);
   *labp = indx_out;
   if (ap->PredFlags & LogUpdatePredFlag) {
     /* add to head of current code children */
@@ -5831,21 +5910,11 @@ add_to_index(struct intermediates *cint, int first, path_stack_entry *sp, Clause
       ipc = NEXTOP(ipc,e);
       break;
     case _index_blob:
-      {
-	CELL *pt = RepAppl(cls->u.t_ptr);
-#if SIZEOF_DOUBLE == 2*SIZEOF_LONG_INT
-	cls->Tag = MkIntTerm(pt[1]^pt[2]);
-#else
-	cls->Tag = MkIntTerm(pt[1]);
-#endif
-      }
+      cls->Tag = Yap_Double_key(cls->u.t_ptr);
       ipc = NEXTOP(ipc,e);
       break;
     case _index_long:
-      {
-	CELL *pt = RepAppl(cls->u.t_ptr);
-	cls->Tag = MkIntTerm((pt[1] & (MAX_ABS_INT-1)));
-      }
+      cls->Tag = Yap_Int_key(cls->u.t_ptr);
       ipc = NEXTOP(ipc,e);
       break;
     case _switch_on_cons:
@@ -6332,21 +6401,11 @@ remove_from_index(PredEntry *ap, path_stack_entry *sp, ClauseDef *cls, yamop *bg
       ipc = NEXTOP(ipc,e);
       break;
     case _index_blob:
-      {
-	CELL *pt = RepAppl(cls->u.t_ptr);
-#if SIZEOF_DOUBLE == 2*SIZEOF_LONG_INT
-	cls->Tag = MkIntTerm(pt[1]^pt[2]);
-#else
-	cls->Tag = MkIntTerm(pt[1]);
-#endif
-      }
+      cls->Tag = Yap_Double_key(cls->u.t_ptr);
       ipc = NEXTOP(ipc,e);
       break;
     case _index_long:
-      {
-	CELL *pt = RepAppl(cls->u.t_ptr);
-	cls->Tag = MkIntTerm(pt[1] & (MAX_ABS_INT-1));
-      }
+      cls->Tag = Yap_Int_key(cls->u.t_ptr);
       ipc = NEXTOP(ipc,e);
       break;
     case _switch_on_cons:
@@ -7005,15 +7064,11 @@ Yap_FollowIndexingCode(PredEntry *ap, yamop *ipc, Term Terms[3], yamop *ap_pc, y
       ipc = NEXTOP(ipc,e);
       break;
     case _index_blob:
-#if SIZEOF_DOUBLE == 2*SIZEOF_LONG_INT
-      t = MkIntTerm(s_reg[0]^s_reg[1]);
-#else
-      t = MkIntTerm(s_reg[0]);
-#endif
+      t = Yap_DoubleP_key(s_reg);
       ipc = NEXTOP(ipc,e);
       break;
     case _index_long:
-      t = MkIntTerm(s_reg[0] & (MAX_ABS_INT-1));
+      t = Yap_IntP_key(s_reg);
       ipc = NEXTOP(ipc,e);
       break;
     case _switch_on_cons:

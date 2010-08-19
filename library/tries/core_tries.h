@@ -27,19 +27,22 @@
 /* --------------------------- */
 
 #ifdef TAG_LOW_BITS_32
-#define ApplTag        1  /* 0x01 */ 
+#define ApplTag           1  /* 0x01 */ 
 #else  /* TAG_64BITS */
-#define ApplTag        5  /* 0x05 */
+#define ApplTag           5  /* 0x05 */
 #endif /* TAG_SCHEME */
-#define PairInitTag    3  /* 0x03 */
-#define PairEndTag    19  /* 0x13 */
-#define CommaInitTag  35  /* 0x23 */
-#define CommaEndTag   51  /* 0x33 */
-#define FloatInitTag  67  /* 0x43 */
-#define FloatEndTag   83  /* 0x53 */
+#define PairInitTag       3  /* 0x03 */
+#define PairEndEmptyTag  19  /* 0x13 */
+#define PairEndTermTag   99  /* 0x63 */
+#define CommaInitTag     35  /* 0x23 */
+#define CommaEndTag      51  /* 0x33 */
+#define FloatInitTag     67  /* 0x43 */
+#define FloatEndTag      83  /* 0x53 */
 
 #define TRIE_MODE_STANDARD   0
 #define TRIE_MODE_REVERSE    1
+#define TRIE_MODE_MINIMAL    2
+#define TRIE_MODE_REVMIN     TRIE_MODE_REVERSE || TRIE_MODE_MINIMAL //3
 
 #define TRIE_PRINT_NORMAL    0
 #define TRIE_PRINT_FLOAT     1
@@ -272,6 +275,11 @@ typedef struct trie_hash {
         TrEngine_nodes(TR_ENGINE)--
 
 
+#define IS_FUNCTOR_NODE(N)  (((ApplTag & TrNode_entry(N)) == ApplTag) && \
+                             (TrNode_entry(N) != PairInitTag) &&         \
+                             (TrNode_entry(N) != PairEndEmptyTag) &&    \
+                             (TrNode_entry(N) != PairEndTermTag))
+
 
 /* --------------------------- */
 /*             API             */
@@ -299,3 +307,10 @@ inline void     core_trie_stats(TrEngine engine, YAP_Int *memory, YAP_Int *tries
 inline void     core_trie_max_stats(TrEngine engine, YAP_Int *memory, YAP_Int *tries, YAP_Int *entries, YAP_Int *nodes);
 inline void     core_trie_usage(TrNode node, YAP_Int *entries, YAP_Int *nodes, YAP_Int *virtual_nodes);
 inline void     core_trie_print(TrNode node, void (*print_function)(TrNode));
+
+inline void     core_disable_hash_table(void);
+inline void     core_enable_hash_table(void);
+
+inline YAP_Term  core_trie_to_list(TrNode node);
+
+#include "core_dbtries.h"

@@ -296,10 +296,6 @@ module(N) :-
 '$module_expansion'(M:G,call(M:G),'$execute_wo_mod'(G,M),_,_,_,_) :- var(M), !.
 '$module_expansion'(M:G,G1,GO,_,CM,_,HVars) :- !,
 	'$module_expansion'(G,G1,GO,M,M,HM,HVars).
-'$module_expansion'(G, G1, GO, CurMod, MM, HM, HVars) :-
-	'$pred_goal_expansion_on',
-	'$do_expand'(G, CurMod, GI), !,
-	'$module_expansion'(GI, G1, GO, CurMod, MM, HM, HVars).
 '$module_expansion'(G, G1, GO, CurMod, MM, HM,HVars) :-
 	% is this imported from some other module M1?
 	'$imported_pred'(G, CurMod, GG, M1),
@@ -327,6 +323,10 @@ expand_goal(G, G).
 	->
 	 true
 	;
+	 recorded('$dialect',swi,_), system:goal_expansion(G, GI)
+	->
+	  true
+	;
 	 user:goal_expansion(G, CurMod, GI)
 	->
 	  true
@@ -342,6 +342,11 @@ expand_goal(G, G).
 %       goal to pass to listing
 %       goal to pass to compiler
 %       head variables.
+'$complete_goal_expansion'(G, CurMod, MM, HM, G1, GO, HVars) :-
+%	'$pred_goal_expansion_on',
+	'$do_expand'(G, CurMod, GI),
+	GI \== G, !,
+	'$module_expansion'(GI, G1, GO, CurMod, MM, HM, HVars).
 '$complete_goal_expansion'(G, M, CM, HM, G1, G2, HVars) :-
 	'$all_system_predicate'(G,M,ORIG), !,
 	% make built-in processing transparent.
@@ -377,10 +382,18 @@ expand_goal(G, G).
 
 '$get_undefined_pred'(G, ImportingMod, G0, ExportingMod) :-
 	recorded('$import','$import'(ExportingModI,ImportingMod,G0I,G,_,_),_),
-	'$continue_imported'(ExportingMod, ExportingModI, G0, G0I).
+	'$continue_imported'(ExportingMod, ExportingModI, G0, G0I), !.
+% SWI builtin
 '$get_undefined_pred'(G, ImportingMod, G0, ExportingMod) :-
-	swi:swi_predicate_table(ImportingMod,G,ExportingModI,G0I),
-	'$continue_imported'(ExportingMod, ExportingModI, G0, G0I).
+	recorded('$dialect',Dialect,_),
+	Dialect \= yap,
+	functor(G, Name, Arity),
+	call(Dialect:index(Name,Arity,ExportingModI,_)), !,
+	'$continue_imported'(ExportingMod, ExportingModI, G0, G), !.
+'$get_undefined_pred'(G, _ImportingMod, G0, ExportingMod) :-
+	autoloader:autoload,
+	autoloader:find_predicate(G,ExportingModI), !,
+	'$continue_imported'(ExportingMod, ExportingModI, G0, G), !.
 '$get_undefined_pred'(G, ImportingMod, G0, ExportingMod) :-
 	prolog:'$parent_module'(ImportingMod,ExportingModI),
 	'$continue_imported'(ExportingMod, ExportingModI, G0, G).
@@ -514,12 +527,12 @@ source_module(Mod) :-
 	'$current_module'(Mod).
 
 % comma has its own problems.
-:- '$install_meta_predicate'((:,:), prolog).
+:- '$install_meta_predicate'((0,0), prolog).
 
 :- meta_predicate
 	abolish(:),
 	abolish(:,+),
-	all(?,:,?),
+	all(?,0,-),
 	assert(:),
 	assert(:,+),
 	assert_static(:),
@@ -529,79 +542,80 @@ source_module(Mod) :-
 	assertz(:),
 	assertz(:,+),
 	assertz_static(:),
-	bagof(?,:,?),
+	bagof(?,0,-),
 	bb_get(:,-),
 	bb_put(:,+),
 	bb_delete(:,?),
 	bb_update(:,?,?),
-	call(:),
-	call(:,?),
-	call(:,?,?),
-	call(:,?,?,?),
-	call_with_args(:),
-	call_with_args(:,?),
-	call_with_args(:,?,?),
-	call_with_args(:,?,?,?),
-	call_with_args(:,?,?,?,?),
-	call_with_args(:,?,?,?,?,?),
-	call_with_args(:,?,?,?,?,?,?),
-	call_with_args(:,?,?,?,?,?,?,?),
-	call_with_args(:,?,?,?,?,?,?,?,?),
-	call_with_args(:,?,?,?,?,?,?,?,?,?),
-	format(+,:),
-	format(+,+,:),
-	call_cleanup(:,:),
-	call_cleanup(:,?,:),
-	setup_call_cleanup(:,:,:),
-	setup_call_catcher_cleanup(:,:,?,:),
-	call_residue(:,?),
-	call_residue_vars(:,?),
-	catch(:,+,:),
+	call(0),
+	call(1,?),
+	call(2,?,?),
+	call(3,?,?,?),
+	call_with_args(0),
+	call_with_args(1,?),
+	call_with_args(2,?,?),
+	call_with_args(3,?,?,?),
+	call_with_args(4,?,?,?,?),
+	call_with_args(5,?,?,?,?,?),
+	call_with_args(6,?,?,?,?,?,?),
+	call_with_args(7,?,?,?,?,?,?,?),
+	call_with_args(8,?,?,?,?,?,?,?,?),
+	call_with_args(9,?,?,?,?,?,?,?,?,?),
+	call_cleanup(0,0),
+	call_cleanup(0,?,0),
+	call_residue(0,?),
+	call_residue_vars(0,?),
+	catch(0,?,0),
 	clause(:,?),
 	clause(:,?,?),
 	compile(:),
 	consult(:),
 	current_predicate(:),
 	current_predicate(?,:),
-	depth_bound_call(:,+),
+	depth_bound_call(0,+),
 	discontiguous(:),
 	ensure_loaded(:),
-	findall(?,:,?),
-	findall(?,:,?,?),
-	forall(:,:),
-	freeze(?,:),
+	findall(?,0,-),
+	findall(?,0,-,?),
+	forall(0,0),
+	format(+,:),
+	format(+,+,:),
+	freeze(?,0),
 	hide_predicate(:),
-	if(:,:,:),
-	ignore(:),
-	incore(:),
+	if(0,0,0),
+	ignore(0),
+	incore(0),
 	listing(:),
 	multifile(:),
 	nospy(:),
-        not(:),
-        once(:),
-        phrase(:,?),
-        phrase(:,?,+),
+        not(0),
+        once(0),
+        phrase(2,?),
+        phrase(2,?,+),
 	predicate_property(:,?),
 	predicate_statistics(:,-,-,-),
-	on_exception(+,:,:),
+	on_exception(+,0,0),
 	reconsult(:),
 	retract(:),
 	retract(:,?),
 	retractall(:),
 	reconsult(:),
-	setof(?,:,?),
+	setof(?,0,-),
+	setup_call_cleanup(0,0,0),
+	setup_call_catcher_cleanup(0,0,?,0),
 	spy(:),
 	unknown(+,:),
 	use_module(:),
 	use_module(:,?),
 	use_module(?,:,?),
-	when(?,:),
-	with_mutex(+,:),
-	(: -> :),
-	(: *-> :),
-	(: ; :),
-	^(+,:),
-	\+ : .
+	when(+,0),
+	with_mutex(+,0),
+	with_output_to(?,0),
+	(0 -> 0),
+	(0 *-> 0),
+	(0 ; 0),
+	^(+,0),
+	\+ 0 .
 
 %
 % get rid of a module and of all predicates included in the module.
@@ -627,11 +641,10 @@ abolish_module(_).
 	;
 	 Goal =	reexport(ModuleSource,Spec)
 	),
-	absolute_file_name(ModuleSource, File),
+	absolute_file_name(ModuleSource, File, [access(read),file_type(source),file_errors(fail),solutions(first)]),
 	'$load_files'(File, [if(not_loaded),imports([])], Goal),
 	recorded('$module', '$module'(FullFile, Mod, Exports),_),
 	atom_concat(File, _, FullFile), !,
-	(recorded('$import','$import'(Mod,Module,G,G1,N0,K0),_), writeln('$import'(Mod,Module,G,G1,N0,K0)), fail; true),
 	'$convert_for_reexport'(Spec, Exports, Tab, MyExports, Goal),
 	'$add_to_imports'(Tab, Module, Mod),
 	recorded('$lf_loaded','$lf_loaded'(TopFile,TopModule,_,_),_),

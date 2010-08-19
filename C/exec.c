@@ -795,7 +795,7 @@ p_execute_nonstop(void)
 #if defined(YAPOR) || defined(THREADS)
     if (RepPredProp(pe)->PredFlags & LogUpdatePredFlag) {
       PP = RepPredProp(pe);
-      LOCK(PP->PELock);
+      PELOCK(80,PP);
     }
 #endif
     return CallPredicate(RepPredProp(pe), B, RepPredProp(pe)->cs.p_code.TrueCodeOfPred);
@@ -948,10 +948,12 @@ p_pred_goal_expansion_on(void) {
   return PRED_GOAL_EXPANSION_ON;
 }
 
+
 static int
 exec_absmi(int top)
 {
   int lval, out;
+
   if (top && (lval = sigsetjmp (Yap_RestartEnv, 1)) != 0) {
     switch(lval) {
     case 1:
@@ -965,6 +967,9 @@ exec_absmi(int top)
 	restore_B();
 	/* H is not so important, because we're gonna backtrack */
 	restore_H();
+	/* set stack */
+	ASP = (CELL *)PROTECT_FROZEN_B(B);
+	Yap_StartSlots();
 	LOCK(SignalLock);
 	CreepFlag = CalculateStackGap();
 	Yap_PrologMode = UserMode;
@@ -994,6 +999,7 @@ exec_absmi(int top)
   } else {
     Yap_PrologMode = UserMode;
   }
+  Yap_CloseSlots();
   out = Yap_absmi(0);
   Yap_StartSlots();
   return out;
@@ -1006,7 +1012,7 @@ init_stack(int arity, CELL *pt, int top, choiceptr saved_b)
   /* create an initial pseudo environment so that when garbage
      collection is going up in the environment chain it doesn't get
      confused */
-  EX = 0L;
+  EX = NULL;
   //  sl = Yap_InitSlot(t);
   YENV = ASP;
   YENV[E_CP] = (CELL)P;
@@ -1049,6 +1055,7 @@ init_stack(int arity, CELL *pt, int top, choiceptr saved_b)
 #endif
   YENV[E_CB] = Unsigned (B);
   CP = YESCODE;
+  Yap_StartSlots();
 }
 
 static Term
@@ -1117,7 +1124,7 @@ Yap_execute_goal(Term t, int nargs, Term mod)
   if (pe == NIL) {
     return(CallMetaCall(mod));
   }
-  LOCK(ppe->PELock);
+  PELOCK(81,ppe);
   if (IsAtomTerm(t)) {
     CodeAdr = RepPredProp (pe)->CodeOfPred;
     UNLOCK(ppe->PELock);
@@ -1162,11 +1169,11 @@ Yap_execute_goal(Term t, int nargs, Term mod)
     CP   = saved_cp;
     P    = saved_p;
     ASP  = ENV;
-    Yap_StartSlots();
 #ifdef DEPTH_LIMIT
     DEPTH= ENV[E_DEPTH];
 #endif
     ENV  = (CELL *)(ENV[E_E]);
+    Yap_StartSlots();
     /* we have failed, and usually we would backtrack to this B,
        trouble is, we may also have a delayed cut to do */
     if (B != NULL)
@@ -1200,7 +1207,6 @@ void
 Yap_trust_last(void)
 {
   ASP  = B->cp_env;
-  P    = (yamop *)(B->cp_env[E_CP]);
   CP   = B->cp_cp;
   H    = B->cp_h;
 #ifdef DEPTH_LIMIT
@@ -1209,6 +1215,7 @@ Yap_trust_last(void)
   YENV= ASP = B->cp_env;
   ENV  = (CELL *)((B->cp_env)[E_E]);
   B    = B->cp_b;
+  P    = (yamop *)(ENV[E_CP]);
   if (B) {
     SET_BB(B);
     HB = PROTECT_FROZEN_H(B);
@@ -1269,7 +1276,7 @@ Yap_RunTopGoal(Term t)
     /* we must always start the emulator with Prolog code */
     return FALSE;
   }
-  LOCK(ppe->PELock);
+  PELOCK(82,ppe);
   CodeAdr = ppe->CodeOfPred;
   UNLOCK(ppe->PELock);
 #if !USE_SYSTEM_MALLOC
@@ -1500,7 +1507,8 @@ JumpToEnv(Term t) {
 	  B = handler;
 	else 
 	  previous->cp_b = handler;
-	EX = t;
+	EX = BallTerm;
+	BallTerm = NULL;
 	P = (yamop *)FAILCODE;
 	HB = B->cp_h;
 	return TRUE;
@@ -1620,12 +1628,10 @@ Yap_InitYaamRegs(void)
   LOCK(SignalLock);
   CreepFlag = CalculateStackGap();
   UNLOCK(SignalLock);
-  EX = 0L;
-  /* for slots to work */
-  Yap_StartSlots();
+  EX = NULL;
   init_stack(0, NULL, TRUE, NULL);
   /* the first real choice-point will also have AP=FAIL */ 
-  Yap_StartSlots();
+  CurSlot = 0;
   GlobalArena = TermNil;
   h0var = MkVarTerm();
 #if COROUTINING
@@ -1725,7 +1731,7 @@ static Int
 p_reset_exception(void)
 {
   Term t;
-  EX = 0L;
+  EX = NULL;
   t = GetException();
   if (!t) 
     return FALSE;

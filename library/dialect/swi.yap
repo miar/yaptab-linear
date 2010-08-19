@@ -1,4 +1,92 @@
 
+% SWI emulation.
+% written in an on-demand basis.
+
+
+:- module(system, [concat_atom/2,
+		   concat_atom/3,
+		   setenv/2,
+		   prolog_to_os_filename/2,
+		   is_absolute_file_name/1,
+		   read_clause/1,
+		   string/1,
+		   working_directory/2,
+		   chdir/1,
+		   compile_aux_clauses/1,
+		   convert_time/2,
+		   '$set_source_module'/2,
+		   '$declare_module'/5,
+		   '$set_predicate_attribute'/3,
+		   stamp_date_time/3,
+		   date_time_stamp/2,
+		   format_time/3,
+		   format_time/4,
+		   time_file/2,
+		   flag/3,
+		   require/1,
+		   normalize_space/2,
+		   current_flag/1
+		]).
+
+:- reexport(library(charsio),[
+			      write_to_chars/2,
+			      read_from_chars/2
+			     ]).
+
+:- reexport(library(lists),[append/2,
+			    append/3,
+			    delete/3,
+			    member/2,
+			    flatten/2,
+			    intersection/3,
+			    last/2,
+			    memberchk/2,
+			    max_list/2,
+			    min_list/2,
+			    nextto/3,
+			    permutation/2,
+			    reverse/2,
+			    select/3,
+			    selectchk/3,
+			    sublist/2,
+			    sumlist/2,
+			    nth1/3,
+			    nth0/3]).
+
+:- reexport(library(apply),[maplist/2,
+			    maplist/3,
+			    maplist/4,
+			    maplist/5,
+			    include/3,
+			    exclude/3,
+			    partition/4,
+			    partition/5
+			   ]).
+
+:- reexport(library(system),
+	      [datime/1,
+	       mktime/2,
+	       file_property/2,
+	       delete_file/1,
+	       sleep/1]).
+
+:- reexport(library(arg),
+	      [genarg/3]).
+
+:- reexport(library(apply_macros),
+	      []).
+
+:- reexport(library(terms),
+	      [subsumes/2,
+	       subsumes_chk/2,
+	       term_hash/2,
+	       unifiable/3,
+	       cyclic_term/1,
+	       variant/2]).
+
+:- use_module(library(error),[must_be/2]).
+
+
 :- source.
 
 :- style_check(all).
@@ -7,130 +95,149 @@
 
 :- yap_flag(open_expands_filename,false).
 
-% redefines stuff in prolog module.
+:- yap_flag(autoload,true).
 
-:- module(swi, []).
-
-:- load_foreign_files([plstream], [], initIO).
 
 :- set_prolog_flag(user_flags,silent).
 
-:- use_module(library(charsio),[write_to_chars/2,read_from_chars/2]).
+:- load_foreign_files([libplstream], [], initIO).
 
-:- use_module(library(lists),[append/2,
-			      append/3,
-			      delete/3,
-			      member/2,
-			      min_list/2,
-			      nth1/3,
-			      nth0/3]).
+:- load_foreign_files(['pl-tai'], [], install).
 
-:- use_module(library(apply),[maplist/2,
-			      maplist/3,
-			      maplist/4,
-			      maplist/5,
-			      include/3,
-			      exclude/3,
-			      partition/4,
-			      partition/5
-			     ]).
+% Time is given as a float in SWI-Prolog.
+swi_get_time(FSecs) :- datime(Datime),  mktime(Datime, Secs), FSecs is Secs*1.0.
 
-:- use_module(library(system),
-	      [datime/1,
-	       mktime/2,
-	       file_property/2,
-	       sleep/1]).
+goal_expansion(atom_concat(A,B),atomic_concat(A,B)).
+goal_expansion(atom_concat(A,B,C),atomic_concat(A,B,C)).
+%goal_expansion(arg(A,_,_),_) :- nonvar(A), !, fail.
+goal_expansion(arg(A,B,C),genarg(A,B,C)).
+goal_expansion(time_file(A,B),system:swi_time_file(A,B)).
 
-:- use_module(library(arg),
-	      [genarg/3]).
+goal_expansion(stamp_date_time(A,B,C),system:swi_stamp_date_time(A,B,C)).
+goal_expansion(date_time_stamp(A,B),system:swi_date_time_stamp(A,B)).
+goal_expansion(format_time(A,B,C),system:swi_format_time(A,B,C)).
+goal_expansion(format_time(A,B,C,D),system:swi_format_time(A,B,C,D)).
+goal_expansion(get_time(A),system:swi_get_time(A)).
+goal_expansion(time_file(A,B),system:swi_time_file(A,B)).
+goal_expansion(expand_file_name(A,B),system:swi_expand_file_name(A,B)).
+goal_expansion(wildcard_match(A,B),system:swi_wilcard_match(A,B)).
+goal_expansion(directory_files(A,B),system:swi_directory_files(A,B)).
+goal_expansion(exists_file(A), system:swi_exists_file(A)).
+goal_expansion(exists_directory(A), system:swi_exists_directory(A)).
 
-:- use_module(library(apply_macros),
-	      []).
+:- dynamic swi_io/0.
 
-:- use_module(library(terms),
-	      [subsumes/2,
-	       subsumes_chk/2,
-	       term_hash/2,
-	       unifiable/3,
-	       variant/2]).
+goal_expansion(open(A,B,C,D),system:swi_open(A,B,C,D)) :- swi_io.
+goal_expansion(open(A,B,C), system:swi_open(A,B,C)) :- swi_io.
+goal_expansion(close(A), system:swi_close(A)) :- swi_io.
+goal_expansion(close(A,B), system:swi_close(A,B)) :- swi_io.
+goal_expansion(set_input(A), system:swi_set_input(A)) :- swi_io.
+goal_expansion(set_output(A), system:swi_set_output(A)) :- swi_io.
+goal_expansion(current_input(A), system:swi_current_input(A)) :- swi_io.
+goal_expansion(current_output(A), system:swi_current_output(A)) :- swi_io.
+goal_expansion(get_code(A,B),system:swi_get_code(A,B)) :- swi_io.
+goal_expansion(get_code(A), system:swi_get_code(A)) :- swi_io.
+goal_expansion(get_char(A,B),system:swi_get_char(A,B)) :- swi_io.
+goal_expansion(get_char(A), system:swi_get_char(A)) :- swi_io.
+goal_expansion(get_byte(A,B),system:swi_get_byte(A,B)) :- swi_io.
+goal_expansion(get_byte(A), system:swi_get_byte(A)) :- swi_io.
+goal_expansion(peek_code(A,B),system:swi_peek_code(A,B)) :- swi_io.
+goal_expansion(peek_code(A), system:swi_peek_code(A)) :- swi_io.
+goal_expansion(peek_char(A,B),system:swi_peek_char(A,B)) :- swi_io.
+goal_expansion(peek_char(A), system:swi_peek_char(A)) :- swi_io.
+goal_expansion(peek_byte(A,B),system:swi_peek_byte(A,B)) :- swi_io.
+goal_expansion(peek_byte(A), system:swi_peek_byte(A)) :- swi_io.
+goal_expansion(put_byte(A,B),system:swi_put_byte(A,B)) :- swi_io.
+goal_expansion(put_byte(A), system:swi_put_byte(A)) :- swi_io.
+goal_expansion(put_code(A,B),system:swi_put_code(A,B)) :- swi_io.
+goal_expansion(put_code(A), system:swi_put_code(A)) :- swi_io.
+goal_expansion(put_char(A,B),system:swi_put_char(A,B)) :- swi_io.
+goal_expansion(put_char(A), system:swi_put_char(A)) :- swi_io.
+goal_expansion(flush_output, system:swi_flush_output).
+goal_expansion(flush_output(A), system:swi_flush_output(A)) :- swi_io.
+goal_expansion(at_end_of_stream(A), system:swi_at_end_of_stream(A)) :- swi_io.
+goal_expansion(at_end_of_stream, system:swi_at_end_of_stream).
+goal_expansion(stream_property(A,B),system:swi_stream_property(A,B)) :- swi_io.
+goal_expansion(set_stream_position(A,B),system:swi_set_stream_position(A,B)) :- swi_io.
 
-:- unhide('$system_library_directories'),
-	unhide('$dir_separator').
+					/* edinburgh IO */
+goal_expansion(see(A), system:swi_see(A)) :- swi_io.
+goal_expansion(seen, system:swi_seen).
+goal_expansion(seeing(A), system:swi_seeing(A)) :- swi_io.
+goal_expansion(tell(A), system:swi_tell(A)) :- swi_io.
+goal_expansion(append(A), system:swi_append(A)) :- swi_io.
+goal_expansion(told, system:swi_told).
+goal_expansion(telling(A), system:swi_telling(A)) :- swi_io.
+goal_expansion(put(A,B),system:swi_put(A,B)) :- swi_io.
+goal_expansion(put(A), system:swi_put(A)) :- swi_io.
+goal_expansion(skip(A), system:swi_skip(A)) :- swi_io.
+goal_expansion(skip(A,B),system:swi_skip(A,B)) :- swi_io.
+goal_expansion(get(A), system:swi_get(A)) :- swi_io.
+goal_expansion(get(A,B),system:swi_get(A,B)) :- swi_io.
+goal_expansion(get0(A,B),system:swi_get0(A,B)) :- swi_io.
+goal_expansion(get0(A), system:swi_get0(A)) :- swi_io.
+goal_expansion(ttyflush, system:swi_ttyflush).
+goal_expansion(prompt(A,B),system:swi_prompt(A,B)) :- swi_io.
+goal_expansion(tab(A,B),system:swi_tab(A,B)) :- swi_io.
+goal_expansion(tab(A), system:swi_tab(A)) :- swi_io.
+					/* Quintus IO */
+goal_expansion(byte_count(A,B),system:swi_byte_count(A,B)) :- swi_io.
+goal_expansion(character_count(A,B),system:swi_character_count(A,B)) :- swi_io.
+goal_expansion(line_count(A,B),system:swi_line_count(A,B)) :- swi_io.
+goal_expansion(line_position(A,B),system:swi_line_position(A,B)) :- swi_io.
+goal_expansion(open_null_stream(A), system:swi_open_null_stream(A)) :- swi_io.
+
+					/* SWI specific */
+goal_expansion(is_stream(A), system:swi_is_stream(A)) :- swi_io.
+goal_expansion(set_stream(A,B),system:swi_set_stream(A,B)) :- swi_io.
+goal_expansion(with_output_to(A,B),system:swi_with_output_to(A,B)) :- swi_io.
+goal_expansion(set_prolog_IO(A,B,C), system:swi_set_prolog_IO(A,B,C)) :- swi_io.
+goal_expansion(protocol(A), system:swi_protocol(A)) :- swi_io.
+goal_expansion(protocola(A), system:swi_protocola(A)) :- swi_io.
+goal_expansion(noprotocol, noprotocol).
+goal_expansion(protocolling(A), system:swi_protocolling(A)) :- swi_io.
+goal_expansion(prompt1(A), system:swi_prompt1(A)) :- swi_io.
+goal_expansion(seek(A,B,C,D),system:swi_seek(A,B,C,D)) :- swi_io.
+goal_expansion(wait_for_input(A,B,C), system:swi_wait_for_input(A,B,C)) :- swi_io.
+goal_expansion(get_single_char(A), system:swi_get_single_char(A)) :- swi_io.
+goal_expansion(read_pending_input(A,B,C), system:swi_read_pending_input(A,B,C)) :- swi_io.
+goal_expansion(source_location(A,B),system:swi_source_location(A,B)) :- swi_io.
+goal_expansion(copy_stream_data(A,B,C), system:swi_copy_stream_data(A,B,C)) :- swi_io.
+goal_expansion(copy_stream_data(A,B),system:swi_copy_stream_data(A,B)) :- swi_io.
+
+					/* SWI internal */
+goal_expansion('$push_input_context', system:'swi_$push_input_context').
+goal_expansion('$pop_input_context', system:'swi_$pop_input_context').
+goal_expansion('$size_stream'(A,B),system:'swi_$size_stream'(A,B)) :- swi_io.
+
+goal_expansion(working_directory(A,B),system:swi_working_directory(A,B)) :- swi_io.
+goal_expansion(access_file(A,B),system:swi_access_file(A,B)) :- swi_io.
+goal_expansion(size_file(A,B),system:swi_size_file(A,B)) :- swi_io.
+goal_expansion(read_link(A,B,C), system:swi_read_link(A,B,C)) :- swi_io.
+goal_expansion(tmp_file(A,B),system:swi_tmp_file(A,B)) :- swi_io.
+goal_expansion(tmp_file_stream(A,B,C), system:swi_tmp_file_stream(A,B,C)) :- swi_io.
+goal_expansion(delete_file(A), delete_file(A)) :- swi_io.
+goal_expansion(delete_directory(A), delete_directory(A)) :- swi_io.
+goal_expansion(make_directory(A), make_directory(A)) :- swi_io.
+goal_expansion(same_file(A,B),system:swi_same_file(A,B)) :- swi_io.
+goal_expansion(rename_file(A,B),system:swi_rename_file(A,B)) :- swi_io.
+goal_expansion(is_absolute_file_name(A), is_absolute_file_name(A)) :- swi_io.
+goal_expansion(file_base_name(A,B),system:swi_file_base_name(A,B)) :- swi_io.
+goal_expansion(file_directory_name(A,B),system:swi_file_directory_name(A,B)) :- swi_io.
+goal_expansion(prolog_to_os_filename(A,B),system:swi_prolog_to_os_filename(A,B)) :- swi_io.
+goal_expansion('$mark_executable'(A), system:'swi_is_absolute_file_name'(A)) :- swi_io.
+goal_expansion('$absolute_file_name'(A,B),system:'swi_$absolute_file_name'(A,B)) :- swi_io.
+
 
 % make sure we also use 
 :- user:library_directory(X),
 	atom(X),
-	atom_concat([X,'/swi'],SwiDir),
+	atom_concat([X,'/dialect/swi'],SwiDir),
 	\+ user:library_directory(SwiDir),
 	asserta(user:library_directory(SwiDir)),
 	fail
 	;
 	true.
-
-:- multifile user:term_expansion/2.
-:- multifile user:goal_expansion/3.
-:- multifile user:goal_expansion/2.
-
-:- dynamic user:goal_expansion/2.
-
-:- multifile swi_predicate_table/4.
-
-swi_predicate_table(_,append(X,Y),lists,append(X,Y)).
-swi_predicate_table(_,append(X,Y,Z),lists,append(X,Y,Z)).
-swi_predicate_table(_,member(X,Y),lists,member(X,Y)).
-swi_predicate_table(_,nextto(X,Y,Z),lists,nextto(X,Y,Z)).
-swi_predicate_table(_,delete(X,Y,Z),lists,delete(X,Y,Z)).
-swi_predicate_table(_,select(X,Y,Z),lists,select(X,Y,Z)).
-swi_predicate_table(_,selectchk(X,Y,Z),lists,selectchk(X,Y,Z)).
-swi_predicate_table(_,nth0(X,Y,Z),lists,nth0(X,Y,Z)).
-swi_predicate_table(_,nth1(X,Y,Z),lists,nth1(X,Y,Z)).
-swi_predicate_table(_,last(X,Y),lists,last(X,Y)).
-swi_predicate_table(_,reverse(X,Y),lists,reverse(X,Y)).
-swi_predicate_table(_,permutation(X,Y),lists,permutation(X,Y)).
-swi_predicate_table(_,flatten(X,Y),lists,flatten(X,Y)).
-swi_predicate_table(_,sumlist(X,Y),lists,sumlist(X,Y)).
-swi_predicate_table(_,min_list(X,Y),lists,min_list(X,Y)).
-swi_predicate_table(_,max_list(X,Y),lists,max_list(X,Y)).
-swi_predicate_table(_,memberchk(X,Y),lists,memberchk(X,Y)).
-swi_predicate_table(_,flatten(X,Y),lists,flatten(X,Y)).
-swi_predicate_table(_,select(X,Y,Z),lists,select(X,Y,Z)).
-swi_predicate_table(_,sublist(X,Y),lists,sublist(X,Y)).
-swi_predicate_table(_,hash_term(X,Y),terms,term_hash(X,Y)).
-swi_predicate_table(_,term_hash(X,Y),terms,term_hash(X,Y)).
-swi_predicate_table(_,subsumes(X,Y),terms,subsumes(X,Y)).
-swi_predicate_table(_,subsumes_chk(X,Y),terms,subsumes_chk(X,Y)).
-swi_predicate_table(_,unifiable(X,Y,Z),terms,unifiable(X,Y,Z)).
-swi_predicate_table(_,cyclic_term(X),terms,cyclic_term(X)).
-swi_predicate_table(_,acyclic_term(X),terms,acyclic_term(X)).
-swi_predicate_table(_,genarg(X,Y,Z),arg,genarg(X,Y,Z)).
-swi_predicate_table(_,tmp_file(X,Y),system,tmp_file(X,Y)).
-swi_predicate_table(_,maplist(X,Y),apply,maplist(X,Y)).
-swi_predicate_table(_,maplist(X,Y,Z),apply,maplist(X,Y,Z)).
-swi_predicate_table(_,maplist(X,Y,Z,A),apply,maplist(X,Y,Z,A)).
-swi_predicate_table(_,maplist(X,Y,Z,A,B),apply,maplist(X,Y,Z,A,B)).
-swi_predicate_table(_,include(X,Y,Z),apply,include(X,Y,Z)).
-swi_predicate_table(_,exclude(X,Y,Z),apply,exclude(X,Y,Z)).
-swi_predicate_table(_,partition(X,Y,Z,A),apply,partition(X,Y,Z,A)).
-swi_predicate_table(_,partition(X,Y,Z,A,B),apply,partition(X,Y,Z,A,B)).
-% swi_predicate_table(_,set_test_options(X),plunit,set_test_options(X)).
-% swi_predicate_table(_,begin_tests(X),plunit,begin_tests(X)).
-% swi_predicate_table(_,begin_tests(X,Y),plunit,begin_tests(X,Y)).
-% swi_predicate_table(_,end_tests(X),plunit,end_tests(X)).
-% swi_predicate_table(_,run_tests,plunit,run_tests).
-% swi_predicate_table(_,run_tests(X),plunit,run_tests(X)).
-% swi_predicate_table(_,load_test_files(X),plunit,load_test_files(X)).
-% swi_predicate_table(_,running_tests,plunit,running_tests).
-% swi_predicate_table(_,test_report(X),plunit,test_report(X)).
-
-swi_mchk(X,Y) :- lists:memberchk(X,Y).
-
-prolog:memberchk(X,Y) :- swi_mchk(X,Y).
-
-:- dynamic
-   prolog:message/3.
-
-:- multifile
-   prolog:message/3.
 
 :- multifile
    user:file_search_path/2.
@@ -145,94 +252,14 @@ user:file_search_path(foreign, swi(ArchLib)) :-
         atom_concat('lib/', Arch, ArchLib).
 user:file_search_path(foreign, swi(lib)).
 
-:- meta_predicate prolog:predsort(:,+,-).
 
-prolog:plus(X, Y, Z) :-
-       integer(X),
-       integer(Y), !,
-       Z is X + Y.
-prolog:plus(X, Y, Z) :-
-       integer(X),
-       integer(Z), !,
-       Y is Z - X.
-prolog:plus(X, Y, Z) :-
-       integer(Y),
-       integer(Z), !,
-       X is Z - Y.
-
-%%	predsort(:Compare, +List, -Sorted) is det.
-%
-%	 Sorts similar to sort/2, but determines  the order of two terms
-%	 by calling Compare(-Delta, +E1,  +E2).   This  call  must unify
-%	 Delta with one of <, > or =. If built-in predicate compare/3 is
-%	 used, the result is the same as sort/2. See also keysort/2.
-
-prolog:predsort(P, L, R) :-
-	length(L, N), 
-	predsort(P, N, L, _, R1), !, 
-	R = R1.
-
-predsort(P, 2, [X1, X2|L], L, R) :- !, 
-	call(P, Delta, X1, X2),
-	sort2(Delta, X1, X2, R).
-predsort(_, 1, [X|L], L, [X]) :- !.
-predsort(_, 0, L, L, []) :- !.
-predsort(P, N, L1, L3, R) :-
-	N1 is N // 2, 
-	plus(N1, N2, N), 
-	predsort(P, N1, L1, L2, R1), 
-	predsort(P, N2, L2, L3, R2), 
-	predmerge(P, R1, R2, R).
-
-sort2(<, X1, X2, [X1, X2]).
-sort2(=, X1, _,  [X1]).
-sort2(>, X1, X2, [X2, X1]).
-
-predmerge(_, [], R, R) :- !.
-predmerge(_, R, [], R) :- !.
-predmerge(P, [H1|T1], [H2|T2], Result) :-
-	call(P, Delta, H1, H2),
-	predmerge(Delta, P, H1, H2, T1, T2, Result).
-
-predmerge(>, P, H1, H2, T1, T2, [H2|R]) :-
-	predmerge(P, [H1|T1], T2, R).
-predmerge(=, P, H1, _, T1, T2, [H1|R]) :-
-	predmerge(P, T1, T2, R).
-predmerge(<, P, H1, H2, T1, T2, [H1|R]) :-
-	predmerge(P, T1, [H2|T2], R).
-
-
-%
-% maybe a good idea to eventually support this in YAP.
-% but for now just ignore it.
-%
-prolog:load_foreign_library(P,Command) :-
-	absolute_file_name(P,[file_type(executable),solutions(first),file_errors(fail)],Lib),
-	load_foreign_files([Lib],[],Command).
-
-prolog:load_foreign_library(P) :-
-	prolog:load_foreign_library(P,install).
-
-:- use_module(library(lists)).
-
-prolog:term_to_atom(Term,Atom) :-
-	nonvar(Atom), !,
-	atom_codes(Atom,S),
-	read_from_chars(S,Term).
-prolog:term_to_atom(Term,Atom) :-
-	write_to_chars(Term,S),
-	atom_codes(Atom,S).
-
-prolog:concat_atom([A|List], Separator, New) :- var(List), !,
+concat_atom([A|List], Separator, New) :- var(List), !,
 	atom_codes(Separator,[C]),
 	atom_codes(New, NewChars),
 	split_atom_by_chars(NewChars,C,L,L,A,List).
-prolog:concat_atom(List, Separator, New) :-
+concat_atom(List, Separator, New) :-
 	add_separator_to_list(List, Separator, NewList),
 	atomic_concat(NewList, New).
-
-prolog:concat_atom(List, New) :-
-	atomic_concat(List, New).
 
 
 split_atom_by_chars([],_,[],L,A,[]):-
@@ -248,23 +275,21 @@ add_separator_to_list([T], _, [T]) :- !.
 add_separator_to_list([H|T], Separator, [H,Separator|NT]) :-
 	add_separator_to_list(T, Separator, NT).
 
+concat_atom(List, New) :-
+	atomic_concat(List, New).
 
-prolog:setenv(X,Y) :- unix(putenv(X,Y)).
 
-prolog:prolog_to_os_filename(X,X).
+setenv(X,Y) :- unix(putenv(X,Y)).
 
-prolog:is_absolute_file_name(X) :-
+prolog_to_os_filename(X,X).
+
+is_absolute_file_name(X) :-
 	absolute_file_name(X,X).
 
-prolog:read_clause(X,Y) :-
+read_clause(X,Y) :-
 	read_term(X,Y,[singetons(warning)]).
 
-prolog:string(_) :- fail.
-
-slp(T) :- sleep(T).
-
-prolog:sleep(T) :-
-	slp(T).
+string(_) :- fail.
 
 bindings_message(V) -->
        { cvt_bindings(V, Bindings) },
@@ -275,70 +300,48 @@ cvt_bindings([[Name|Value]|L],[AName=Value|Bindings]) :-
 	atom_codes(AName, Name),
 	cvt_bindings(L,Bindings).
 
-prolog:working_directory(OCWD,NCWD) :-
+working_directory(OCWD,NCWD) :-
 	getcwd(OCWD),
 	(var(NCWD) -> true ; cd(NCWD)).
 
-prolog:chdir(X) :- cd(X).
-
-% Time is given as int, not as float.
-prolog:get_time(Secs) :- datime(Datime),  mktime(Datime, Secs).
+chdir(X) :- cd(X).
 
 % Time is received as int, and converted to "..."
-prolog:convert_time(X,Y) :- swi:ctime(X,Y).
+% ctime is a built-in.
+convert_time(X,Y) :- swi:ctime(X,Y).
 
-:- hide(atom_concat).
-
-prolog:atom_concat(A,B) :- atomic_concat(A,B).
-
-prolog:atom_concat(A,B,C) :- atomic_concat(A,B,C).
-
-:- hide(create_mutable).
-
-:- hide(get_mutable).
-
-:- hide(update_mutable).
-
-% copied from SWI lists library.
-lists:intersection([], _, []) :- !.
-lists:intersection([X|T], L, Intersect) :-
-	memberchk(X, L), !, 
-	Intersect = [X|R], 
-	lists:intersection(T, L, R).
-lists:intersection([_|T], L, R) :-
-	lists:intersection(T, L, R).
-
-prolog:compile_aux_clauses([]).
-prolog:compile_aux_clauses([(:- G)|Cls]) :-
+compile_aux_clauses([]).
+compile_aux_clauses([(:- G)|Cls]) :-
 	prolog_load_context(module, M),
 	once(M:G),
-	prolog:compile_aux_clauses(Cls).
-prolog:compile_aux_clauses([Cl|Cls]) :-
+	compile_aux_clauses(Cls).
+compile_aux_clauses([Cl|Cls]) :-
 	prolog_load_context(module, M),
 	assert_static(M:Cl),
-	prolog:compile_aux_clauses(Cls).
+	compile_aux_clauses(Cls).
 
-% fix different semantics for arg/3.
-user:goal_expansion(arg(X,Y,Z),arg:genarg(X,Y,Z)) :-
-	nonvar(X), !.
-
-prolog:'$set_source_module'(Source0, SourceF) :-
-	prolog_load_context(module, Source0),
+'$set_source_module'(Source0, SourceF) :-
+	prolog_load_context(module, Source0), !,
 	module(SourceF).
-
-prolog:'$set_source_module'(Source0, SourceF) :-
+'$set_source_module'(Source0, SourceF) :-
 	current_module(Source0, SourceF).
 
-prolog:'$declare_module'(Name, Context, _, _, _) :-
+/** '$declare_module'(+Module, +Super, +File, +Line, +Redefine) is det.
+
+Start a new (source-)module
+
+@param	Module is the name of the module to declare
+@param	File is the canonical name of the file from which the module
+	is loaded
+@param  Line is the line-number of the :- module/2 directive.
+@param	Redefine If =true=, allow associating the module to a new file
+*/
+'$declare_module'(Name, Context, _, _, _) :-
 	add_import_module(Name, Context, start).
 
-prolog:'$set_predicate_attribute'(_, _, _).
+'$set_predicate_attribute'(_, _, _).
 
-prolog:time_file(File, Time) :-
-	file_property(File, mod_time(Date)),
-	Time is Date*1.0.
-
-prolog:flag(Key, Old, New) :-
+flag(Key, Old, New) :-
 	recorded(Key, Old, R), !,
 	(
 	 Old \== New
@@ -348,11 +351,33 @@ prolog:flag(Key, Old, New) :-
 	;
 	 true
 	).
-prolog:flag(Key, 0, New) :-
+flag(Key, 0, New) :-
 	functor(Key, N, Ar),
 	functor(K, N, Ar),
-	assert(swi:flag(K)),
+	assert(flag(K)),
 	recorda(K, New, _).
 
-prolog:current_flag(Key) :-
+current_flag(Key) :-
 	swi:flag(Key).
+
+require(F) :-
+	must_be(list, F),
+	% notice that this must be used as a declaration.
+	prolog_load_context(module, Mod),
+	required_predicates(F, Mod).
+
+required_predicates([], _).
+required_predicates(F.Fs, M) :-
+	required_predicate(F, M),
+	required_predicates(Fs, M).
+
+required_predicate(Na/Ar, M) :-
+	functor(G, Na, Ar),
+	(
+	 predicate_property(M:G, _) ->
+	 true
+	;
+         autoloader:find_predicate(G, _)
+	).
+
+

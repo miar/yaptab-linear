@@ -15,11 +15,12 @@ BINDIR = $(EROOTDIR)/bin
 #
 # where YAP should look for libraries
 #
-LIBDIR=@libdir@/Yap
+LIBDIR=@libdir@
+YAPLIBDIR=@libdir@/Yap
 #
 #
 CC=@CC@
-CFLAGS= @CFLAGS@ $(YAP_EXTRAS) $(DEFS)  -D_YAP_NOT_INSTALLED_=1 -I$(srcdir) -I../.. -I$(srcdir)/../../include -I$(srcdir)/uxnt
+CFLAGS= @SHLIB_CFLAGS@ $(YAP_EXTRAS) $(DEFS)  -D_YAP_NOT_INSTALLED_=1 -I$(srcdir) -I../.. -I$(srcdir)/../../include  @CPPFLAGS@
 #
 #
 # You shouldn't need to change what follows.
@@ -30,8 +31,7 @@ INSTALL_PROGRAM=@INSTALL_PROGRAM@
 SHELL=/bin/sh
 RANLIB=@RANLIB@
 srcdir=@srcdir@
-SHLIB_CFLAGS=@SHLIB_CFLAGS@
-SHLIB_SUFFIX=@SHLIB_SUFFIX@
+SO=@SO@
 #4.1VPATH=@srcdir@:@srcdir@/OPTYap
 CWD=$(PWD)
 #
@@ -48,19 +48,21 @@ HEADERS=$(srcdir)/atoms.h $(srcdir)/pl-buffer.h $(srcdir)/pl-ctype.h  \
 	$(srcdir)/pl-yap.h @ENABLE_WINCONSOLE@ $(srcdir)/uxnt/dirent.h $(srcdir)/uxnt/utf8.h $(srcdir)/pl-utf8.c $(srcdir)/uxnt/uxnt.h
 C_SOURCES=$(srcdir)/pl-buffer.c $(srcdir)/pl-ctype.c \
 	$(srcdir)/pl-error.c  \
-	$(srcdir)/pl-file.c $(srcdir)/pl-files.c   $(srcdir)/pl-os.c \
+	$(srcdir)/pl-file.c $(srcdir)/pl-files.c  \
+	$(srcdir)/pl-glob.c  \
+	$(srcdir)/pl-os.c \
 	$(srcdir)/pl-privitf.c \
 	$(srcdir)/pl-stream.c $(srcdir)/pl-string.c \
 	$(srcdir)/pl-table.c \
 	$(srcdir)/pl-text.c \
-	$(srcdir)/pl-utils.c \
+	$(srcdir)/pl-util.c \
 	$(srcdir)/pl-yap.c @ENABLE_WINCONSOLE@ $(srcdir)/popen.c $(srcdir)/uxnt/uxnt.c
 OBJS=pl-buffer.o pl-ctype.o pl-error.o  \
-	pl-file.o pl-files.o pl-os.o pl-privitf.o \
+	pl-file.o pl-files.o pl-glob.o pl-os.o pl-privitf.o \
 	pl-stream.o pl-string.o pl-table.o \
-	pl-text.o pl-utils.o pl-utf8.o \
+	pl-text.o pl-util.o pl-utf8.o \
 	pl-yap.o @ENABLE_WINCONSOLE@ uxnt.o
-SOBJS=plstream@SHLIB_SUFFIX@
+SOBJS=libplstream.@SO@
 
 #in some systems we just create a single object, in others we need to
 # create a libray
@@ -68,20 +70,20 @@ SOBJS=plstream@SHLIB_SUFFIX@
 all: $(SOBJS) 
 
 uxnt.o: $(srcdir)/uxnt/uxnt.c
-	$(CC) -c $(CFLAGS) $(SHLIB_CFLAGS) $(srcdir)/uxnt/uxnt.c -o uxnt.o
+	$(CC) -c $(CFLAGS) $(srcdir)/uxnt/uxnt.c -o uxnt.o
 
 # default rule
 %.o : $(srcdir)/%.c
-	$(CC) -c $(CFLAGS)  $(SHLIB_CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@
 
-@DO_SECOND_LD@%@SHLIB_SUFFIX@: %.o
-@DO_SECOND_LD@	@SHLIB_LD@ -o $@ $<
+@DO_SECOND_LD@%.@SO@: %.o
+@DO_SECOND_LD@	@SHLIB_LD@ -o $@ $<  @EXTRA_LIBS_FOR_DLLS@
 
-@DO_SECOND_LD@plstream@SHLIB_SUFFIX@: $(OBJS)
-@DO_SECOND_LD@	@SHLIB_LD@ -o plstream@SHLIB_SUFFIX@ $(OBJS)
+@DO_SECOND_LD@libplstream.@SO@: $(OBJS)
+@DO_SECOND_LD@	@SHLIB_LD@ -o libplstream.@SO@ $(OBJS) @EXTRA_LIBS_FOR_DLLS@
 
 install: all
-	$(INSTALL_PROGRAM) $(SOBJS) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROGRAM) $(SOBJS) $(DESTDIR)$(YAPLIBDIR)
 
 clean:
 	rm -f *.o *~ $(OBJS) $(SOBJS) *.BAK

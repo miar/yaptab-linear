@@ -1,101 +1,126 @@
-/**********************************************************************
-                                                               
-                       The OPTYap Prolog system                
-  OPTYap extends the Yap Prolog system to support or-parallel tabling
-                                                               
-  Copyright:   R. Rocha and NCC - University of Porto, Portugal
-  File:        tab.macros.h
-  version:     $Id: tab.macros.h,v 1.22 2008-05-23 18:28:58 ricroc Exp $   
-                                                                     
-**********************************************************************/
+/************************************************************************
+**                                                                     **
+**                   The YapTab/YapOr/OPTYap systems                   **
+**                                                                     **
+** YapTab extends the Yap Prolog engine to support sequential tabling  **
+** YapOr extends the Yap Prolog engine to support or-parallelism       **
+** OPTYap extends the Yap Prolog engine to support or-parallel tabling **
+**                                                                     **
+**                                                                     **
+**      Yap Prolog was developed at University of Porto, Portugal      **
+**                                                                     **
+************************************************************************/
 
-/* ------------------ **
-**      Includes      **
-** ------------------ */
+/************************************
+**      Includes & Prototypes      **
+************************************/
 
 #include <stdlib.h>
-
+#if HAVE_STRING_H
+#include <string.h>
+#endif /* HAVE_STRING_H */
 #include "opt.mavar.h"
 
-
-#ifdef LINEAR_TABLING
-#include "linear.tab.macros.h"
-#else
-#define find_leader_node(LEADER_CP, DEP_ON_STACK)                                 \
-        { dep_fr_ptr chain_dep_fr = LOCAL_top_dep_fr;                             \
-          while (YOUNGER_CP(DepFr_cons_cp(chain_dep_fr), LEADER_CP)) {            \
-            if (EQUAL_OR_YOUNGER_CP(LEADER_CP, DepFr_leader_cp(chain_dep_fr))) {  \
-              LEADER_CP = DepFr_leader_cp(chain_dep_fr);                          \
-              break;                                                              \
-            }                                                                     \
-            chain_dep_fr = DepFr_next(chain_dep_fr);                              \
-          }                                                                       \
-	}
-#define SgFr_init_linear_tabling_fields(SG_FR)
-#endif /*LINEAR_TABLING*/
-
-
-
-/* -------------------- **
-**      Prototypes      **
-** -------------------- */
-
-STD_PROTO(static inline void adjust_freeze_registers, (void));
-STD_PROTO(static inline void mark_as_completed, (sg_fr_ptr));
-STD_PROTO(static inline void unbind_variables, (tr_fr_ptr, tr_fr_ptr));
-STD_PROTO(static inline void rebind_variables, (tr_fr_ptr, tr_fr_ptr));
-STD_PROTO(static inline void restore_bindings, (tr_fr_ptr, tr_fr_ptr));
-STD_PROTO(static inline void abolish_incomplete_subgoals, (choiceptr));
-STD_PROTO(static inline void free_subgoal_hash_chain, (sg_hash_ptr));
-STD_PROTO(static inline void free_answer_hash_chain, (ans_hash_ptr));
-STD_PROTO(static inline choiceptr freeze_current_cp, (void));
-STD_PROTO(static inline void resume_frozen_cp, (choiceptr));
-
+static inline Int freeze_current_cp(void);
+static inline void wake_frozen_cp(Int);
+static inline void abolish_frozen_cps_until(Int);
+static inline void abolish_frozen_cps_all(void);
+static inline void adjust_freeze_registers(void);
+static inline void mark_as_completed(sg_fr_ptr);
+static inline void unbind_variables(tr_fr_ptr, tr_fr_ptr);
+static inline void rebind_variables(tr_fr_ptr, tr_fr_ptr);
+static inline void restore_bindings(tr_fr_ptr, tr_fr_ptr);
+static inline CELL *expand_auxiliary_stack(CELL *);
+static inline void abolish_incomplete_subgoals(choiceptr);
 #ifdef YAPOR
-STD_PROTO(static inline void pruning_over_tabling_data_structures, (void));
-STD_PROTO(static inline void collect_suspension_frames, (or_fr_ptr));
+static inline void pruning_over_tabling_data_structures(void);
+static inline void collect_suspension_frames(or_fr_ptr);
 #ifdef TIMESTAMP_CHECK
-STD_PROTO(static inline susp_fr_ptr suspension_frame_to_resume, (or_fr_ptr, long));
+static inline susp_fr_ptr suspension_frame_to_resume(or_fr_ptr, long);
 #else
-STD_PROTO(static inline susp_fr_ptr suspension_frame_to_resume, (or_fr_ptr));
+static inline susp_fr_ptr suspension_frame_to_resume(or_fr_ptr);
 #endif /* TIMESTAMP_CHECK */
 #endif /* YAPOR */
-
 #ifdef TABLING_INNER_CUTS
-STD_PROTO(static inline void CUT_store_tg_answer, (or_fr_ptr, ans_node_ptr, choiceptr, int));
-STD_PROTO(static inline tg_sol_fr_ptr CUT_store_tg_answers, (or_fr_ptr, tg_sol_fr_ptr, int));
-STD_PROTO(static inline void CUT_validate_tg_answers, (tg_sol_fr_ptr));
-STD_PROTO(static inline void CUT_join_tg_solutions, (tg_sol_fr_ptr *, tg_sol_fr_ptr));
-STD_PROTO(static inline void CUT_join_solution_frame_tg_answers, (tg_sol_fr_ptr));
-STD_PROTO(static inline void CUT_join_solution_frames_tg_answers, (tg_sol_fr_ptr));
-STD_PROTO(static inline void CUT_free_tg_solution_frame, (tg_sol_fr_ptr));
-STD_PROTO(static inline void CUT_free_tg_solution_frames, (tg_sol_fr_ptr));
-STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_ptr, int));
+static inline void CUT_store_tg_answer(or_fr_ptr, ans_node_ptr, choiceptr, int);
+static inline tg_sol_fr_ptr CUT_store_tg_answers(or_fr_ptr, tg_sol_fr_ptr, int);
+static inline void CUT_validate_tg_answers(tg_sol_fr_ptr);
+static inline void CUT_join_tg_solutions(tg_sol_fr_ptr *, tg_sol_fr_ptr);
+static inline void CUT_join_solution_frame_tg_answers(tg_sol_fr_ptr);
+static inline void CUT_join_solution_frames_tg_answers(tg_sol_fr_ptr);
+static inline void CUT_free_tg_solution_frame(tg_sol_fr_ptr);
+static inline void CUT_free_tg_solution_frames(tg_sol_fr_ptr);
+static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames(tg_sol_fr_ptr, int);
 #endif /* TABLING_INNER_CUTS */
 
 
 
-/* ----------------- **
-**      Defines      **
-** ----------------- */
+/*********************************
+**      Tabling mode flags      **
+*********************************/
 
-#define TRAVERSE_MODE_NORMAL    0
-#define TRAVERSE_MODE_FLOAT     1
-#define TRAVERSE_MODE_FLOAT2    2
-#define TRAVERSE_MODE_FLOAT_END 3
-#define TRAVERSE_MODE_LONG      4
-#define TRAVERSE_MODE_LONG_END  5
+#define Flag_Batched            0x001
+#define Flag_Local              0x002
+#define Flags_SchedulingMode    (Flag_Batched | Flag_Local)
+#define Flag_ExecAnswers        0x010
+#define Flag_LoadAnswers        0x020
+#define Flags_AnswersMode       (Flag_ExecAnswers | Flag_LoadAnswers)
+#define Flag_LocalTrie          0x100
+#define Flag_GlobalTrie         0x200
+#define Flags_TrieMode          (Flag_LocalTrie | Flag_GlobalTrie)
+
+#define SetMode_Batched(X)      (X) = ((X) & ~Flags_SchedulingMode) | Flag_Batched
+#define SetMode_Local(X)        (X) = ((X) & ~Flags_SchedulingMode) | Flag_Local
+#define SetMode_ExecAnswers(X)  (X) = ((X) & ~Flags_AnswersMode) | Flag_ExecAnswers
+#define SetMode_LoadAnswers(X)  (X) = ((X) & ~Flags_AnswersMode) | Flag_LoadAnswers
+#define SetMode_LocalTrie(X)    (X) = ((X) & ~Flags_TrieMode) | Flag_LocalTrie
+#define SetMode_GlobalTrie(X)   (X) = ((X) & ~Flags_TrieMode) | Flag_GlobalTrie
+#define IsMode_Batched(X)       ((X) & Flag_Batched)
+#define IsMode_Local(X)         ((X) & Flag_Local)
+#define IsMode_ExecAnswers(X)   ((X) & Flag_ExecAnswers)
+#define IsMode_LoadAnswers(X)   ((X) & Flag_LoadAnswers)
+#define IsMode_LocalTrie(X)     ((X) & Flag_LocalTrie)
+#define IsMode_GlobalTrie(X)    ((X) & Flag_GlobalTrie)
+
+
+
+/******************************
+**      Tabling defines      **
+******************************/
+
+#define SHOW_MODE_STRUCTURE        0
+#define SHOW_MODE_STATISTICS       1
+#define TRAVERSE_MODE_NORMAL       0
+#define TRAVERSE_MODE_DOUBLE       1
+#define TRAVERSE_MODE_DOUBLE2      2
+#define TRAVERSE_MODE_DOUBLE_END   3
+#define TRAVERSE_MODE_LONGINT      4
+#define TRAVERSE_MODE_LONGINT_END  5
 /* do not change order !!! */
-#define TRAVERSE_POSITION_NEXT  0
-#define TRAVERSE_POSITION_FIRST 1
-#define TRAVERSE_POSITION_LAST  2
+#define TRAVERSE_TYPE_SUBGOAL      0
+#define TRAVERSE_TYPE_ANSWER       1
+#define TRAVERSE_TYPE_GT_SUBGOAL   2
+#define TRAVERSE_TYPE_GT_ANSWER    3
+/* do not change order !!! */
+#define TRAVERSE_POSITION_NEXT     0
+#define TRAVERSE_POSITION_FIRST    1
+#define TRAVERSE_POSITION_LAST     2
 
-
-
-
-/* ----------------------- **
-**     Tabling Macros      **
-** ----------------------- */
+/* LowTagBits is 3 for 32 bit-machines and 7 for 64 bit-machines */
+#define NumberOfLowTagBits         (LowTagBits == 3 ? 2 : 3)
+#define MakeTableVarTerm(INDEX)    ((INDEX) << NumberOfLowTagBits)
+#define VarIndexOfTableTerm(TERM)  (((unsigned int) (TERM)) >> NumberOfLowTagBits)
+#define VarIndexOfTerm(TERM)                                                     \
+        ((((CELL) (TERM)) - GLOBAL_table_var_enumerator(0)) / sizeof(CELL))
+#define IsTableVarTerm(TERM)                                                     \
+        ((CELL) (TERM)) >= GLOBAL_table_var_enumerator(0) &&		 	 \
+        ((CELL) (TERM)) <= GLOBAL_table_var_enumerator(MAX_TABLE_VARS - 1)
+#ifdef TRIE_COMPACT_PAIRS
+#define PairTermMark        NULL
+#define CompactPairInit     AbsPair((Term *) 0)
+#define CompactPairEndTerm  AbsPair((Term *) (LowTagBits + 1))
+#define CompactPairEndList  AbsPair((Term *) (2*(LowTagBits + 1)))
+#endif /* TRIE_COMPACT_PAIRS */
 
 #define NORM_CP(CP)                 ((choiceptr)(CP))
 #define GEN_CP(CP)                  ((struct generator_choicept *)(CP))
@@ -110,66 +135,53 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 #define IS_BATCHED_GEN_CP(CP)       (GEN_CP(CP)->cp_dep_fr == NULL)
 #endif /* DETERMINISTIC_TABLING */
 
-#define TAG_AS_ANSWER_LEAF_NODE(NODE)  TrNode_parent(NODE) = (ans_node_ptr)((unsigned long int)TrNode_parent(NODE) | 0x1)
-#define UNTAG_ANSWER_LEAF_NODE(NODE)   ((ans_node_ptr)((unsigned long int)NODE & ~(0x1)))
-#define IS_ANSWER_LEAF_NODE(NODE)      ((unsigned long int)TrNode_parent(NODE) & 0x1)
+#define TAG_AS_SUBGOAL_LEAF_NODE(NODE)  TrNode_child(NODE) = (sg_node_ptr)((unsigned long int) TrNode_child(NODE) | 0x1)
+#define UNTAG_SUBGOAL_LEAF_NODE(NODE)   ((sg_fr_ptr)((unsigned long int) (NODE) & ~(0x1)))
+#define IS_SUBGOAL_LEAF_NODE(NODE)      ((unsigned long int) TrNode_child(NODE) & 0x1)
+#define TAG_AS_ANSWER_LEAF_NODE(NODE)   TrNode_parent(NODE) = (ans_node_ptr)((unsigned long int) TrNode_parent(NODE) | 0x1)
+#define UNTAG_ANSWER_LEAF_NODE(NODE)    ((ans_node_ptr)((unsigned long int) (NODE) & ~(0x1)))
+#define IS_ANSWER_LEAF_NODE(NODE)       ((unsigned long int) TrNode_parent(NODE) & 0x1)
 
-#define STACK_NOT_EMPTY(STACK, STACK_BASE)  STACK != STACK_BASE
-#define STACK_PUSH_UP(ITEM, STACK)          *--STACK = (CELL)(ITEM)
-#define STACK_POP_DOWN(STACK)               *STACK++
-#define STACK_PUSH_DOWN(ITEM, STACK)        *STACK++ = (CELL)(ITEM)
-#define STACK_POP_UP(STACK)                 *--STACK
-#ifdef YAPOR
-#define STACK_CHECK_EXPAND(STACK, STACK_LIMIT, STACK_BASE)                       \
-        if (STACK_LIMIT >= STACK) {                                              \
-          Yap_Error(INTERNAL_ERROR, TermNil, "stack full (STACK_CHECK_EXPAND)")
-#else
-#define STACK_CHECK_EXPAND(STACK, STACK_LIMIT, STACK_BASE)                              \
-        if (STACK_LIMIT >= STACK) {                                                     \
-          void *old_top;                                                                \
-          UInt diff;                                                                    \
-          CELL *NEW_STACK;                                                              \
-          INFORMATION_MESSAGE("Expanding trail in 64 Kbytes");                          \
-          old_top = Yap_TrailTop;                                                       \
-          if (!Yap_growtrail(64 * 1024L, TRUE)) {                                       \
-            Yap_Error(OUT_OF_TRAIL_ERROR, TermNil, "stack full (STACK_CHECK_EXPAND)");  \
-            P = FAILCODE;                                                               \
-          } else {                                                                      \
-            diff = (void *)Yap_TrailTop - old_top;                                      \
-            NEW_STACK = (CELL *)((void *)STACK + diff);                                 \
-            memmove((void *)NEW_STACK, (void *)STACK, old_top - (void *)STACK);         \
-            STACK = NEW_STACK;                                                          \
-            STACK_BASE = (CELL *)((void *)STACK_BASE + diff);                           \
-          }                                                                             \
-        }
-#endif /* YAPOR */
+#define MAX_NODES_PER_TRIE_LEVEL    8
+#define MAX_NODES_PER_BUCKET        (MAX_NODES_PER_TRIE_LEVEL / 2)
+#define BASE_HASH_BUCKETS           64
+#define HASH_ENTRY(ENTRY, SEED)     ((((unsigned long int) ENTRY) >> NumberOfLowTagBits) & (SEED))
+#define SUBGOAL_TRIE_HASH_MARK      ((Term) MakeTableVarTerm(MAX_TABLE_VARS))
+#define IS_SUBGOAL_TRIE_HASH(NODE)  (TrNode_entry(NODE) == SUBGOAL_TRIE_HASH_MARK)
+#define ANSWER_TRIE_HASH_MARK       0
+#define IS_ANSWER_TRIE_HASH(NODE)   (TrNode_instr(NODE) == ANSWER_TRIE_HASH_MARK)
+#define GLOBAL_TRIE_HASH_MARK       ((Term) MakeTableVarTerm(MAX_TABLE_VARS))
+#define IS_GLOBAL_TRIE_HASH(NODE)   (TrNode_entry(NODE) == GLOBAL_TRIE_HASH_MARK)
 
-
-/* LowTagBits is 3 for 32 bit-machines and 7 for 64 bit-machines */
-#define NumberOfLowTagBits         (LowTagBits == 3 ? 2 : 3)
-#define MakeTableVarTerm(INDEX)    (INDEX << NumberOfLowTagBits)
-#define VarIndexOfTableTerm(TERM)  (TERM >> NumberOfLowTagBits)
-#define VarIndexOfTerm(TERM)                                               \
-        ((((CELL) TERM) - GLOBAL_table_var_enumerator(0)) / sizeof(CELL))
-#define IsTableVarTerm(TERM)                                               \
-        ((CELL) TERM) >= GLOBAL_table_var_enumerator(0) &&                 \
-        ((CELL) TERM) <= GLOBAL_table_var_enumerator(MAX_TABLE_VARS - 1)
-#ifdef TRIE_COMPACT_PAIRS
-#define PairTermMark        NULL
-#define CompactPairInit     AbsPair((Term *) 0)
-#define CompactPairEndTerm  AbsPair((Term *) (LowTagBits + 1))
-#define CompactPairEndList  AbsPair((Term *) (2*(LowTagBits + 1)))
-#endif /* TRIE_COMPACT_PAIRS */
-
-#define HASH_TABLE_LOCK(NODE)  ((((unsigned long int)NODE) >> 5) & (TABLE_LOCK_BUCKETS - 1))
+#define HASH_TABLE_LOCK(NODE)  ((((unsigned long int) (NODE)) >> 5) & (TABLE_LOCK_BUCKETS - 1))
 #define LOCK_TABLE(NODE)         LOCK(GLOBAL_table_lock(HASH_TABLE_LOCK(NODE)))
 #define UNLOCK_TABLE(NODE)     UNLOCK(GLOBAL_table_lock(HASH_TABLE_LOCK(NODE)))
 
+#define STACK_PUSH_UP(ITEM, STACK)                  *--(STACK) = (CELL)(ITEM)
+#define STACK_POP_UP(STACK)                         *--(STACK)
+#define STACK_PUSH_DOWN(ITEM, STACK)                *(STACK)++ = (CELL)(ITEM)
+#define STACK_POP_DOWN(STACK)                       *(STACK)++
+#define STACK_NOT_EMPTY(STACK, STACK_BASE)          (STACK) != (STACK_BASE)
+#define AUX_STACK_CHECK_EXPAND(STACK, STACK_LIMIT)  if ((STACK_LIMIT) >= (STACK)) EXPAND_AUX_STACK(STACK)
+#define STACK_CHECK_EXPAND(STACK, STACK_LIMIT)  if ((STACK_LIMIT) >= (STACK)+4096) EXPAND_STACK(STACK)
+#if defined(YAPOR) && !defined(THREADS)
+#define EXPAND_AUX_STACK(STACK)    Yap_Error(INTERNAL_ERROR, TermNil, "stack full (AUX_STACK_CHECK_EXPAND)");
+#define EXPAND_STACK(STACK)    Yap_Error(INTERNAL_ERROR, TermNil, "stack full (STACK_CHECK_EXPAND)");
+#else
+#define EXPAND_AUX_STACK(STACK)    STACK = expand_auxiliary_stack(STACK)
+#define EXPAND_STACK(STACK)    Yap_Error(INTERNAL_ERROR, TermNil, "stack full (STACK_CHECK_EXPAND)");
+#endif /* YAPOR */
+#define OPTYAP_ERROR_MESSAGE(OP, COND)  
 
-#define frame_with_suspensions_not_collected(OR_FR)  (OrFr_nearest_suspnode(OR_FR) == NULL)
 
+
+/*************************************
+**      Data structures macros      **
+*************************************/
 
 #ifdef YAPOR
+#define frame_with_suspensions_not_collected(OR_FR)                               \
+        (OrFr_nearest_suspnode(OR_FR) == NULL)
 #define find_dependency_node(SG_FR, LEADER_CP, DEP_ON_STACK)                      \
         if (SgFr_gen_worker(SG_FR) == worker_id) {                                \
           LEADER_CP = SgFr_gen_cp(SG_FR);                                         \
@@ -178,7 +190,7 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
           or_fr_ptr aux_or_fr = SgFr_gen_top_or_fr(SG_FR);                        \
           while (! BITMAP_member(OrFr_members(aux_or_fr), worker_id))             \
             aux_or_fr = OrFr_next(aux_or_fr);                                     \
-          LEADER_CP = OrFr_node(aux_or_fr);                                       \
+          LEADER_CP = GetOrFr_node(aux_or_fr);                                    \
           DEP_ON_STACK = (LEADER_CP == SgFr_gen_cp(SG_FR));                       \
         }
 #define find_leader_node(LEADER_CP, DEP_ON_STACK)                                 \
@@ -195,41 +207,46 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
             chain_dep_fr = DepFr_next(chain_dep_fr);                              \
           }                                                                       \
 	}
-#else
-#define find_dependency_node(SG_FR, LEADER_CP, DEP_ON_STACK)                      \
-        LEADER_CP = SgFr_gen_cp(SG_FR);                                           \
-        DEP_ON_STACK = TRUE
-#endif /* YAPOR */
-
-
-#ifdef YAPOR
 #ifdef TIMESTAMP
 #define DepFr_init_timestamp_field(DEP_FR)  DepFr_timestamp(DEP_FR) = 0
 #else
 #define DepFr_init_timestamp_field(DEP_FR)
 #endif /* TIMESTAMP */
 #define YAPOR_SET_LOAD(CP_PTR)  SCH_set_load(CP_PTR)
-#define SgFr_init_yapor_fields(SG_FR)                             \
-        SgFr_gen_worker(SG_FR) = worker_id;                       \
+#define SgFr_init_yapor_fields(SG_FR)                                             \
+        SgFr_gen_worker(SG_FR) = worker_id;                                       \
         SgFr_gen_top_or_fr(SG_FR) = LOCAL_top_or_fr
-#define DepFr_init_yapor_fields(DEP_FR, DEP_ON_STACK, TOP_OR_FR)  \
-        DepFr_leader_dep_is_on_stack(DEP_FR) = DEP_ON_STACK;      \
-        DepFr_top_or_fr(DEP_FR) = TOP_OR_FR;                      \
+#define DepFr_init_yapor_fields(DEP_FR, DEP_ON_STACK, TOP_OR_FR)                  \
+        DepFr_leader_dep_is_on_stack(DEP_FR) = DEP_ON_STACK;                      \
+        DepFr_top_or_fr(DEP_FR) = TOP_OR_FR;                                      \
         DepFr_init_timestamp_field(DEP_FR)
 #else
+#define find_dependency_node(SG_FR, LEADER_CP, DEP_ON_STACK)                      \
+        LEADER_CP = SgFr_gen_cp(SG_FR);                                           \
+        DEP_ON_STACK = TRUE
+#define find_leader_node(LEADER_CP, DEP_ON_STACK)                                 \
+        { dep_fr_ptr chain_dep_fr = LOCAL_top_dep_fr;                             \
+          while (YOUNGER_CP(DepFr_cons_cp(chain_dep_fr), LEADER_CP)) {            \
+            if (EQUAL_OR_YOUNGER_CP(LEADER_CP, DepFr_leader_cp(chain_dep_fr))) {  \
+              LEADER_CP = DepFr_leader_cp(chain_dep_fr);                          \
+              break;                                                              \
+            }                                                                     \
+            chain_dep_fr = DepFr_next(chain_dep_fr);                              \
+          }                                                                       \
+	}
 #define YAPOR_SET_LOAD(CP_PTR)
 #define SgFr_init_yapor_fields(SG_FR)
 #define DepFr_init_yapor_fields(DEP_FR, DEP_ON_STACK, TOP_OR_FR)
 #endif /* YAPOR */
 
-
 #ifdef TABLE_LOCK_AT_ENTRY_LEVEL
-#define TabEnt_init_lock_field(TAB_ENT)  INIT_LOCK(TabEnt_lock(TAB_ENT))
+#define TabEnt_init_lock_field(TAB_ENT)                \
+        INIT_LOCK(TabEnt_lock(TAB_ENT))
 #define SgHash_init_next_field(HASH, TAB_ENT)          \
         Hash_next(HASH) = TabEnt_hash_chain(TAB_ENT);  \
         TabEnt_hash_chain(TAB_ENT) = HASH
-#define AnsHash_init_next_field(HASH, SG_FR)       \
-        Hash_next(HASH) = SgFr_hash_chain(SG_FR);  \
+#define AnsHash_init_next_field(HASH, SG_FR)           \
+        Hash_next(HASH) = SgFr_hash_chain(SG_FR);      \
         SgFr_hash_chain(SG_FR) = HASH
 #else
 #define TabEnt_init_lock_field(TAB_ENT)
@@ -238,18 +255,76 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
         Hash_next(HASH) = TabEnt_hash_chain(TAB_ENT);  \
         TabEnt_hash_chain(TAB_ENT) = HASH;             \
         UNLOCK(TabEnt_lock(TAB_ENT))
-#define AnsHash_init_next_field(HASH, SG_FR)       \
-        LOCK(SgFr_lock(SG_FR));                    \
-        Hash_next(HASH) = SgFr_hash_chain(SG_FR);  \
-        SgFr_hash_chain(SG_FR) = HASH;             \
+#define AnsHash_init_next_field(HASH, SG_FR)           \
+        LOCK(SgFr_lock(SG_FR));                        \
+        Hash_next(HASH) = SgFr_hash_chain(SG_FR);      \
+        SgFr_hash_chain(SG_FR) = HASH;                 \
         UNLOCK(SgFr_lock(SG_FR))
 #endif /* TABLE_LOCK_AT_ENTRY_LEVEL */
+
 #ifdef TABLE_LOCK_AT_NODE_LEVEL
-#define TrNode_init_lock_field(NODE)  INIT_LOCK(TrNode_lock(NODE))
+#define TrNode_init_lock_field(NODE)                   \
+        INIT_LOCK(TrNode_lock(NODE))
 #else
 #define TrNode_init_lock_field(NODE)
 #endif /* TABLE_LOCK_AT_NODE_LEVEL */
 
+#define new_table_entry(TAB_ENT, PRED_ENTRY, ATOM, ARITY)        \
+        { register sg_node_ptr sg_node;                          \
+          new_subgoal_trie_node(sg_node, 0, NULL, NULL, NULL);   \
+          ALLOC_TABLE_ENTRY(TAB_ENT);                            \
+          TabEnt_init_lock_field(TAB_ENT);                       \
+          TabEnt_pe(TAB_ENT) = PRED_ENTRY;                       \
+          TabEnt_atom(TAB_ENT) = ATOM;                           \
+          TabEnt_arity(TAB_ENT) = ARITY;                         \
+          TabEnt_flags(TAB_ENT) = 0;                             \
+          SetMode_Batched(TabEnt_flags(TAB_ENT));                \
+          SetMode_ExecAnswers(TabEnt_flags(TAB_ENT));            \
+          SetMode_LocalTrie(TabEnt_flags(TAB_ENT));              \
+          TabEnt_mode(TAB_ENT) = TabEnt_flags(TAB_ENT);          \
+          if (IsMode_Local(yap_flags[TABLING_MODE_FLAG]))        \
+            SetMode_Local(TabEnt_mode(TAB_ENT));                 \
+          if (IsMode_LoadAnswers(yap_flags[TABLING_MODE_FLAG]))  \
+            SetMode_LoadAnswers(TabEnt_mode(TAB_ENT));           \
+          if (IsMode_GlobalTrie(yap_flags[TABLING_MODE_FLAG]))   \
+            SetMode_GlobalTrie(TabEnt_mode(TAB_ENT));            \
+          TabEnt_subgoal_trie(TAB_ENT) = sg_node;                \
+          TabEnt_hash_chain(TAB_ENT) = NULL;                     \
+          TabEnt_next(TAB_ENT) = GLOBAL_root_tab_ent;            \
+          GLOBAL_root_tab_ent = TAB_ENT;                         \
+        }
+
+#define new_subgoal_frame(SG_FR, CODE)                             \
+        { register ans_node_ptr ans_node;                          \
+          new_answer_trie_node(ans_node, 0, 0, NULL, NULL, NULL);  \
+          ALLOC_SUBGOAL_FRAME(SG_FR);                              \
+          INIT_LOCK(SgFr_lock(SG_FR));                             \
+          SgFr_code(SG_FR) = CODE;                                 \
+          SgFr_state(SG_FR) = ready;                               \
+          SgFr_hash_chain(SG_FR) = NULL;                           \
+          SgFr_answer_trie(SG_FR) = ans_node;                      \
+          SgFr_first_answer(SG_FR) = NULL;                         \
+          SgFr_last_answer(SG_FR) = NULL;                          \
+	}
+#define init_subgoal_frame(SG_FR)               \
+        { SgFr_init_yapor_fields(SG_FR);        \
+          SgFr_state(SG_FR) = evaluating;       \
+          SgFr_next(SG_FR) = LOCAL_top_sg_fr;   \
+          LOCAL_top_sg_fr = SG_FR;              \
+	}
+
+#define new_dependency_frame(DEP_FR, DEP_ON_STACK, TOP_OR_FR, LEADER_CP, CONS_CP, SG_FR, NEXT)         \
+        ALLOC_DEPENDENCY_FRAME(DEP_FR);                                                                \
+        INIT_LOCK(DepFr_lock(DEP_FR));                                                                 \
+        DepFr_init_yapor_fields(DEP_FR, DEP_ON_STACK, TOP_OR_FR);                                      \
+        DepFr_backchain_cp(DEP_FR) = NULL;                                                             \
+        DepFr_leader_cp(DEP_FR) = NORM_CP(LEADER_CP);                                                  \
+        DepFr_cons_cp(DEP_FR) = NORM_CP(CONS_CP);                                                      \
+        /* start with TrNode_child(DepFr_last_answer(DEP_FR)) pointing to SgFr_first_answer(SG_FR) */  \
+        DepFr_last_answer(DEP_FR) = (ans_node_ptr) ((unsigned long int) (SG_FR) +                      \
+                                    (unsigned long int) (&SgFr_first_answer((sg_fr_ptr)DEP_FR)) -      \
+                                    (unsigned long int) (&TrNode_child((ans_node_ptr)DEP_FR)));        \
+        DepFr_next(DEP_FR) = NEXT
 
 #define new_suspension_frame(SUSP_FR, TOP_OR_FR_ON_STACK, TOP_DEP, TOP_SG,         \
                              H_REG, B_REG, TR_REG, H_SIZE, B_SIZE, TR_SIZE)        \
@@ -260,7 +335,7 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
         SuspFr_global_reg(SUSP_FR) = (void *) (H_REG);                             \
         SuspFr_local_reg(SUSP_FR) = (void *) (B_REG);                              \
         SuspFr_trail_reg(SUSP_FR) = (void *) (TR_REG);                             \
-        ALLOC_BLOCK(SuspFr_global_start(SUSP_FR), H_SIZE + B_SIZE + TR_SIZE);      \
+        ALLOC_BLOCK(SuspFr_global_start(SUSP_FR), H_SIZE + B_SIZE + TR_SIZE, void *); \
         SuspFr_local_start(SUSP_FR) = SuspFr_global_start(SUSP_FR) + H_SIZE;       \
         SuspFr_trail_start(SUSP_FR) = SuspFr_local_start(SUSP_FR) + B_SIZE;        \
         SuspFr_global_size(SUSP_FR) = H_SIZE;                                      \
@@ -270,83 +345,13 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
         memcpy(SuspFr_local_start(SUSP_FR), SuspFr_local_reg(SUSP_FR), B_SIZE);    \
         memcpy(SuspFr_trail_start(SUSP_FR), SuspFr_trail_reg(SUSP_FR), TR_SIZE)
 
-
-#ifdef LINEAR_TABLING
-#define new_subgoal_frame(SG_FR, CODE)                             \
-        { register ans_node_ptr ans_node;                          \
-          ALLOC_SUBGOAL_FRAME(SG_FR);                              \
-	  ALLOC_ALTERNATIVES_BUCKET(SgFr_loop_alts(SG_FR));	   \
-          SgFr_allocate_drs_looping_structure(SG_FR); 		   \
-          INIT_LOCK(SgFr_lock(SG_FR));                             \
-          SgFr_code(SG_FR) = CODE;                                 \
-          SgFr_state(SG_FR) = ready;                               \
-          new_answer_trie_node(ans_node, 0, 0, NULL, NULL, NULL);  \
-          SgFr_hash_chain(SG_FR) = NULL;                           \
-          SgFr_answer_trie(SG_FR) = ans_node;                      \
-          SgFr_first_answer(SG_FR) = NULL;                         \
-          SgFr_last_answer(SG_FR) = NULL;                          \
-	}
-
-#define init_subgoal_frame(SG_FR,TAB_ENT) 		           \
-        { SgFr_init_yapor_fields(SG_FR);                           \
-          SgFr_state(SG_FR) = evaluating;                          \
-	  SgFr_init_linear_tabling_fields(SG_FR,TAB_ENT);          \
-	}
-
-#else /*!LINEAR_TABLING */
-#define new_subgoal_frame(SG_FR, CODE)                             \
-        { register ans_node_ptr ans_node;                          \
-          INIT_LOCK(SgFr_lock(SG_FR));                             \
-          SgFr_code(SG_FR) = CODE;                                 \
-          SgFr_state(SG_FR) = ready;                               \
-          new_answer_trie_node(ans_node, 0, 0, NULL, NULL, NULL);  \
-          SgFr_hash_chain(SG_FR) = NULL;                           \
-          SgFr_answer_trie(SG_FR) = ans_node;                      \
-          SgFr_first_answer(SG_FR) = NULL;                         \
-          SgFr_last_answer(SG_FR) = NULL;                          \
-	}
-
-#define init_subgoal_frame(SG_FR) 		                   \
-        { SgFr_init_yapor_fields(SG_FR);                           \
-          SgFr_state(SG_FR) = evaluating;                          \
-	}
-#endif /*LINEAR_TABLING */
-
-#define new_dependency_frame(DEP_FR, DEP_ON_STACK, TOP_OR_FR, LEADER_CP, CONS_CP, SG_FR, NEXT)         \
-        ALLOC_DEPENDENCY_FRAME(DEP_FR);                                                                \
-        INIT_LOCK(DepFr_lock(DEP_FR));                                                                 \
-        DepFr_init_yapor_fields(DEP_FR, DEP_ON_STACK, TOP_OR_FR);                                      \
-        DepFr_backchain_cp(DEP_FR) = NULL;                                                             \
-        DepFr_leader_cp(DEP_FR) = NORM_CP(LEADER_CP);                                                  \
-        DepFr_cons_cp(DEP_FR) = NORM_CP(CONS_CP);                                                      \
-        /* start with TrNode_child(DepFr_last_answer(DEP_FR)) pointing to SgFr_first_answer(SG_FR) */  \
-        DepFr_last_answer(DEP_FR) = (ans_node_ptr)((unsigned long int)(SG_FR) +                        \
-                                    (unsigned long int)(&SgFr_first_answer((sg_fr_ptr)DEP_FR)) -       \
-                                    (unsigned long int)(&TrNode_child((ans_node_ptr)DEP_FR)));         \
-        DepFr_next(DEP_FR) = NEXT
-
-
-#define new_table_entry(TAB_ENT, PRED_ENTRY, ATOM, ARITY, SUBGOAL_TRIE)  \
-        ALLOC_TABLE_ENTRY(TAB_ENT);                                      \
-        TabEnt_init_lock_field(TAB_ENT);                                 \
-        TabEnt_pe(TAB_ENT) = PRED_ENTRY;                                 \
-        TabEnt_atom(TAB_ENT) = ATOM;                                     \
-        TabEnt_arity(TAB_ENT) = ARITY;                                   \
-        TabEnt_mode(TAB_ENT) = 0;                                        \
-        TabEnt_subgoal_trie(TAB_ENT) = SUBGOAL_TRIE;                     \
-        TabEnt_hash_chain(TAB_ENT) = NULL;                               \
-        TabEnt_next(TAB_ENT) = GLOBAL_root_tab_ent;                      \
-        GLOBAL_root_tab_ent = TAB_ENT
-
-
 #define new_subgoal_trie_node(NODE, ENTRY, CHILD, PARENT, NEXT)  \
         ALLOC_SUBGOAL_TRIE_NODE(NODE);                           \
-        TrNode_entry(NODE) = ENTRY;                              \
+        TrNode_entry(NODE) = ENTRY;				 \
         TrNode_init_lock_field(NODE);                            \
-        TrNode_child(NODE) = CHILD;                              \
+	TrNode_child(NODE) = CHILD;	                         \
         TrNode_parent(NODE) = PARENT;                            \
-        TrNode_next(NODE) = NEXT
-
+	TrNode_next(NODE) = NEXT
 
 #define new_answer_trie_node(NODE, INSTR, ENTRY, CHILD, PARENT, NEXT)  \
         ALLOC_ANSWER_TRIE_NODE(NODE);                                  \
@@ -357,34 +362,35 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
         TrNode_parent(NODE) = PARENT;                                  \
         TrNode_next(NODE) = NEXT
 
+#define new_global_trie_node(NODE, ENTRY, CHILD, PARENT, NEXT)  \
+        ALLOC_GLOBAL_TRIE_NODE(NODE);                           \
+        TrNode_entry(NODE) = ENTRY;                             \
+        TrNode_child(NODE) = CHILD;                             \
+        TrNode_parent(NODE) = PARENT;                           \
+        TrNode_next(NODE) = NEXT
 
-#define MAX_NODES_PER_TRIE_LEVEL  8
-#define MAX_NODES_PER_BUCKET      (MAX_NODES_PER_TRIE_LEVEL / 2)
-#define BASE_HASH_BUCKETS         64
-#define SUBGOAL_HASH_MARK         ((Term) MakeTableVarTerm(MAX_TABLE_VARS))
-#define ANSWER_HASH_MARK          0
-#define IS_SUBGOAL_HASH(NODE)     (TrNode_entry(NODE) == SUBGOAL_HASH_MARK)
-#define IS_ANSWER_HASH(NODE)      (TrNode_instr(NODE) == ANSWER_HASH_MARK)
-#define HASH_TERM(TERM, SEED)     (((TERM) >> NumberOfLowTagBits) & (SEED))
-
-
-#define new_subgoal_hash(HASH, NUM_NODES, TAB_ENT)                  \
-        ALLOC_SUBGOAL_HASH(HASH);                                   \
-        Hash_mark(HASH) = SUBGOAL_HASH_MARK;                        \
+#define new_subgoal_trie_hash(HASH, NUM_NODES, TAB_ENT)             \
+        ALLOC_SUBGOAL_TRIE_HASH(HASH);                              \
+        Hash_mark(HASH) = SUBGOAL_TRIE_HASH_MARK;                   \
         Hash_num_buckets(HASH) = BASE_HASH_BUCKETS;                 \
         ALLOC_HASH_BUCKETS(Hash_buckets(HASH), BASE_HASH_BUCKETS);  \
         Hash_num_nodes(HASH) = NUM_NODES;                           \
         SgHash_init_next_field(HASH, TAB_ENT)      
 
-
-#define new_answer_hash(HASH, NUM_NODES, SG_FR)                     \
-        ALLOC_ANSWER_HASH(HASH);                                    \
-        Hash_mark(HASH) = ANSWER_HASH_MARK;                         \
+#define new_answer_trie_hash(HASH, NUM_NODES, SG_FR)                \
+        ALLOC_ANSWER_TRIE_HASH(HASH);                               \
+        Hash_mark(HASH) = ANSWER_TRIE_HASH_MARK;                    \
         Hash_num_buckets(HASH) = BASE_HASH_BUCKETS;                 \
         ALLOC_HASH_BUCKETS(Hash_buckets(HASH), BASE_HASH_BUCKETS);  \
         Hash_num_nodes(HASH) = NUM_NODES;                           \
         AnsHash_init_next_field(HASH, SG_FR)
 
+#define new_global_trie_hash(HASH, NUM_NODES)                       \
+        ALLOC_GLOBAL_TRIE_HASH(HASH);                               \
+        Hash_mark(HASH) = GLOBAL_TRIE_HASH_MARK;                    \
+        Hash_num_buckets(HASH) = BASE_HASH_BUCKETS;                 \
+        ALLOC_HASH_BUCKETS(Hash_buckets(HASH), BASE_HASH_BUCKETS);  \
+	Hash_num_nodes(HASH) = NUM_NODES
 
 #ifdef LIMIT_TABLING
 #define insert_into_global_sg_fr_list(SG_FR)                                 \
@@ -416,12 +422,52 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 
 
 
-/* ------------------------- **
+/******************************
 **      Inline funcions      **
-** ------------------------- */
+******************************/
 
-static inline
-void adjust_freeze_registers(void) {
+static inline Int freeze_current_cp(void) {
+  choiceptr freeze_cp = B;
+
+  B_FZ  = freeze_cp;
+  H_FZ  = freeze_cp->cp_h;
+  TR_FZ = freeze_cp->cp_tr;
+  B = B->cp_b;
+  HB = B->cp_h;
+  return (Yap_LocalBase - (ADDR)freeze_cp);
+}
+
+
+static inline void wake_frozen_cp(Int frozen_offset) {
+  choiceptr frozen_cp = (choiceptr)(Yap_LocalBase - frozen_offset);
+
+  restore_bindings(TR, frozen_cp->cp_tr);
+  B = frozen_cp;
+  TR = TR_FZ;
+  TRAIL_LINK(B->cp_tr);
+  return;
+}
+
+
+static inline void abolish_frozen_cps_until(Int frozen_offset) {
+  choiceptr frozen_cp = (choiceptr)(Yap_LocalBase - frozen_offset);
+
+  B_FZ  = frozen_cp;
+  H_FZ  = frozen_cp->cp_h;
+  TR_FZ = frozen_cp->cp_tr;
+  return;
+}
+
+
+static inline void abolish_frozen_cps_all(void) {
+  B_FZ  = (choiceptr) Yap_LocalBase;
+  H_FZ  = (CELL *) Yap_GlobalBase;
+  TR_FZ = (tr_fr_ptr) Yap_TrailBase;
+  return;
+}
+
+
+static inline void adjust_freeze_registers(void) {
   B_FZ  = DepFr_cons_cp(LOCAL_top_dep_fr);
   H_FZ  = B_FZ->cp_h;
   TR_FZ = B_FZ->cp_tr;
@@ -429,25 +475,16 @@ void adjust_freeze_registers(void) {
 }
 
 
-static inline
-void mark_as_completed(sg_fr_ptr sg_fr) {
+static inline void mark_as_completed(sg_fr_ptr sg_fr) {
   LOCK(SgFr_lock(sg_fr));
-  SgFr_state(sg_fr) = complete;  
-#ifdef LINEAR_TABLING
-  free_alternatives(sg_fr);
-  free_drs_answers(sg_fr);
-#endif /* LINEAR_TABLING */
+  SgFr_state(sg_fr) = complete;
   UNLOCK(SgFr_lock(sg_fr));
   return;
 }
 
 
-static inline
-void unbind_variables(tr_fr_ptr unbind_tr, tr_fr_ptr end_tr) {
-#ifdef TABLING_ERRORS
-  if (unbind_tr < end_tr)
-    TABLING_ERROR_MESSAGE("unbind_tr < end_tr (function unbind_variables)");
-#endif /* TABLING_ERRORS */
+static inline void unbind_variables(tr_fr_ptr unbind_tr, tr_fr_ptr end_tr) {
+  TABLING_ERROR_CHECKING(unbind_variables, unbind_tr < end_tr);
   /* unbind loop */
   while (unbind_tr != end_tr) {
     CELL ref = (CELL) TrailTerm(--unbind_tr);
@@ -457,15 +494,11 @@ void unbind_variables(tr_fr_ptr unbind_tr, tr_fr_ptr end_tr) {
       RESET_VARIABLE(ref);
     } else if (IsPairTerm(ref)) {
       ref = (CELL) RepPair(ref);
-      if ((ADDR)ref >= Yap_TrailBase) {
+      if (IN_BETWEEN(Yap_TrailBase, ref, Yap_TrailTop)) {
         /* avoid frozen segments */
         unbind_tr = (tr_fr_ptr) ref;
-#ifdef TABLING_ERRORS
-        if (unbind_tr > (tr_fr_ptr) Yap_TrailTop)
-          TABLING_ERROR_MESSAGE("unbind_tr > Yap_TrailTop (function unbind_variables)");
-        if (unbind_tr < end_tr)
-          TABLING_ERROR_MESSAGE("unbind_tr < end_tr (function unbind_variables)");
-#endif /* TABLING_ERRORS */
+	TABLING_ERROR_CHECKING(unbind_variables, unbind_tr > (tr_fr_ptr) Yap_TrailTop);
+	TABLING_ERROR_CHECKING(unbind_variables, unbind_tr < end_tr);
       }
 #ifdef MULTI_ASSIGNMENT_VARIABLES
     } else {
@@ -480,12 +513,8 @@ void unbind_variables(tr_fr_ptr unbind_tr, tr_fr_ptr end_tr) {
 }
 
 
-static inline
-void rebind_variables(tr_fr_ptr rebind_tr, tr_fr_ptr end_tr) {
-#ifdef TABLING_ERRORS
-  if (rebind_tr < end_tr)
-    TABLING_ERROR_MESSAGE("rebind_tr < end_tr (function rebind_variables)");
-#endif /* TABLING_ERRORS */
+static inline void rebind_variables(tr_fr_ptr rebind_tr, tr_fr_ptr end_tr) {
+  TABLING_ERROR_CHECKING(rebind_variables, rebind_tr < end_tr);
   /* rebind loop */
   Yap_NEW_MAHASH((ma_h_inner_struct *)H);
   while (rebind_tr != end_tr) {
@@ -496,15 +525,11 @@ void rebind_variables(tr_fr_ptr rebind_tr, tr_fr_ptr end_tr) {
       *((CELL *)ref) = TrailVal(rebind_tr);
     } else if (IsPairTerm(ref)) {
       ref = (CELL) RepPair(ref);
-      if ((ADDR)ref >= Yap_TrailBase) {
+      if (IN_BETWEEN(Yap_TrailBase, ref, Yap_TrailTop)) {
         /* avoid frozen segments */
   	rebind_tr = (tr_fr_ptr) ref;
-#ifdef TABLING_ERRORS
-        if (rebind_tr > (tr_fr_ptr) Yap_TrailTop)
-          TABLING_ERROR_MESSAGE("rebind_tr > Yap_TrailTop (function rebind_variables)");
-        if (rebind_tr < end_tr)
-          TABLING_ERROR_MESSAGE("rebind_tr < end_tr (function rebind_variables)");
-#endif /* TABLING_ERRORS */
+	TABLING_ERROR_CHECKING(rebind_variables, rebind_tr > (tr_fr_ptr) Yap_TrailTop);
+	TABLING_ERROR_CHECKING(rebind_variables, rebind_tr < end_tr);
       }
 #ifdef MULTI_ASSIGNMENT_VARIABLES
     } else {
@@ -521,16 +546,13 @@ void rebind_variables(tr_fr_ptr rebind_tr, tr_fr_ptr end_tr) {
 }
 
 
-static inline
-void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
+static inline void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
   CELL ref;
   tr_fr_ptr end_tr;
 
-#ifdef TABLING_ERRORS
-  if (unbind_tr < rebind_tr)
-    TABLING_ERROR_MESSAGE("unbind_tr < rebind_tr (function restore_bindings)");
-#endif /* TABLING_ERRORS */
+  TABLING_ERROR_CHECKING(restore_variables, unbind_tr < rebind_tr);
   end_tr = rebind_tr;
+  Yap_NEW_MAHASH((ma_h_inner_struct *)H);
   while (unbind_tr != end_tr) {
     /* unbind loop */
     while (unbind_tr > end_tr) {
@@ -539,12 +561,10 @@ void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
         RESET_VARIABLE(ref);
       } else if (IsPairTerm(ref)) {
         ref = (CELL) RepPair(ref);
-        if ((ADDR)ref >= Yap_TrailBase) {
+	if (IN_BETWEEN(Yap_TrailBase, ref, Yap_TrailTop)) {
+	  /* avoid frozen segments */
           unbind_tr = (tr_fr_ptr) ref;
-#ifdef TABLING_ERRORS
-          if (unbind_tr > (tr_fr_ptr) Yap_TrailTop)
-            TABLING_ERROR_MESSAGE("unbind_tr > Yap_TrailTop (function restore_bindings)");
-#endif /* TABLING_ERRORS */
+	  TABLING_ERROR_CHECKING(restore_variables, unbind_tr > (tr_fr_ptr) Yap_TrailTop);
         }
 #ifdef MULTI_ASSIGNMENT_VARIABLES
       }	else if (IsApplTerm(ref)) {
@@ -552,10 +572,12 @@ void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
 
 	/* AbsAppl means */
 	/* multi-assignment variable */
-	/* so the next cell is the old value */ 
+	/* so that the upper cell is the old value */ 
 	--unbind_tr;
-	pt[0] = TrailVal(unbind_tr);
-#endif
+	if (!Yap_lookup_ma_var(pt)) {
+	  pt[0] = TrailVal(unbind_tr);
+	}
+#endif /* MULTI_ASSIGNMENT_VARIABLES */
       }
     }
     /* look for end */
@@ -563,40 +585,32 @@ void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
       ref = (CELL) TrailTerm(--end_tr);
       if (IsPairTerm(ref)) {
         ref = (CELL) RepPair(ref);
-        if ((ADDR)ref >= Yap_TrailBase) {
+	if (IN_BETWEEN(Yap_TrailBase, ref, Yap_TrailTop)) {
+	  /* avoid frozen segments */
   	  end_tr = (tr_fr_ptr) ref;
-#ifdef TABLING_ERRORS
-	  if (end_tr > (tr_fr_ptr) Yap_TrailTop)
-            TABLING_ERROR_MESSAGE("end_tr > Yap_TrailTop (function restore_bindings)");
-#endif /* TABLING_ERRORS */
+	  TABLING_ERROR_CHECKING(restore_variables, end_tr > (tr_fr_ptr) Yap_TrailTop);
         }
       }
     }
   }
   /* rebind loop */
-  Yap_NEW_MAHASH((ma_h_inner_struct *)H);
   while (rebind_tr != end_tr) {
     ref = (CELL) TrailTerm(--rebind_tr);
     if (IsVarTerm(ref)) {
       *((CELL *)ref) = TrailVal(rebind_tr);
     } else if (IsPairTerm(ref)) {
       ref = (CELL) RepPair(ref);
-      if ((ADDR)ref >= Yap_TrailBase) {
+      if (IN_BETWEEN(Yap_TrailBase, ref, Yap_TrailTop)) {
+	/* avoid frozen segments */
         rebind_tr = (tr_fr_ptr) ref;
-#ifdef TABLING_ERRORS
-	if (rebind_tr > (tr_fr_ptr) Yap_TrailTop)
-          TABLING_ERROR_MESSAGE("rebind_tr > Yap_TrailTop (function restore_bindings)");
-        if (rebind_tr < end_tr)
-          TABLING_ERROR_MESSAGE("rebind_tr < end_tr (function restore_bindings)");
-#endif /* TABLING_ERRORS */
+	TABLING_ERROR_CHECKING(restore_variables, rebind_tr > (tr_fr_ptr) Yap_TrailTop);
+	TABLING_ERROR_CHECKING(restore_variables, rebind_tr < end_tr);
       }
 #ifdef MULTI_ASSIGNMENT_VARIABLES
     } else {
       CELL *cell_ptr = RepAppl(ref);
-      if (!Yap_lookup_ma_var(cell_ptr)) {
-	/* first time we found the variable, let's put the new value */
-	*cell_ptr = TrailVal(rebind_tr);
-      }
+      /* first time we found the variable, let's put the new value */
+      *cell_ptr = TrailVal(rebind_tr);
       --rebind_tr;
 #endif /* MULTI_ASSIGNMENT_VARIABLES */
     }
@@ -605,46 +619,24 @@ void restore_bindings(tr_fr_ptr unbind_tr, tr_fr_ptr rebind_tr) {
 }
 
 
-static inline
-void abolish_incomplete_subgoals(choiceptr prune_cp) {
-  //  INFO_LINEAR_TABLING("abolish_incomplete_subgoals");
-  //return;
-
-#ifdef LINEAR_TABLING
-  while (LOCAL_top_sg_fr && EQUAL_OR_YOUNGER_CP(SgFr_gen_cp(LOCAL_top_sg_fr), prune_cp)) {
-    sg_fr_ptr sg_fr;
-    sg_fr = LOCAL_top_sg_fr;
-    LOCAL_top_sg_fr = SgFr_next(sg_fr);
-    if(sg_fr==LOCAL_max_scc)
-      LOCAL_max_scc=SgFr_next_on_scc(LOCAL_max_scc);
-    if(sg_fr==LOCAL_top_sg_fr_on_branch)
-      LOCAL_top_sg_fr_on_branch=SgFr_next_on_branch(LOCAL_top_sg_fr_on_branch);
-    free_alternatives(sg_fr);
-    free_drs_answers(sg_fr);
-    if (SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr)) {
-      /* yes answer --> complete */
-      SgFr_state(sg_fr) = complete;
-      continue;
-    }
-    SgFr_state(sg_fr) = incomplete;
-    free_answer_hash_chain(SgFr_hash_chain(sg_fr));
-    SgFr_hash_chain(sg_fr) = NULL;
-    SgFr_first_answer(sg_fr) = NULL;
-    SgFr_last_answer(sg_fr) = NULL;
-    ans_node_ptr node;
-    node = TrNode_child(SgFr_answer_trie(sg_fr));
-    TrNode_child(SgFr_answer_trie(sg_fr)) = NULL;
-    UNLOCK(SgFr_lock(sg_fr));
-    free_answer_trie_branch(node, TRAVERSE_POSITION_FIRST);
+static inline CELL *expand_auxiliary_stack(CELL *stack) {
+  void *old_top = Yap_TrailTop;
+  INFORMATION_MESSAGE("Expanding trail in 64 Kbytes");
+  if (! Yap_growtrail(K64, TRUE)) {  /* TRUE means 'contiguous_only' */
+    Yap_Error(OUT_OF_TRAIL_ERROR, TermNil, "stack full (STACK_CHECK_EXPAND)");
+    return NULL;
+  } else {
+    UInt diff = (void *)Yap_TrailTop - old_top;
+    CELL *new_stack = (CELL *)((void *)stack + diff);
+    memmove((void *)new_stack, (void *)stack, old_top - (void *)stack);
+    return new_stack;
   }
-  return;
 }
-#endif /*LINEAR_TABLING */
 
-#ifndef LINEAR_TABLING
 
+static inline void abolish_incomplete_subgoals(choiceptr prune_cp) {
 #ifdef YAPOR
-  if (EQUAL_OR_YOUNGER_CP(OrFr_node(LOCAL_top_susp_or_fr), prune_cp))
+  if (EQUAL_OR_YOUNGER_CP(GetOrFr_node(LOCAL_top_susp_or_fr), prune_cp))
     pruning_over_tabling_data_structures();
 #endif /* YAPOR */
 
@@ -660,7 +652,6 @@ void abolish_incomplete_subgoals(choiceptr prune_cp) {
     } while (EQUAL_OR_YOUNGER_CP(DepFr_cons_cp(LOCAL_top_dep_fr), prune_cp));
     adjust_freeze_registers();
   }
-/*#endif ! LINEAR_TABLING */
 
   while (LOCAL_top_sg_fr && EQUAL_OR_YOUNGER_CP(SgFr_gen_cp(LOCAL_top_sg_fr), prune_cp)) {
     sg_fr_ptr sg_fr;
@@ -670,16 +661,6 @@ void abolish_incomplete_subgoals(choiceptr prune_cp) {
 #endif /* YAPOR */
     sg_fr = LOCAL_top_sg_fr;
     LOCAL_top_sg_fr = SgFr_next(sg_fr);
-#ifdef LINEAR_TABLING
-    if(sg_fr==LOCAL_max_scc)
-      LOCAL_max_scc=SgFr_next_on_scc(LOCAL_max_scc);
-    if(sg_fr==LOCAL_top_sg_fr_on_branch)
-      LOCAL_top_sg_fr_on_branch=SgFr_next_on_branch(LOCAL_top_sg_fr_on_branch);
-    //SET_SGFR_DFN(sg_fr,0);			            
-    //TAG_AS_LEADER(sg_fr);  
-    free_alternatives(sg_fr);
-    free_drs_answers(sg_fr);                                            
-#endif /*LINEAR_TABLING */
     LOCK(SgFr_lock(sg_fr));
     if (SgFr_first_answer(sg_fr) == NULL) {
       /* no answers --> ready */
@@ -707,146 +688,31 @@ void abolish_incomplete_subgoals(choiceptr prune_cp) {
       node = TrNode_child(SgFr_answer_trie(sg_fr));
       TrNode_child(SgFr_answer_trie(sg_fr)) = NULL;
       UNLOCK(SgFr_lock(sg_fr));
-      free_answer_trie_branch(node, TRAVERSE_POSITION_FIRST);
+      free_answer_trie(node, TRAVERSE_MODE_NORMAL, TRAVERSE_POSITION_FIRST);
 #endif /* INCOMPLETE_TABLING */
     }
 #ifdef LIMIT_TABLING
     insert_into_global_sg_fr_list(sg_fr);
 #endif /* LIMIT_TABLING */
   }
-  return;
-}
-#endif /*! LINEAR_TABLING */
 
-
-static inline
-void free_subgoal_hash_chain(sg_hash_ptr hash) {
-  while (hash) {
-    sg_node_ptr chain_node, *bucket, *last_bucket;
-    sg_hash_ptr next_hash;
-
-    bucket = Hash_buckets(hash);
-    last_bucket = bucket + Hash_num_buckets(hash);
-    while (! *bucket)
-      bucket++;
-    chain_node = *bucket;
-    TrNode_child(TrNode_parent(chain_node)) = chain_node;
-    while (++bucket != last_bucket) {
-      if (*bucket) {
-        while (TrNode_next(chain_node))
-          chain_node = TrNode_next(chain_node);
-        TrNode_next(chain_node) = *bucket;
-        chain_node = *bucket;
-      }
-    }
-    next_hash = Hash_next(hash);
-    FREE_HASH_BUCKETS(Hash_buckets(hash));
-    FREE_SUBGOAL_HASH(hash);
-    hash = next_hash;
-  }
-  return;
-}
-
-
-static inline
-void free_answer_hash_chain(ans_hash_ptr hash) {
-  while (hash) {
-    ans_node_ptr chain_node, *bucket, *last_bucket;
-    ans_hash_ptr next_hash;
-
-    bucket = Hash_buckets(hash);
-    last_bucket = bucket + Hash_num_buckets(hash);
-    while (! *bucket)
-      bucket++;
-    chain_node = *bucket;
-    TrNode_child(UNTAG_ANSWER_LEAF_NODE(TrNode_parent(chain_node))) = chain_node;
-    while (++bucket != last_bucket) {
-      if (*bucket) {
-        while (TrNode_next(chain_node))
-          chain_node = TrNode_next(chain_node);
-        TrNode_next(chain_node) = *bucket;
-        chain_node = *bucket;
-      }
-    }
-    next_hash = Hash_next(hash);
-    FREE_HASH_BUCKETS(Hash_buckets(hash));
-    FREE_ANSWER_HASH(hash);
-    hash = next_hash;
-  }
-  return;
-}
-
-
-/*
-static inline
-choiceptr create_cp_and_freeze(void) {
-  choiceptr freeze_cp;
-
-  // initialize and store freeze choice point
-  //  freeze_cp = (NORM_CP(YENV) - 1);
-  freeze_cp = (NORM_CP(YENV) - 2);
-  HBREG = H;
-  store_yaam_reg_cpdepth(freeze_cp);
-  freeze_cp->cp_tr = TR;
-  freeze_cp->cp_ap = (yamop *)(TRUSTFAILCODE);
-  freeze_cp->cp_h  = H;
-  freeze_cp->cp_b  = B;
-  freeze_cp->cp_env = ENV;
-  freeze_cp->cp_cp = CPREG;
-  // set_cut((CELL *)freeze_cp, B);
-  B = freeze_cp;
-  SET_BB(B);
-  // adjust freeze registers
-  B_FZ  = freeze_cp;
-  H_FZ  = H;
-  TR_FZ = TR;
-  return freeze_cp;
-}
-*/
-
-
-static inline
-choiceptr freeze_current_cp(void) {
-  choiceptr freeze_cp = B;
-
-  B_FZ  = freeze_cp;
-  H_FZ  = freeze_cp->cp_h;
-  TR_FZ = freeze_cp->cp_tr;
-  B = B->cp_b;
-  HB = B->cp_h;
-  return freeze_cp;
-}
-
-
-static inline
-void resume_frozen_cp(choiceptr frozen_cp) {
-  restore_bindings(TR, frozen_cp->cp_tr);
-  B = frozen_cp;
-  TR = TR_FZ;
-  TRAIL_LINK(B->cp_tr);
   return;
 }
 
 
 #ifdef YAPOR
-static inline
-void pruning_over_tabling_data_structures(void) {
+static inline void pruning_over_tabling_data_structures(void) {
   Yap_Error(INTERNAL_ERROR, TermNil, "pruning over tabling data structures");
   return;
 }
 
 
-static inline
-void collect_suspension_frames(or_fr_ptr or_fr) {  
+static inline void collect_suspension_frames(or_fr_ptr or_fr) {  
   int depth;
   or_fr_ptr *susp_ptr;
 
-#ifdef OPTYAP_ERRORS
-  if (IS_UNLOCKED(or_fr))
-    OPTYAP_ERROR_MESSAGE("or_fr unlocked (collect_suspension_frames)");
-  if (OrFr_suspensions(or_fr) == NULL)
-    OPTYAP_ERROR_MESSAGE("OrFr_suspensions(or_fr) == NULL (collect_suspension_frames)");
-#endif /* OPTYAP_ERRORS */
+  OPTYAP_ERROR_CHECKING(collect_suspension_frames, IS_UNLOCKED(or_fr));
+  OPTYAP_ERROR_CHECKING(collect_suspension_frames, OrFr_suspensions(or_fr) == NULL);
 
   /* order collected suspension frames by depth */
   depth = OrFr_depth(or_fr);
@@ -869,7 +735,7 @@ susp_fr_ptr suspension_frame_to_resume(or_fr_ptr susp_or_fr) {
   susp_fr_ptr *susp_ptr, susp_fr;
   dep_fr_ptr dep_fr;
 
-  top_cp = OrFr_node(susp_or_fr);
+  top_cp = GetOrFr_node(susp_or_fr);
   susp_ptr = & OrFr_suspensions(susp_or_fr);
   susp_fr = *susp_ptr;
   while (susp_fr) {
@@ -898,14 +764,8 @@ susp_fr_ptr suspension_frame_to_resume(or_fr_ptr susp_or_fr) {
 #endif /* YAPOR */
 
 
-
-/* --------------------------------------------------- **
-**      Cut Stuff: Managing table subgoal answers      **
-** --------------------------------------------------- */
-
 #ifdef TABLING_INNER_CUTS
-static inline
-void CUT_store_tg_answer(or_fr_ptr or_frame, ans_node_ptr ans_node, choiceptr gen_cp, int ltt) {
+static inline void CUT_store_tg_answer(or_fr_ptr or_frame, ans_node_ptr ans_node, choiceptr gen_cp, int ltt) {
   tg_sol_fr_ptr tg_sol_fr, *solution_ptr, next, ltt_next;
   tg_ans_fr_ptr tg_ans_fr;
 
@@ -958,13 +818,12 @@ void CUT_store_tg_answer(or_fr_ptr or_frame, ans_node_ptr ans_node, choiceptr ge
 }
 
 
-static inline
-tg_sol_fr_ptr CUT_store_tg_answers(or_fr_ptr or_frame, tg_sol_fr_ptr new_solution, int ltt) {
+static inline tg_sol_fr_ptr CUT_store_tg_answers(or_fr_ptr or_frame, tg_sol_fr_ptr new_solution, int ltt) {
   tg_sol_fr_ptr *old_solution_ptr, next_new_solution;
   choiceptr node, gen_cp;
 
   old_solution_ptr = & OrFr_tg_solutions(or_frame);
-  node = OrFr_node(or_frame);
+  node = GetOrFr_node(or_frame);
   while (new_solution && YOUNGER_CP(node, TgSolFr_gen_cp(new_solution))) {
     next_new_solution = TgSolFr_next(new_solution);
     gen_cp = TgSolFr_gen_cp(new_solution);
@@ -1007,8 +866,7 @@ tg_sol_fr_ptr CUT_store_tg_answers(or_fr_ptr or_frame, tg_sol_fr_ptr new_solutio
 }
 
 
-static inline
-void CUT_validate_tg_answers(tg_sol_fr_ptr valid_solutions) {
+static inline void CUT_validate_tg_answers(tg_sol_fr_ptr valid_solutions) {
   tg_ans_fr_ptr valid_answers, free_answer;
   tg_sol_fr_ptr ltt_valid_solutions, free_solution;
   ans_node_ptr first_answer, last_answer, ans_node;
@@ -1077,8 +935,7 @@ void CUT_validate_tg_answers(tg_sol_fr_ptr valid_solutions) {
 }
 
 
-static inline
-void CUT_join_tg_solutions(tg_sol_fr_ptr *old_solution_ptr, tg_sol_fr_ptr new_solution) {
+static inline void CUT_join_tg_solutions(tg_sol_fr_ptr *old_solution_ptr, tg_sol_fr_ptr new_solution) {
   tg_sol_fr_ptr next_old_solution, next_new_solution;
   choiceptr gen_cp;
 
@@ -1125,8 +982,7 @@ void CUT_join_tg_solutions(tg_sol_fr_ptr *old_solution_ptr, tg_sol_fr_ptr new_so
 }
 
 
-static inline 
-void CUT_join_solution_frame_tg_answers(tg_sol_fr_ptr join_solution) {
+static inline void CUT_join_solution_frame_tg_answers(tg_sol_fr_ptr join_solution) {
   tg_sol_fr_ptr next_solution;
 
   while ((next_solution = TgSolFr_ltt_next(join_solution))) {
@@ -1139,8 +995,7 @@ void CUT_join_solution_frame_tg_answers(tg_sol_fr_ptr join_solution) {
 }
 
 
-static inline 
-void CUT_join_solution_frames_tg_answers(tg_sol_fr_ptr join_solution) {
+static inline void CUT_join_solution_frames_tg_answers(tg_sol_fr_ptr join_solution) {
   do {
     CUT_join_solution_frame_tg_answers(join_solution);
     join_solution = TgSolFr_next(join_solution);
@@ -1149,8 +1004,7 @@ void CUT_join_solution_frames_tg_answers(tg_sol_fr_ptr join_solution) {
 }
 
 
-static inline 
-void CUT_free_tg_solution_frame(tg_sol_fr_ptr solution) {
+static inline void CUT_free_tg_solution_frame(tg_sol_fr_ptr solution) {
   tg_ans_fr_ptr current_answer, next_answer;
 
   current_answer = TgSolFr_first(solution);
@@ -1164,8 +1018,7 @@ void CUT_free_tg_solution_frame(tg_sol_fr_ptr solution) {
 }
 
 
-static inline 
-void CUT_free_tg_solution_frames(tg_sol_fr_ptr current_solution) {
+static inline void CUT_free_tg_solution_frames(tg_sol_fr_ptr current_solution) {
   tg_sol_fr_ptr ltt_solution, next_solution;
 
   while (current_solution) {
@@ -1183,8 +1036,7 @@ void CUT_free_tg_solution_frames(tg_sol_fr_ptr current_solution) {
 }
 
 
-static inline 
-tg_sol_fr_ptr CUT_prune_tg_solution_frames(tg_sol_fr_ptr solutions, int ltt) {
+static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames(tg_sol_fr_ptr solutions, int ltt) {
   tg_sol_fr_ptr ltt_next_solution, return_solution;
 
   if (! solutions) return NULL;
@@ -1202,4 +1054,3 @@ tg_sol_fr_ptr CUT_prune_tg_solution_frames(tg_sol_fr_ptr solutions, int ltt) {
   }
 }
 #endif /* TABLING_INNER_CUTS */
-

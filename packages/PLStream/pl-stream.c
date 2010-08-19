@@ -27,7 +27,7 @@
 #endif
 
 #ifdef __WINDOWS__
-#include <uxnt.h>
+#include <uxnt/uxnt.h>
 #ifdef __MINGW32__
 #include "config.h"
 #include <windows.h>
@@ -3458,3 +3458,4 @@ Scleanup(void)
     *s = S__iob0[i];			/* re-initialise */
   }
 }
+

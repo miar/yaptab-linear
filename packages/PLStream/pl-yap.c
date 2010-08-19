@@ -3,6 +3,14 @@
 
 #include <stdio.h>
 #include "pl-incl.h"
+
+#define	Quote_illegal_f		1
+#define	Ignore_ops_f		2
+#define	Handle_vars_f		4
+#define	Use_portray_f		8
+#define	To_heap_f	       16
+#define	Unfold_cyclics_f       32
+
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
@@ -62,6 +70,20 @@ codeToAtom(int chrcode)
   return a;
 }
 
+word
+globalString(size_t size, char *s)
+{
+  // return YAP_MkBlobStringTerm(s, size);
+  return 0L;
+}
+
+word
+globalWString(size_t size, wchar_t *s)
+{
+  // return YAP_MkBlobWideStringTerm(size, s);
+  return 0L;
+}
+
 int
 PL_rethrow(void)
 { GET_LD
@@ -111,10 +133,21 @@ callProlog(module_t module, term_t goal, int flags, term_t *ex)
   }
 }
 
-int
+extern X_API int PL_write_term(IOSTREAM *s, term_t term, int precedence, int flags);
+
+X_API int 
 PL_write_term(IOSTREAM *s, term_t term, int precedence, int flags)
 {
-
+  int nflags = 0;
+  if (flags & PL_WRT_QUOTED)
+    nflags |= Quote_illegal_f;
+  if (flags & PL_WRT_IGNOREOPS)
+    nflags |= Ignore_ops_f;
+  if (flags & PL_WRT_NUMBERVARS)
+    nflags |= Handle_vars_f;
+  if (flags & PL_WRT_PORTRAY)
+    nflags |= Use_portray_f;
+  /* ignore other flags for now */
   YAP_Write(YAP_GetFromSlot(term), (void (*)(int))Sputc, flags);
   return TRUE;
 }
@@ -198,17 +231,41 @@ switch(n->type)
 int
 _PL_unify_atomic(term_t t, PL_atomic_t a)
 {
-  return YAP_Unify(YAP_GetFromSlot(t), (YAP_Term)a);
+  return PL_unify_atom(t, a);
 }
 
 word lookupAtom(const char *s, size_t len)
 {
-  return (word)YAP_LookupAtom(s);
+  if (len >= strlen(s)) {
+    return (word)YAP_LookupAtom(s);
+  } else {
+    char * buf = PL_malloc(len+1);
+    word out;
+
+    if (!buf)
+      return 0;
+    strncpy(buf,s,len);
+    out = (word)YAP_LookupAtom(buf);
+    PL_free(buf);
+    return out;
+  }
 }
 
 atom_t lookupUCSAtom(const pl_wchar_t *s, size_t len)
 {
-  return (atom_t)YAP_LookupWideAtom(s);
+  if (len >= wcslen(s)) {
+    return (atom_t)YAP_LookupWideAtom(s);
+  } else {
+    pl_wchar_t * buf = PL_malloc((len+1)*sizeof(pl_wchar_t));
+    word out;
+
+    if (!buf)
+      return 0;
+    wcsncpy(buf,s,len);
+    out = (word)YAP_LookupWideAtom(buf);
+    PL_free(buf);
+    return out;
+  }
 }
 
 
@@ -588,3 +645,107 @@ PL_unify_chars(term_t t, int flags, size_t len, const char *s)
   return rc;
 }
 
+X_API int PL_handle_signals(void)
+{
+  if ( !LD || LD->critical || !LD->signal.pending )
+    return 0;
+  fprintf(stderr,"PL_handle_signals not implemented\n");
+  return 0;
+}
+
+/* just a stub for now */
+int
+warning(const char *fm, ...)
+{  va_list args;
+
+  va_start(args, fm);
+  fprintf(stderr,"warning: %s\n", fm);
+  va_end(args);
+
+  return TRUE;
+}
+
+#if defined(HAVE_SELECT) && !defined(__WINDOWS__)
+
+#ifdef __WINDOWS__
+#include <winsock2.h>
+#endif
+
+static int
+input_on_fd(int fd)
+{ fd_set rfds;
+  struct timeval tv;
+
+  FD_ZERO(&rfds);
+  FD_SET(fd, &rfds);
+  tv.tv_sec = 0;
+  tv.tv_usec = 0;
+
+  return select(fd+1, &rfds, NULL, NULL, &tv) != 0;
+}
+
+#else
+#define input_on_fd(fd) 1
+#endif
+
+
+X_API int
+PL_dispatch(int fd, int wait)
+{ if ( wait == PL_DISPATCH_INSTALLED )
+    return GD->foreign.dispatch_events ? TRUE : FALSE;
+
+  if ( GD->foreign.dispatch_events && PL_thread_self() == 1 )
+  { if ( wait == PL_DISPATCH_WAIT )
+    { while( !input_on_fd(fd) )
+      { if ( PL_handle_signals() < 0 )
+	  return FALSE;
+	(*GD->foreign.dispatch_events)(fd);
+      }
+    } else
+    { (*GD->foreign.dispatch_events)(fd);
+      if ( PL_handle_signals() < 0 )
+	  return FALSE;
+    }
+  }
+
+  return TRUE;
+}
+
+extern size_t PL_utf8_strlen(const char *s, size_t len);
+
+X_API size_t
+PL_utf8_strlen(const char *s, size_t len)
+{ return utf8_strlen(s, len);
+}
+
+#define COUNT_MUTEX_INITIALIZER(name) \
+ { PTHREAD_MUTEX_INITIALIZER, \
+   name, \
+   0L \
+ }
+
+#if THREADS
+counting_mutex _PL_mutexes[] =
+{ COUNT_MUTEX_INITIALIZER("L_MISC"),
+  COUNT_MUTEX_INITIALIZER("L_ALLOC"),
+  COUNT_MUTEX_INITIALIZER("L_ATOM"),
+  COUNT_MUTEX_INITIALIZER("L_FLAG"),
+  COUNT_MUTEX_INITIALIZER("L_FUNCTOR"),
+  COUNT_MUTEX_INITIALIZER("L_RECORD"),
+  COUNT_MUTEX_INITIALIZER("L_THREAD"),
+  COUNT_MUTEX_INITIALIZER("L_PREDICATE"),
+  COUNT_MUTEX_INITIALIZER("L_MODULE"),
+  COUNT_MUTEX_INITIALIZER("L_TABLE"),
+  COUNT_MUTEX_INITIALIZER("L_BREAK"),
+  COUNT_MUTEX_INITIALIZER("L_FILE"),
+  COUNT_MUTEX_INITIALIZER("L_PLFLAG"),
+  COUNT_MUTEX_INITIALIZER("L_OP"),
+  COUNT_MUTEX_INITIALIZER("L_INIT"),
+  COUNT_MUTEX_INITIALIZER("L_TERM"),
+  COUNT_MUTEX_INITIALIZER("L_GC"),
+  COUNT_MUTEX_INITIALIZER("L_AGC"),
+  COUNT_MUTEX_INITIALIZER("L_FOREIGN"),
+  COUNT_MUTEX_INITIALIZER("L_OS")
+};
+
+#endif

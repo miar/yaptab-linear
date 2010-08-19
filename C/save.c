@@ -110,6 +110,7 @@ STATIC_PROTO(int   get_coded, (int, OPCODE []));
 STATIC_PROTO(void  restore_codes, (void));
 STATIC_PROTO(Term  AdjustDBTerm, (Term, Term *));
 STATIC_PROTO(void  RestoreDB, (DBEntry *));
+STATIC_PROTO(void  RestoreDBTerm, (DBTerm *, int));
 STATIC_PROTO(void  CleanClauses, (yamop *, yamop *,PredEntry *));
 STATIC_PROTO(void  rehash, (CELL *, int, int));
 STATIC_PROTO(void  CleanCode, (PredEntry *));
@@ -404,7 +405,7 @@ save_regs(int mode)
       return -1;
     if (putout(CreepFlag) < 0)
       return -1;
-    if (putout(EX) < 0)
+    if (putcellptr((CELL *)EX) < 0)
       return -1;
 #if defined(SBA) || defined(TABLING)
     if (putcellptr(H_FZ) < 0)
@@ -450,9 +451,17 @@ save_regs(int mode)
   /* Then the start of the free code */
   if (putcellptr(CellPtr(FreeBlocks)) < 0)
     return -1;
+  if (putcellptr(CellPtr(AuxBase)) < 0)
+    return -1;
   if (putcellptr(AuxSp) < 0)
     return -1;
   if (putcellptr(CellPtr(AuxTop)) < 0)
+    return -1;
+  if (putcellptr(CellPtr(ScratchPad.ptr)) < 0)
+    return -1;
+  if (putout(ScratchPad.sz) < 0)
+    return -1;
+  if (putout(ScratchPad.msz) < 0)
     return -1;
   if (mode == DO_EVERYTHING) {
     /* put the old trail base, just in case it moves again */
@@ -497,25 +506,10 @@ save_heap(void)
   int j;
   /* Then save the whole heap */
   Yap_ResetConsultStack();
-#if defined(YAPOR) || (defined(TABLING) && !defined(YAP_MEMORY_ALLOC_SCHEME))
-  Yap_ResetConsultStack();
-  Yap_CloseScratchPad();
-  /* skip the local and global data structures */
-  j = Unsigned(&GLOBAL) - Unsigned(Yap_HeapBase);
-  if (putout(j) < 0)
-    return -1;
-  mywrite(splfild, (char *) Yap_HeapBase, j);
-  j = Unsigned(HeapTop) - Unsigned(REMOTE+MAX_WORKERS);
-  if (putout(j) < 0)
-    return -1;
-  if (mywrite(splfild, (char *) &(REMOTE[MAX_WORKERS]), j) < 0)
-    return -1;
-#else
   j = Unsigned(HeapTop) - Unsigned(Yap_HeapBase);
   /* store 10 more cells because of the memory manager */
   if (mywrite(splfild, (char *) Yap_HeapBase, j) < 0)
     return -1;
-#endif /* YAPOR || (TABLING && !YAP_MEMORY_ALLOC_SCHEME) */
   return 0;
 }
 
@@ -771,10 +765,22 @@ get_heap_info(void)
   FreeBlocks = (BlockHeader *) get_cellptr();
   if (Yap_ErrorMessage)
       return -1;
+  AuxBase = (ADDR)get_cellptr();
+  if (Yap_ErrorMessage)
+      return -1;
   AuxSp = get_cellptr();
   if (Yap_ErrorMessage)
       return -1;
   AuxTop = (ADDR)get_cellptr();
+  if (Yap_ErrorMessage)
+      return -1;
+  ScratchPad.ptr = (ADDR)get_cellptr();
+  if (Yap_ErrorMessage)
+      return -1;
+  ScratchPad.sz = get_cell();
+  if (Yap_ErrorMessage)
+      return -1;
+  ScratchPad.msz = get_cell();
   if (Yap_ErrorMessage)
       return -1;
   HDiff = Unsigned(Yap_HeapBase) - Unsigned(OldHeapBase);
@@ -836,7 +842,7 @@ get_regs(int flag)
     CreepFlag = get_cell();
     if (Yap_ErrorMessage)
       return -1;
-    EX = get_cell();
+    EX = (struct DB_TERM *)get_cellptr();
     if (Yap_ErrorMessage)
       return -1;
 #if defined(SBA) || defined(TABLING)
@@ -934,27 +940,8 @@ get_hash(void)
 static int 
 CopyCode(void)
 {
-#if defined(YAPOR) || (defined(TABLING) && !defined(YAP_MEMORY_ALLOC_SCHEME))
-  /* skip the local and global data structures */
-  CELL j = get_cell();
-  if (Yap_ErrorMessage)
+  if (myread(splfild, (char *) Yap_HeapBase, (Unsigned(OldHeapTop) - Unsigned(OldHeapBase))) < 0)
     return -1;
-  if (j != Unsigned(&GLOBAL) - Unsigned(Yap_HeapBase)) {
-    Yap_ErrorMessage = "code space size does not match saved state";
-    return -1;
-  }
-  if (myread(splfild, (char *) Yap_HeapBase, j) < 0)
-    return -1;
-  j = get_cell();
-  if (Yap_ErrorMessage)
-      return -1;
-  if (myread(splfild, (char *) &(REMOTE[MAX_WORKERS]), j) < 0)
-      return -1;
-#else
-  if (myread(splfild, (char *) Yap_HeapBase,
-	     (Unsigned(OldHeapTop) - Unsigned(OldHeapBase))) < 0)
-    return -1;
-#endif /* YAPOR || (TABLING && !YAP_MEMORY_ALLOC_SCHEME) */
   return 1;
 }
 
@@ -1060,8 +1047,10 @@ restore_regs(int flag)
     HB = PtoLocAdjust(HB);
     YENV = PtoLocAdjust(YENV);
     S = PtoGloAdjust(S);
-    if (EX)
-      EX = AbsAppl(PtoGloAdjust(RepAppl(EX)));
+    if (EX) {
+      EX = DBTermAdjust(EX);
+      RestoreDBTerm(EX, TRUE);
+    }
     WokenGoals = AbsAppl(PtoGloAdjust(RepAppl(WokenGoals)));
   }
 }
@@ -1194,6 +1183,13 @@ rehash(CELL *oldcode, int NOfE, int KindOfEntries)
   }
 }
 
+static void
+RestoreSWIHash(void)
+{
+  Yap_InitSWIHash();
+}
+
+
 #include "rheap.h"
 
 /* restore the atom entries which are invisible for the user */
@@ -1218,6 +1214,7 @@ RestoreFreeSpace(void)
       AuxSp = PtoHeapCellAdjust(AuxSp);
       AuxBase = AddrAdjust(AuxBase);
       AuxTop = AddrAdjust(AuxTop);
+      ScratchPad.ptr = AddrAdjust(ScratchPad.ptr);
     }
   }
 #else
@@ -1313,7 +1310,6 @@ RestoreHashPreds(void)
     Yap_FreeAtomSpace((ADDR)np);
 }
 
-
 /*
  * This is the really tough part, to restore the whole of the heap 
  */
@@ -1321,7 +1317,6 @@ static void
 restore_heap(void)
 {
   restore_codes();
-  RestoreHashPreds();
   RestoreIOStructures();
 }
 
@@ -1391,7 +1386,7 @@ commit_to_saved_state(char *s, CELL *Astate, CELL *ATrail, CELL *AStack, CELL *A
    */
   errout = Yap_stderr;
 #endif
-  return(mode);
+  return mode;
 }
 
 static void
@@ -1406,10 +1401,27 @@ cat_file_name(char *s, char *prefix, char *name, unsigned int max_length)
   strncat(s, name, max_length-1);
 }
 
+static int try_open(char *inpf, CELL *Astate, CELL *ATrail, CELL *AStack, CELL *AHeap, char *buf) {
+  int mode;
+
+  
+  if ((splfild = open_file(inpf, O_RDONLY)) < 0) {
+    return FAIL_RESTORE;
+  }
+  if (buf[0] == '\0')
+    strncpy(buf, inpf, YAP_FILENAME_MAX);
+  if ((mode = commit_to_saved_state(inpf,Astate,ATrail,AStack,AHeap)) != FAIL_RESTORE) {
+    Yap_ErrorMessage = NULL;
+    return mode;
+  }
+  return mode;
+}
+
 static int 
 OpenRestore(char *inpf, char *YapLibDir, CELL *Astate, CELL *ATrail, CELL *AStack, CELL *AHeap)
 {
   int mode = FAIL_RESTORE;
+  char save_buffer[YAP_FILENAME_MAX+1];
 
   //  Yap_ErrorMessage = NULL;
   if (inpf == NULL) {
@@ -1418,21 +1430,25 @@ OpenRestore(char *inpf, char *YapLibDir, CELL *Astate, CELL *ATrail, CELL *AStac
 #endif
       inpf = StartUpFile;
   }
+  /* careful it starts from the root */
+  if (inpf[0] != '/') {
 #if __simplescalar__
-  /* does not implement getcwd */
-  strncpy(Yap_FileNameBuf,yap_pwd,YAP_FILENAME_MAX);
+    /* does not implement getcwd */
+    strncpy(Yap_FileNameBuf,yap_pwd,YAP_FILENAME_MAX);
 #elif HAVE_GETCWD
-  if (getcwd (Yap_FileNameBuf, YAP_FILENAME_MAX) == NULL)
-    Yap_FileNameBuf[0] = '\0';
+    if (getcwd (Yap_FileNameBuf, YAP_FILENAME_MAX) == NULL)
+      Yap_FileNameBuf[0] = '\0';
 #else
-  if (getwd (Yap_FileNameBuf) == NULL)
-    Yap_FileNameBuf[0] = '\0';
+    if (getwd (Yap_FileNameBuf) == NULL)
+      Yap_FileNameBuf[0] = '\0';
 #endif
-  strncat(Yap_FileNameBuf, "/", YAP_FILENAME_MAX-1);
-  strncat(Yap_FileNameBuf, inpf, YAP_FILENAME_MAX-1);
+    strncat(Yap_FileNameBuf, "/", YAP_FILENAME_MAX-1);
+    strncat(Yap_FileNameBuf, inpf, YAP_FILENAME_MAX-1);
+  } else {
+    strncat(Yap_FileNameBuf, inpf, YAP_FILENAME_MAX-1);
+  }
   if (inpf != NULL && (splfild = open_file(inpf, O_RDONLY)) > 0) {
-    if ((mode = commit_to_saved_state(inpf,Astate,ATrail,AStack,AHeap)) != FAIL_RESTORE) {
-      Yap_ErrorMessage = NULL;
+    if ((mode = try_open(inpf,Astate,ATrail,AStack,AHeap,save_buffer)) != FAIL_RESTORE) {
       return mode;
     }
   }
@@ -1443,11 +1459,12 @@ OpenRestore(char *inpf, char *YapLibDir, CELL *Astate, CELL *ATrail, CELL *AStac
     */
     if (YapLibDir != NULL) {
       cat_file_name(Yap_FileNameBuf, Yap_LibDir, inpf, YAP_FILENAME_MAX);
-      if ((splfild = open_file(Yap_FileNameBuf, O_RDONLY)) > 0) {
-	if ((mode = commit_to_saved_state(Yap_FileNameBuf,Astate,ATrail,AStack,AHeap)) != FAIL_RESTORE) {
-	  Yap_ErrorMessage = NULL;
-	  return mode;
-	}
+      if ((mode = try_open(Yap_FileNameBuf,Astate,ATrail,AStack,AHeap,save_buffer)) != FAIL_RESTORE) {
+	return mode;
+      }
+    } else {
+      if ((mode = try_open(Yap_FileNameBuf,Astate,ATrail,AStack,AHeap,save_buffer)) != FAIL_RESTORE) {
+	return mode;
       }
     }
 #if HAVE_GETENV
@@ -1455,11 +1472,8 @@ OpenRestore(char *inpf, char *YapLibDir, CELL *Astate, CELL *ATrail, CELL *AStac
       char *yap_env = getenv("YAPLIBDIR");
       if (yap_env != NULL) {
 	cat_file_name(Yap_FileNameBuf, yap_env, inpf, YAP_FILENAME_MAX);
-	if ((splfild = open_file(Yap_FileNameBuf, O_RDONLY)) > 0) {
-	  if ((mode = commit_to_saved_state(Yap_FileNameBuf,Astate,ATrail,AStack,AHeap)) != FAIL_RESTORE) {
-	    Yap_ErrorMessage = NULL;
-	    return mode;
-	  }
+	if ((mode = try_open(Yap_FileNameBuf,Astate,ATrail,AStack,AHeap,save_buffer)) != FAIL_RESTORE) {
+	  return mode;
 	}
       }
     }
@@ -1467,9 +1481,8 @@ OpenRestore(char *inpf, char *YapLibDir, CELL *Astate, CELL *ATrail, CELL *AStac
     if (YAP_LIBDIR != NULL) {
       cat_file_name(Yap_FileNameBuf, YAP_LIBDIR, inpf, YAP_FILENAME_MAX);
       if ((splfild = open_file(Yap_FileNameBuf, O_RDONLY)) > 0) {
-	if ((mode = commit_to_saved_state(Yap_FileNameBuf,Astate,ATrail,AStack,AHeap)) != FAIL_RESTORE) {
-	  Yap_ErrorMessage = NULL;
-	  return(mode);
+	if ((mode = try_open(Yap_FileNameBuf,Astate,ATrail,AStack,AHeap,save_buffer)) != FAIL_RESTORE) {
+	  return mode;
 	}
       }
     }
@@ -1508,11 +1521,8 @@ OpenRestore(char *inpf, char *YapLibDir, CELL *Astate, CELL *ATrail, CELL *AStac
       pt[1] = '\0';
       strncat(Yap_FileNameBuf,"lib/Yap/startup.yss",YAP_FILENAME_MAX);
     }
-    if ((splfild = open_file(Yap_FileNameBuf, O_RDONLY)) > 0) {
-      if ((mode = commit_to_saved_state(Yap_FileNameBuf,Astate,ATrail,AStack,AHeap)) != FAIL_RESTORE) {
-	Yap_ErrorMessage = NULL;
-	return(mode);
-      }
+    if ((mode = try_open(Yap_FileNameBuf,Astate,ATrail,AStack,AHeap,save_buffer)) != FAIL_RESTORE) {
+      return mode;
     }
   }
  end:
@@ -1520,19 +1530,13 @@ OpenRestore(char *inpf, char *YapLibDir, CELL *Astate, CELL *ATrail, CELL *AStac
   /* try to open from current directory */
   /* could not open file */
   if (Yap_ErrorMessage == NULL) {
-#if __simplescalar__
-    /* does not implement getcwd */
-    strncpy(Yap_FileNameBuf,yap_pwd,YAP_FILENAME_MAX);
-#elif HAVE_GETCWD
-    if (getcwd (Yap_FileNameBuf, YAP_FILENAME_MAX) == NULL)
-      Yap_FileNameBuf[0] = '\0';
-#else
-    if (getwd (Yap_FileNameBuf) == NULL)
-      Yap_FileNameBuf[0] = '\0';
-#endif
-    strncat(Yap_FileNameBuf, "/", YAP_FILENAME_MAX-1);
-    strncat(Yap_FileNameBuf, inpf, YAP_FILENAME_MAX-1);
-    do_system_error(PERMISSION_ERROR_OPEN_SOURCE_SINK,"could not open saved state");
+    if (save_buffer[0]) {
+      strncpy(Yap_FileNameBuf, save_buffer, YAP_FILENAME_MAX-1);
+      do_system_error(PERMISSION_ERROR_OPEN_SOURCE_SINK,"incorrect saved state");
+    } else {
+      strncpy(Yap_FileNameBuf, inpf, YAP_FILENAME_MAX-1);
+      do_system_error(PERMISSION_ERROR_OPEN_SOURCE_SINK,"could not open saved state");
+    }
   }
   return FAIL_RESTORE;
 }

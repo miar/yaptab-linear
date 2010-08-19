@@ -1,13 +1,15 @@
-/**********************************************************************
-                                                               
-                       The OPTYap Prolog system                
-  OPTYap extends the Yap Prolog system to support or-parallel tabling
-                                                               
-  Copyright:   R. Rocha and NCC - University of Porto, Portugal
-  File:        or.engine.c
-  version:     $Id: or.engine.c,v 1.11 2008-03-25 16:45:53 vsc Exp $   
-                                                                     
-**********************************************************************/
+/************************************************************************
+**                                                                     **
+**                   The YapTab/YapOr/OPTYap systems                   **
+**                                                                     **
+** YapTab extends the Yap Prolog engine to support sequential tabling  **
+** YapOr extends the Yap Prolog engine to support or-parallelism       **
+** OPTYap extends the Yap Prolog engine to support or-parallel tabling **
+**                                                                     **
+**                                                                     **
+**      Yap Prolog was developed at University of Porto, Portugal      **
+**                                                                     **
+************************************************************************/
 
 /* ------------------ **
 **      Includes      **
@@ -19,7 +21,7 @@
 #include <string.h>
 #endif /* HAVE_STRING_H */
 #include "Yatom.h"
-#include "Heap.h"
+#include "YapHeap.h"
 #include "or.macros.h"
 #ifdef TABLING
 #include "tab.macros.h"
@@ -41,6 +43,8 @@ static void share_private_nodes(int worker_q);
 **      Local macros      **
 ** ---------------------- */
 
+#define INCREMENTAL_COPY 1
+#if INCREMENTAL_COPY
 #define COMPUTE_SEGMENTS_TO_COPY_TO(Q)                                   \
         REMOTE_start_global_copy(Q) = (CELL) (REMOTE_top_cp(Q)->cp_h);   \
         REMOTE_end_global_copy(Q)   = (CELL) (B->cp_h);                  \
@@ -48,6 +52,15 @@ static void share_private_nodes(int worker_q);
         REMOTE_end_local_copy(Q)    = (CELL) (REMOTE_top_cp(Q));         \
         REMOTE_start_trail_copy(Q)  = (CELL) (REMOTE_top_cp(Q)->cp_tr);  \
         REMOTE_end_trail_copy(Q)    = (CELL) (TR)
+#else
+#define COMPUTE_SEGMENTS_TO_COPY_TO(Q)                                   \
+        REMOTE_start_global_copy(Q) = (CELL) (H0);   \
+        REMOTE_end_global_copy(Q)   = (CELL) (H);                  \
+        REMOTE_start_local_copy(Q)  = (CELL) (B);                        \
+        REMOTE_end_local_copy(Q)    = (CELL) (LCL0);         \
+        REMOTE_start_trail_copy(Q)  = (CELL) (Yap_TrailBase);  \
+        REMOTE_end_trail_copy(Q)    = (CELL) (TR)
+#endif
 
 #define P_COPY_GLOBAL_TO(Q)                                                         \
         memcpy((void *) (worker_offset(Q) + REMOTE_start_global_copy(Q)),           \
@@ -94,7 +107,7 @@ void make_root_choice_point(void) {
   B->cp_or_fr = GLOBAL_root_or_fr;
   LOCAL_top_or_fr = GLOBAL_root_or_fr;
   LOCAL_load = 0;
-  LOCAL_prune_request = NULL;
+  Set_LOCAL_prune_request(NULL);
   BRANCH(worker_id, 0) = 0;
 #ifdef TABLING_INNER_CUTS
   LOCAL_pruning_scope = NULL;
@@ -112,12 +125,12 @@ void free_root_choice_point(void) {
 #ifdef TABLING
   LOCAL_top_cp_on_stack =
 #endif /* TABLING */
-  LOCAL_top_cp = GLOBAL_root_cp = OrFr_node(GLOBAL_root_or_fr) = B_BASE;
+  LOCAL_top_cp = GLOBAL_root_cp = OrFr_node(GLOBAL_root_or_fr) = (choiceptr) Yap_LocalBase;
   return;
 }
 
 
-void p_share_work(void) {
+int p_share_work(void) {
   int worker_q = LOCAL_share_request;
 
   if (! BITMAP_member(OrFr_members(REMOTE_top_or_fr(worker_q)), worker_id) ||
@@ -127,7 +140,7 @@ void p_share_work(void) {
     REMOTE_reply_signal(LOCAL_share_request) = no_sharing;
     LOCAL_share_request = MAX_WORKERS;
     PUT_OUT_REQUESTABLE(worker_id);
-    return;
+    return 0;
   }
   /* sharing request accepted */
   COMPUTE_SEGMENTS_TO_COPY_TO(worker_q);
@@ -135,7 +148,7 @@ void p_share_work(void) {
   REMOTE_p_fase_signal(worker_q) = P_idle;
 #ifndef TABLING
   /* wait for incomplete installations */
-  while (LOCAL_reply_signal != ready);
+  while (LOCAL_reply_signal != worker_ready);
 #endif /* TABLING */
   LOCAL_reply_signal = sharing;
   REMOTE_reply_signal(worker_q) = sharing;
@@ -172,10 +185,11 @@ void p_share_work(void) {
 sync_with_q:
   REMOTE_reply_signal(worker_q) = copy_done;
   while (LOCAL_reply_signal == sharing);
+  while (REMOTE_reply_signal(worker_q) != worker_ready);
   LOCAL_share_request = MAX_WORKERS;
   PUT_IN_REQUESTABLE(worker_id);
 
-  return;
+  return 1;
 }
 
 
@@ -189,11 +203,7 @@ int q_share_work(int worker_p) {
     UNLOCK_OR_FRAME(LOCAL_top_or_fr);
     return FALSE;
   }
-#ifdef YAPOR_ERRORS
-  if (OrFr_pend_prune_cp(LOCAL_top_or_fr) &&
-      BRANCH_LTT(worker_p, OrFr_depth(LOCAL_top_or_fr)) < OrFr_pend_prune_ltt(LOCAL_top_or_fr))
-    YAPOR_ERROR_MESSAGE("prune ltt > worker_p branch ltt (q_share_work)");
-#endif /* YAPOR_ERRORS */
+  YAPOR_ERROR_CHECKING(q_share_work, Get_OrFr_pend_prune_cp(LOCAL_top_or_fr) && BRANCH_LTT(worker_p, OrFr_depth(LOCAL_top_or_fr)) < OrFr_pend_prune_ltt(LOCAL_top_or_fr));
   /* there is no pending prune with worker p at right --> safe move to worker p branch */
   BRANCH(worker_id, OrFr_depth(LOCAL_top_or_fr)) = BRANCH(worker_p, OrFr_depth(LOCAL_top_or_fr));
   LOCAL_prune_request = NULL;
@@ -201,10 +211,7 @@ int q_share_work(int worker_p) {
 
   /* unbind variables */
   aux_tr = LOCAL_top_cp->cp_tr;
-#ifdef TABLING_ERRORS
-  if (TR < aux_tr)
-    TABLING_ERROR_MESSAGE("TR < aux_tr (q_share_work)");
-#endif /* TABLING_ERRORS */
+  TABLING_ERROR_CHECKING(q_share_work, TR < aux_tr);
   while (aux_tr != TR) {
     aux_cell = TrailTerm(--TR);
     /* check for global or local variables */
@@ -212,16 +219,12 @@ int q_share_work(int worker_p) {
       RESET_VARIABLE(aux_cell);
 #ifdef TABLING
     } else if (IsPairTerm(aux_cell)) {
-      /* avoid frozen segments */
       aux_cell = (CELL) RepPair(aux_cell);
-      if ((ADDR) aux_cell >= TrailBase) {
+      if (IN_BETWEEN(Yap_TrailBase, aux_cell, Yap_TrailTop)) {
+	/* avoid frozen segments */
         TR = (tr_fr_ptr) aux_cell;
-#ifdef TABLING_ERRORS
-        if (TR > (tr_fr_ptr) TrailTop)
-          TABLING_ERROR_MESSAGE("TR > TrailTop (q_share_work)");
-        if (TR < aux_tr)
-          TABLING_ERROR_MESSAGE("TR < aux_tr (q_share_work)");
-#endif /* TABLING_ERRORS */
+	TABLING_ERROR_CHECKING(q_share_work, TR > (tr_fr_ptr) Yap_TrailTop);
+	TABLING_ERROR_CHECKING(q_share_work, TR < aux_tr);
       }
 #endif /* TABLING */
 #ifdef MULTI_ASSIGNMENT_VARIABLES
@@ -233,16 +236,9 @@ int q_share_work(int worker_p) {
     }
   }
 
-#ifdef OPTYAP_ERRORS
-  if (LOCAL_top_cp != LOCAL_top_cp_on_stack)
-    OPTYAP_ERROR_MESSAGE("LOCAL_top_cp != LOCAL_top_cp_on_stack (q_share_work)");
-  if (YOUNGER_CP(B_FZ, LOCAL_top_cp))
-    OPTYAP_ERROR_MESSAGE("YOUNGER_CP(B_FZ, LOCAL_top_cp) (q_share_work)");
-#endif /* OPTYAP_ERRORS */
-#ifdef YAPOR_ERRORS
-  if (LOCAL_reply_signal != ready)
-    YAPOR_ERROR_MESSAGE("LOCAL_reply_signal != ready (q_share_work)");
-#endif /* YAPOR_ERRORS */
+  OPTYAP_ERROR_CHECKING(q_share_work, LOCAL_top_cp != LOCAL_top_cp_on_stack);
+  OPTYAP_ERROR_CHECKING(q_share_work, YOUNGER_CP(B_FZ, LOCAL_top_cp));
+  YAPOR_ERROR_CHECKING(q_share_work, LOCAL_reply_signal != ready);
 
   /* make sharing request */
   LOCK_WORKER(worker_p);
@@ -256,10 +252,10 @@ int q_share_work(int worker_p) {
   UNLOCK_WORKER(worker_p);
 
   /* wait for an answer */
-  while (LOCAL_reply_signal == ready);
+  while (LOCAL_reply_signal == worker_ready);
   if (LOCAL_reply_signal == no_sharing) {
     /* sharing request refused */
-    LOCAL_reply_signal = ready;
+    LOCAL_reply_signal = worker_ready;
     return FALSE;
   }
 
@@ -302,20 +298,17 @@ sync_with_p:
 #endif /* TABLING */
   while (LOCAL_reply_signal != copy_done);
 
+#if INCREMENTAL_COPY
   /* install fase --> TR and LOCAL_top_cp->cp_tr are equal */
   aux_tr = ((choiceptr) LOCAL_start_local_copy)->cp_tr;
+  TR = ((choiceptr) LOCAL_end_local_copy)->cp_tr;
   Yap_NEW_MAHASH((ma_h_inner_struct *)H);
   while (TR != aux_tr) {
     aux_cell = TrailTerm(--aux_tr);
     if (IsVarTerm(aux_cell)) {
-      if (aux_cell < LOCAL_start_global_copy || 
-          EQUAL_OR_YOUNGER_CP((choiceptr)LOCAL_end_local_copy, (choiceptr)aux_cell)) {
-#ifdef YAPOR_ERRORS
-        if ((CELL *)aux_cell < H0)
-          YAPOR_ERROR_MESSAGE("aux_cell < H0 (q_share_work)");
-        if ((ADDR)aux_cell > Yap_LocalBase)
-          YAPOR_ERROR_MESSAGE("aux_cell > LocalBase (q_share_work)");
-#endif /* YAPOR_ERRORS */
+      if (aux_cell < LOCAL_start_global_copy || EQUAL_OR_YOUNGER_CP((choiceptr)LOCAL_end_local_copy, (choiceptr)aux_cell)) {
+	YAPOR_ERROR_CHECKING(q_share_work, (CELL *)aux_cell < H0);
+	YAPOR_ERROR_CHECKING(q_share_work, (ADDR)aux_cell > Yap_LocalBase);
 #ifdef TABLING
         *((CELL *) aux_cell) = TrailVal(aux_tr);
 #else
@@ -324,9 +317,9 @@ sync_with_p:
       }
 #ifdef TABLING 
     } else if (IsPairTerm(aux_cell)) {
-      /* avoid frozen segments */
       aux_cell = (CELL) RepPair(aux_cell);
-      if ((ADDR) aux_cell >= TrailBase)
+      if (IN_BETWEEN(Yap_TrailBase, aux_cell, Yap_TrailTop)) {
+        /* avoid frozen segments */
         aux_tr = (tr_fr_ptr) aux_cell;
 #endif /* TABLING */
 #ifdef MULTI_ASSIGNMENT_VARIABLES
@@ -347,12 +340,13 @@ sync_with_p:
 #endif /* MULTI_ASSIGNMENT_VARIABLES */
     }
   }
+#endif /* incremental */
 
   /* update registers and return */
 #ifndef TABLING
-  REMOTE_reply_signal(worker_p) = ready;
+  REMOTE_reply_signal(worker_p) = worker_ready;
 #endif /* TABLING */
-  LOCAL_reply_signal = ready;
+  LOCAL_reply_signal = worker_ready;
   PUT_IN_REQUESTABLE(worker_id);
   TR = (tr_fr_ptr) LOCAL_end_trail_copy;
 #ifdef TABLING
@@ -371,24 +365,16 @@ static
 void share_private_nodes(int worker_q) {
   choiceptr sharing_node = B;
 
-#ifdef OPTYAP_ERRORS
-  if (YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack)) {
-    OPTYAP_ERROR_MESSAGE("YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack) (share_private_nodes)");
-  } else {
-    choiceptr aux_cp = B;
+#ifdef DEBUG_OPTYAP
+  OPTYAP_ERROR_CHECKING(share_private_nodes, YOUNGER_CP(LOCAL_top_cp, LOCAL_top_cp_on_stack));
+  { choiceptr aux_cp = B;
     while (aux_cp != LOCAL_top_cp) {
-      if (YOUNGER_CP(LOCAL_top_cp, aux_cp)) {
-        OPTYAP_ERROR_MESSAGE("LOCAL_top_cp not in branch (share_private_nodes)");
-        break;
-      }
-      if (EQUAL_OR_YOUNGER_CP(LOCAL_top_cp_on_stack, aux_cp)) {
-        OPTYAP_ERROR_MESSAGE("shared frozen segments in branch (share_private_nodes)");
-        break;
-      }
+      OPTYAP_ERROR_CHECKING(share_private_nodes, YOUNGER_CP(LOCAL_top_cp, aux_cp));
+      OPTYAP_ERROR_CHECKING(share_private_nodes, EQUAL_OR_YOUNGER_CP(LOCAL_top_cp_on_stack, aux_cp));
       aux_cp = aux_cp->cp_b;
     }
   }
-#endif /* OPTYAP_ERRORS */
+#endif /* DEBUG_OPTYAP */
 
 #ifdef TABLING
   /* check if the branch is already shared */
@@ -397,18 +383,15 @@ void share_private_nodes(int worker_q) {
     sg_fr_ptr sg_frame;
     dep_fr_ptr dep_frame;
 
-#ifdef OPTYAP_ERRORS
+#ifdef DEBUG_OPTYAP
     { or_fr_ptr aux_or_fr;
       aux_or_fr = LOCAL_top_or_fr;
       while (aux_or_fr != REMOTE_top_or_fr(worker_q)) {
-        if (YOUNGER_CP(OrFr_node(REMOTE_top_or_fr(worker_q)), OrFr_node(aux_or_fr))) {
-          OPTYAP_ERROR_MESSAGE("YOUNGER_CP(OrFr_node(REMOTE_top_or_fr(worker_q)), OrFr_node(aux_or_fr)) (share_private_nodes)");
-          break; 
-        }
+	OPTYAP_ERROR_CHECKING(share_private_nodes, YOUNGER_CP(OrFr_node(REMOTE_top_or_fr(worker_q)), OrFr_node(aux_or_fr)));
         aux_or_fr = OrFr_next_on_stack(aux_or_fr);
       }
     }
-#endif /* OPTYAP_ERRORS */
+#endif /* DEBUG_OPTYAP */
 
     /* update old shared nodes */
     or_frame = LOCAL_top_or_fr;
@@ -449,7 +432,7 @@ void share_private_nodes(int worker_q) {
     choiceptr consumer_cp, next_node_on_branch;
     dep_fr_ptr dep_frame;
     sg_fr_ptr sg_frame;
-    CELL *stack, *stack_base, *stack_limit;
+    CELL *stack, *stack_limit;
 
     /* find top dependency frame above current choice point */
     dep_frame = LOCAL_top_dep_fr;
@@ -460,7 +443,7 @@ void share_private_nodes(int worker_q) {
     consumer_cp = DepFr_cons_cp(dep_frame);
     next_node_on_branch = NULL;
     stack_limit = (CELL *)TR;
-    stack_base = stack = (CELL *)Yap_TrailTop;
+    stack = (CELL *)Yap_TrailTop;
 #endif /* TABLING */
 
     /* initialize auxiliary variables */
@@ -477,29 +460,22 @@ void share_private_nodes(int worker_q) {
     while (sharing_node != LOCAL_top_cp) {
 #endif /* TABLING */
 
-#ifdef OPTYAP_ERRORS
+#ifdef DEBUG_OPTYAP
       if (next_node_on_branch) {
         choiceptr aux_cp = B;
         while (aux_cp != next_node_on_branch) {
-          if (sharing_node == aux_cp)
-            OPTYAP_ERROR_MESSAGE("sharing_node on branch (share_private_nodes)");
-          if (YOUNGER_CP(next_node_on_branch, aux_cp)) {
-            OPTYAP_ERROR_MESSAGE("next_node_on_branch not in branch (share_private_nodes)");
-            break;
-  	  }
+	  OPTYAP_ERROR_CHECKING(share_private_nodes, sharing_node == aux_cp);
+	  OPTYAP_ERROR_CHECKING(share_private_nodes, YOUNGER_CP(next_node_on_branch, aux_cp));
           aux_cp = aux_cp->cp_b;
         }
       } else {
         choiceptr aux_cp = B;
         while (aux_cp != sharing_node) {
-          if (YOUNGER_CP(sharing_node, aux_cp)) {
-            OPTYAP_ERROR_MESSAGE("sharing_node not in branch (share_private_nodes)");
-            break;
-	  }
+	  OPTYAP_ERROR_CHECKING(share_private_nodes, YOUNGER_CP(sharing_node, aux_cp));
           aux_cp = aux_cp->cp_b;
         }
       }
-#endif /* OPTYAP_ERRORS */
+#endif /* DEBUG_OPTYAP */
 
       ALLOC_OR_FRAME(or_frame);
       if (previous_or_frame) {
@@ -529,10 +505,7 @@ void share_private_nodes(int worker_q) {
 #endif /* TABLING */
         OrFr_members(or_frame) = bm_workers;
 
-#ifdef YAPOR_ERRORS
-      if (sharing_node->cp_ap == GETWORK || sharing_node->cp_ap == GETWORK_SEQ)
-        YAPOR_ERROR_MESSAGE("choicepoint already shared (share_private_nodes)");
-#endif /* YAPOR_ERRORS */
+      YAPOR_ERROR_CHECKING(share_private_nodes, sharing_node->cp_ap == GETWORK || sharing_node->cp_ap == GETWORK_SEQ);
       if (sharing_node->cp_ap && YAMOP_SEQ(sharing_node->cp_ap)) {
         sharing_node->cp_ap = GETWORK_SEQ;
       } else {
@@ -549,9 +522,9 @@ void share_private_nodes(int worker_q) {
         if (! next_node_on_branch)
           next_node_on_branch = sharing_node;
         STACK_PUSH_UP(or_frame, stack);
-        STACK_CHECK_EXPAND1(stack, stack_limit, stack_base);
+        STACK_CHECK_EXPAND(stack, stack_limit);
         STACK_PUSH(sharing_node, stack);
-        STACK_CHECK_EXPAND1(stack, stack_limit, stack_base);
+        STACK_CHECK_EXPAND(stack, stack_limit);
         sharing_node = consumer_cp;
         dep_frame = DepFr_next(dep_frame);
         consumer_cp = DepFr_cons_cp(dep_frame);
@@ -562,10 +535,7 @@ void share_private_nodes(int worker_q) {
       if (next_node_on_branch == sharing_node)
         next_node_on_branch = NULL;
 #endif /* TABLING */
-#ifdef OPTYAP_ERRORS
-      if (next_node_on_branch && YOUNGER_CP(next_node_on_branch, sharing_node))
-        OPTYAP_ERROR_MESSAGE("frozen node greater than next_node_on_branch (share_private_nodes)");
-#endif /* OPTYAP_ERRORS */
+      OPTYAP_ERROR_CHECKING(share_private_nodes, next_node_on_branch && YOUNGER_CP(next_node_on_branch, sharing_node));
     }
 
     /* initialize last or-frame pointer */
@@ -579,7 +549,7 @@ void share_private_nodes(int worker_q) {
 
 #ifdef TABLING
     /* update or-frames stored in auxiliary stack */
-    while (STACK_NOT_EMPTY(stack, stack_base)) {
+    while (STACK_NOT_EMPTY(stack, (CELL *)Yap_TrailTop)) {
       next_node_on_branch = (choiceptr) STACK_POP_DOWN(stack);
       or_frame = (or_fr_ptr) STACK_POP_DOWN(stack);
       OrFr_nearest_livenode(or_frame) = OrFr_next(or_frame) = next_node_on_branch->cp_or_fr;
@@ -608,20 +578,15 @@ void share_private_nodes(int worker_q) {
       or_frame = OrFr_next_on_stack(or_frame);
     }
 
-#ifdef YAPOR_ERRORS
-    if (depth != OrFr_depth(LOCAL_top_or_fr))
-      YAPOR_ERROR_MESSAGE("incorrect depth value (share_private_nodes)");
-#endif /* YAPOR_ERRORS */
+    YAPOR_ERROR_CHECKING(share_private_nodes, depth != OrFr_depth(LOCAL_top_or_fr));
 
-#ifdef OPTYAP_ERRORS
+#ifdef DEBUG_OPTYAP
     { or_fr_ptr aux_or_fr = B->cp_or_fr;
       choiceptr aux_cp;
       while (aux_or_fr != LOCAL_top_cp_on_stack->cp_or_fr) {
         aux_cp = OrFr_node(aux_or_fr);
-        if (OrFr_next(aux_or_fr) != aux_cp->cp_b->cp_or_fr)
-          OPTYAP_ERROR_MESSAGE("OrFr_next not in branch (share_private_nodes)");
-        if (OrFr_nearest_livenode(aux_or_fr) != aux_cp->cp_b->cp_or_fr)
-          OPTYAP_ERROR_MESSAGE("OrFr_nearest_livenode not in branch (share_private_nodes)");
+	OPTYAP_ERROR_CHECKING(share_private_nodes, OrFr_next(aux_or_fr) != aux_cp->cp_b->cp_or_fr);
+	OPTYAP_ERROR_CHECKING(share_private_nodes, OrFr_nearest_livenode(aux_or_fr) != aux_cp->cp_b->cp_or_fr);
         aux_or_fr = OrFr_next_on_stack(aux_or_fr);
       }
       aux_or_fr = B->cp_or_fr;
@@ -629,16 +594,13 @@ void share_private_nodes(int worker_q) {
         or_fr_ptr nearest_leftnode = OrFr_nearest_leftnode(aux_or_fr);
         aux_cp = OrFr_node(aux_or_fr);
         while (OrFr_node(nearest_leftnode) != aux_cp) {
-          if (YOUNGER_CP(OrFr_node(nearest_leftnode), aux_cp)) {
-            OPTYAP_ERROR_MESSAGE("OrFr_nearest_leftnode not in branch (share_private_nodes)");
-            break;
-          }
+	  OPTYAP_ERROR_CHECKING(share_private_nodes, YOUNGER_CP(OrFr_node(nearest_leftnode), aux_cp));
           aux_cp = aux_cp->cp_b;
         }
         aux_or_fr = OrFr_next_on_stack(aux_or_fr);
       }
     }
-#endif /* OPTYAP_ERRORS */
+#endif /* DEBUG_OPTYAP */
 
     /* update old shared nodes */
     while (or_frame != REMOTE_top_or_fr(worker_q)) {
@@ -694,7 +656,7 @@ void share_private_nodes(int worker_q) {
     }
 #endif /* TABLING */
 
-#ifdef OPTYAP_ERRORS
+#ifdef DEBUG_OPTYAP
     { dep_fr_ptr aux_dep_fr = LOCAL_top_dep_fr;
       while(aux_dep_fr != GLOBAL_root_dep_fr) {
         choiceptr top_cp_on_branch;
@@ -702,12 +664,11 @@ void share_private_nodes(int worker_q) {
         while (YOUNGER_CP(top_cp_on_branch, B)) {
           top_cp_on_branch = top_cp_on_branch->cp_b;
         }
-        if (top_cp_on_branch->cp_or_fr != DepFr_top_or_fr(aux_dep_fr))
-          OPTYAP_ERROR_MESSAGE("Error on DepFr_top_or_fr (share_private_nodes)");
+	OPTYAP_ERROR_CHECKING(share_private_nodes, top_cp_on_branch->cp_or_fr != DepFr_top_or_fr(aux_dep_fr));
         aux_dep_fr = DepFr_next(aux_dep_fr);
       }
     }
-#endif /* OPTYAP_ERRORS */
+#endif /* DEBUG_OPTYAP */
 
     /* update top shared nodes */
 #ifdef TABLING

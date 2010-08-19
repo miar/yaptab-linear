@@ -10,9 +10,27 @@
 #include <SWI-Prolog.h>
 typedef int bool;
 
+#define Arg(N)  (PL__t0+((n)-1))
+#define A1      (PL__t0)
+#define A2      (PL__t0+1)
+#define A3      (PL__t0+2)
+#define A3      (PL__t0+2)
+#define A4      (PL__t0+3)
+#define A5      (PL__t0+4)
+#define A6      (PL__t0+5)
+#define A7      (PL__t0+6)
+#define A8      (PL__t0+7)
+#define A9      (PL__t0+8)
+#define A10     (PL__t0+9)
+
+
 /* atom_t macro layer */
 #define NULL_ATOM ((atom_t)0)
+#if __YAP_PROLOG__
+#include "dswiatoms.h"
+#else
 #include "atoms.h"
+#endif
 #if HAVE_STRING_H
 #include <string.h>
 #endif
@@ -98,6 +116,8 @@ typedef enum
 typedef struct tempfile *	TempFile; 	/* pl-os.c */
 typedef struct canonical_dir *	CanonicalDir;	/* pl-os.c */
 typedef struct on_halt *	OnHalt;		/* pl-os.c */
+typedef struct extension_cell *	ExtensionCell;  /* pl-ext.c */
+typedef struct initialise_handle * InitialiseHandle;
 
 /* The GD global variable */
 typedef struct {
@@ -107,6 +127,12 @@ typedef struct {
  struct
   { Table       table;                  /* global (read-only) features */
   } prolog_flag;
+
+#if THREADS
+  struct
+  { int		    	enabled;	/* threads are enabled */
+  } thread;
+#endif
 
   struct
   { Table		tmp_files;	/* Known temporary files */
@@ -146,6 +172,17 @@ typedef struct {
     size_t	count;			/* elements in array */
     atom_t     *for_code[256];		/* code --> one-char-atom */
   } atoms;
+
+  struct
+  { ExtensionCell _ext_head;		/* head of registered extensions */
+    ExtensionCell _ext_tail;		/* tail of this chain */
+
+    InitialiseHandle initialise_head;	/* PL_initialise_hook() */
+    InitialiseHandle initialise_tail;
+    PL_dispatch_hook_t dispatch_events; /* PL_dispatch_hook() */
+
+    int		  _loaded;		/* system extensions are loaded */
+  } foreign;
 
 } gds_t;
 
@@ -282,6 +319,7 @@ typedef struct PL_local_data {
     occurs_check_t occurs_check;        /* Unify and occurs check */
   } prolog_flag;
 
+  void *        glob_info;              /* pl-glob.c */
   IOENC		encoding;		/* default I/O encoding */
 
   struct
@@ -292,6 +330,18 @@ typedef struct PL_local_data {
 #endif
     int		rand_initialised;	/* have we initialised random? */
   } os;
+
+ struct
+  { int64_t     pending;                /* PL_raise() pending signals */
+    int         current;                /* currently processing signal */
+    int         is_sync;                /* current signal is synchronous */
+    record_t    exception;              /* Pending exception from signal */
+#ifdef O_PLMT
+    simpleMutex sig_lock;               /* lock delivery and processing */
+#endif
+  } signal;
+
+  int		critical;		/* heap is being modified */
 
   struct
   { term_t	term;			/* exception term */
@@ -343,8 +393,70 @@ extern PL_local_data_t lds;
 
 
 /* Support PL_LOCK in the interface */
-#define PL_LOCK(X)
-#define PL_UNLOCK(X)
+#if THREADS
+
+typedef pthread_mutex_t simpleMutex;
+
+#define simpleMutexInit(p)	pthread_mutex_init(p, NULL)
+#define simpleMutexDelete(p)	pthread_mutex_destroy(p)
+#define simpleMutexLock(p)	pthread_mutex_lock(p)
+#define simpleMutexUnlock(p)	pthread_mutex_unlock(p)
+
+extern counting_mutex _PL_mutexes[];	/* Prolog mutexes */
+
+#define L_MISC		0
+#define L_ALLOC		1
+#define L_ATOM		2
+#define L_FLAG	        3
+#define L_FUNCTOR	4
+#define L_RECORD	5
+#define L_THREAD	6
+#define L_PREDICATE	7
+#define L_MODULE	8
+#define L_TABLE		9
+#define L_BREAK	       10
+#define L_FILE	       11
+#define L_PLFLAG      12
+#define L_OP	       13
+#define L_INIT	       14
+#define L_TERM	       15
+#define L_GC	       16
+#define L_AGC	       17
+#define L_FOREIGN      18
+#define L_OS	       19
+
+#define IF_MT(id, g) if ( id == L_THREAD || GD->thread.enabled ) g
+
+#ifdef O_CONTENTION_STATISTICS
+#define countingMutexLock(cm) \
+	do \
+	{ if ( pthread_mutex_trylock(&(cm)->mutex) == EBUSY ) \
+	  { (cm)->collisions++; \
+	    pthread_mutex_lock(&(cm)->mutex); \
+	  } \
+	  (cm)->count++; \
+	} while(0)
+#else
+#define countingMutexLock(cm) \
+	do \
+	{ simpleMutexLock(&(cm)->mutex); \
+	  (cm)->count++; \
+	} while(0)
+#endif
+#define countingMutexUnlock(cm) \
+	do \
+	{ (cm)->unlocked++; \
+	  assert((cm)->unlocked <= (cm)->count); \
+	  simpleMutexUnlock(&(cm)->mutex); \
+	} while(0)
+
+#define PL_LOCK(id)   IF_MT(id, countingMutexLock(&_PL_mutexes[id]))
+#define PL_UNLOCK(id) IF_MT(id, countingMutexUnlock(&_PL_mutexes[id]))
+
+#else
+#define PL_LOCK(X)		
+#define PL_UNLOCK(X)		
+#endif
 
 
 #ifndef TRUE
@@ -481,14 +593,12 @@ typedef double			real;
 
 #endif
 
-#define PL_dispatch(FD, COM)
 extern int PL_unify_char(term_t chr, int c, int how);
 extern int PL_get_char(term_t chr, int *c, int eof);
 extern int PL_get_text(term_t l, PL_chars_t *text, int flags);
 extern void PL_cleanup_fork(void);
 extern int PL_rethrow(void);
 extern void PL_get_number(term_t l, number *n);
-extern int PL_write_term(IOSTREAM *s, term_t term, int precedence, int flags);
 extern int PL_unify_atomic(term_t t, PL_atomic_t a);
 
 #define _PL_get_arg(X,Y,Z) PL_get_arg(X,Y,Z)
@@ -574,6 +684,9 @@ extern word notImplemented(char *name, int arity);
 /**** stuff from pl-ctype.c ****/
 extern void  initCharTypes(void);
 
+/**** stuff from pl-glob.c ****/
+extern void  initGlob(void);
+
 /**** stuff from pl-os.c ****/
 extern void cleanupOs(void);
 extern void PL_clock_wait_ticks(long waited);
@@ -606,11 +719,15 @@ extern word lookupAtom(const char *s, size_t len);
 extern atom_t	lookupUCSAtom(const pl_wchar_t *s, size_t len);
 extern int toIntegerNumber(Number n, int flags);
 extern int get_atom_ptr_text(Atom a, PL_chars_t *text);
+extern int warning(const char *fm, ...);
 
 /**** stuff from pl-files.c ****/
 void initFiles(void);
 int RemoveFile(const char *path);
 int PL_get_file_name(term_t n, char **namep, int flags);
+
+/**** stuff from pl-utf8.c ****/
+size_t utf8_strlen(const char *s, size_t len);
 
 /* empty stub */
 void setPrologFlag(const char *name, int flags, ...);

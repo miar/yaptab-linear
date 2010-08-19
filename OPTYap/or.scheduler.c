@@ -1,13 +1,15 @@
-/**********************************************************************
-                                                               
-                       The OPTYap Prolog system                
-  OPTYap extends the Yap Prolog system to support or-parallel tabling
-                                                               
-  Copyright:   R. Rocha and NCC - University of Porto, Portugal
-  File:        or.scheduler.c
-  version:     $Id: or.scheduler.c,v 1.4 2005-05-31 08:24:24 ricroc Exp $   
-                                                                     
-**********************************************************************/
+/************************************************************************
+**                                                                     **
+**                   The YapTab/YapOr/OPTYap systems                   **
+**                                                                     **
+** YapTab extends the Yap Prolog engine to support sequential tabling  **
+** YapOr extends the Yap Prolog engine to support or-parallelism       **
+** OPTYap extends the Yap Prolog engine to support or-parallel tabling **
+**                                                                     **
+**                                                                     **
+**      Yap Prolog was developed at University of Porto, Portugal      **
+**                                                                     **
+************************************************************************/
 
 /* ------------------ **
 **      Includes      **
@@ -16,7 +18,7 @@
 #include "Yap.h"
 #ifdef YAPOR
 #include "Yatom.h"
-#include "Heap.h"
+#include "YapHeap.h"
 #include "or.macros.h"
 #ifdef TABLING
 #include "tab.macros.h"
@@ -98,10 +100,7 @@ void PUT_OUT_ROOT_NODE(int worker_num) {
 
 static inline
 void move_up_to_prune_request(void) {
-#ifdef YAPOR_ERRORS
-  if (EQUAL_OR_YOUNGER_CP(LOCAL_prune_request, LOCAL_top_cp))
-    YAPOR_ERROR_MESSAGE("invalid LOCAL_prune_request (move_up_to_prune_request)");
-#endif /* YAPOR_ERRORS */
+  YAPOR_ERROR_CHECKING(move_up_to_prune_request, EQUAL_OR_YOUNGER_CP(Get_LOCAL_prune_request(), Get_LOCAL_top_cp()));
 
   do {
     LOCK_OR_FRAME(LOCAL_top_or_fr);
@@ -123,12 +122,12 @@ void move_up_to_prune_request(void) {
       UNLOCK_OR_FRAME(LOCAL_top_or_fr);
     }
     SCH_update_local_or_tops();
-  } while (LOCAL_top_cp != LOCAL_prune_request);
+  } while (Get_LOCAL_top_cp() != Get_LOCAL_prune_request());
 
   CUT_reset_prune_request();
 #ifdef TABLING
-  LOCAL_top_cp_on_stack = LOCAL_top_cp;
-  abolish_incomplete_subgoals(LOCAL_top_cp - 1);  /* do not include LOCAL_top_cp */
+  Set_LOCAL_top_cp_on_stack( Get_LOCAL_top_cp());
+  abolish_incomplete_subgoals(Get_LOCAL_top_cp() - 1);  /* do not include LOCAL_top_cp */
 #endif /* TABLIG */
 
   return;
@@ -153,7 +152,7 @@ int get_work(void) {
   LOCAL_load = 0;
 
   /* check for prune request */
-  if (LOCAL_prune_request)
+  if (Get_LOCAL_prune_request())
     move_up_to_prune_request();
 
   /* find nearest node with available work */
@@ -167,13 +166,13 @@ int get_work(void) {
 
 #ifndef TABLING
   /* wait for incomplete installations */
-  while (LOCAL_reply_signal != ready);
+  while (LOCAL_reply_signal != worker_ready);
 #endif /* TABLING */
 
   if (or_fr_with_work) {
     /* move up to the nearest node with available work */
 #ifdef TABLING
-    if (leader_node && YOUNGER_CP(leader_node, OrFr_node(or_fr_with_work)))
+    if (leader_node && YOUNGER_CP(leader_node, GetOrFr_node(or_fr_with_work)))
       /* there is a leader node before the nearest node with work */
       or_fr_to_move_to = leader_node->cp_or_fr;
     else
@@ -216,14 +215,14 @@ int get_work(void) {
   BITMAP_difference(stable_busy, OrFr_members(LOCAL_top_or_fr), GLOBAL_bm_idle_workers);
   while (1) {
     while (BITMAP_subset(GLOBAL_bm_idle_workers, OrFr_members(LOCAL_top_or_fr)) &&
-           LOCAL_top_cp != GLOBAL_root_cp) {
+           Get_LOCAL_top_cp() != Get_GLOBAL_root_cp()) {
       /* no busy workers here and below */
       if (! move_up_one_node(NULL)) {
         PUT_BUSY(worker_id);
         return TRUE;
       }
     }
-    if (LOCAL_top_cp == GLOBAL_root_cp) {
+    if (Get_LOCAL_top_cp() == Get_GLOBAL_root_cp()) {
       if (! BITMAP_member(GLOBAL_bm_root_cp_workers, worker_id))
         PUT_IN_ROOT_NODE(worker_id);
       if (BITMAP_same(GLOBAL_bm_idle_workers, GLOBAL_bm_root_cp_workers) &&
@@ -266,15 +265,9 @@ int get_work(void) {
 
 static
 int move_up_one_node(or_fr_ptr nearest_livenode) {
-#ifdef YAPOR_ERRORS
-  if (LOCAL_prune_request && EQUAL_OR_YOUNGER_CP(LOCAL_prune_request, LOCAL_top_cp))
-    YAPOR_ERROR_MESSAGE("invalid LOCAL_prune_request (move_up_one_node)");
-#endif /* YAPOR_ERRORS */
-
+  YAPOR_ERROR_CHECKING(move_up_one_node, Get_LOCAL_prune_request() && EQUAL_OR_YOUNGER_CP(Get_LOCAL_prune_request(), Get_LOCAL_top_cp()));
 
   LOCK_OR_FRAME(LOCAL_top_or_fr);
-
-
   /* last worker in a sequential choicepoint ? */
   if (OrFr_alternative(LOCAL_top_or_fr) 
       && YAMOP_SEQ(OrFr_alternative(LOCAL_top_or_fr)) 
@@ -283,43 +276,33 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
     return FALSE;
   }
 
-
   /* pending prune ? */
-  if (OrFr_pend_prune_cp(LOCAL_top_or_fr) 
-      && ! LOCAL_prune_request
+  if (Get_OrFr_pend_prune_cp(LOCAL_top_or_fr) 
+      && ! Get_LOCAL_prune_request()
       && CUT_last_worker_left_pending_prune(LOCAL_top_or_fr)) {
 #ifdef TABLING
-    choiceptr aux_cp = LOCAL_top_cp;
+    choiceptr aux_cp = Get_LOCAL_top_cp();
 #endif /* TABLIG */
-    choiceptr prune_cp = OrFr_pend_prune_cp(LOCAL_top_or_fr);
-    OrFr_pend_prune_cp(LOCAL_top_or_fr) = NULL;
+    choiceptr prune_cp = Get_OrFr_pend_prune_cp(LOCAL_top_or_fr);
+    Set_OrFr_pend_prune_cp(LOCAL_top_or_fr, NULL);
     BRANCH(worker_id, OrFr_depth(LOCAL_top_or_fr)) = OrFr_pend_prune_ltt(LOCAL_top_or_fr);
     UNLOCK_OR_FRAME(LOCAL_top_or_fr);
     prune_shared_branch(prune_cp);
 #ifdef TABLING
-    while (YOUNGER_CP(aux_cp->cp_b, LOCAL_top_cp))
+    while (YOUNGER_CP(aux_cp->cp_b, Get_LOCAL_top_cp()))
       aux_cp = aux_cp->cp_b;
     abolish_incomplete_subgoals(aux_cp);
 #endif /* TABLIG */
     return FALSE;
   }
 
-
-#ifdef OPTYAP_ERRORS
-  if (B_FZ != DepFr_cons_cp(LOCAL_top_dep_fr))
-    OPTYAP_ERROR_MESSAGE("B_FZ != DepFr_cons_cp(LOCAL_top_dep_fr) (move_up_one_node)");
-  if (LOCAL_top_susp_or_fr) {
-    if (EQUAL_OR_YOUNGER_CP(LOCAL_top_cp, B_FZ) && YOUNGER_CP(OrFr_node(LOCAL_top_susp_or_fr), LOCAL_top_cp))
-      OPTYAP_ERROR_MESSAGE("YOUNGER_CP(OrFr_node(LOCAL_top_susp_or_fr), LOCAL_top_cp) (move_up_one_node)");
-    if (YOUNGER_CP(B_FZ, LOCAL_top_cp) && YOUNGER_CP(OrFr_node(LOCAL_top_susp_or_fr), B_FZ))
-      OPTYAP_ERROR_MESSAGE("YOUNGER_CP(OrFr_node(LOCAL_top_susp_or_fr), B_FZ) (move_up_one_node)");
-  }
-#endif /* OPTYAP_ERRORS */
-
+  OPTYAP_ERROR_CHECKING(move_up_one_node, B_FZ != DepFr_cons_cp(LOCAL_top_dep_fr));
+  OPTYAP_ERROR_CHECKING(move_up_one_node, LOCAL_top_susp_or_fr && EQUAL_OR_YOUNGER_CP(Get_LOCAL_top_cp(), B_FZ) && YOUNGER_CP(GetOrFr_node(LOCAL_top_susp_or_fr), Get_LOCAL_top_cp()));
+  OPTYAP_ERROR_CHECKING(move_up_one_node, LOCAL_top_susp_or_fr && YOUNGER_CP(B_FZ, Get_LOCAL_top_cp()) && YOUNGER_CP(GetOrFr_node(LOCAL_top_susp_or_fr), B_FZ));
 
 #ifdef TABLING
   /* frozen stacks on branch ? */
-  if (YOUNGER_CP(B_FZ, LOCAL_top_cp)) {
+  if (YOUNGER_CP(B_FZ, Get_LOCAL_top_cp())) {
     if (nearest_livenode)
       OrFr_nearest_livenode(LOCAL_top_or_fr) = nearest_livenode;
     BITMAP_delete(OrFr_members(LOCAL_top_or_fr), worker_id);
@@ -351,11 +334,10 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
   update_local_tops1:
 #endif /* TABLING_INNER_CUTS */
     SCH_update_local_or_tops();
-    if (LOCAL_prune_request)
+    if (Get_LOCAL_prune_request())
       pruning_over_tabling_data_structures();
     return TRUE;
   }
-
 
   /* suspension frames to resume ? */
   if (OrFr_suspensions(LOCAL_top_or_fr)) {
@@ -371,7 +353,7 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
         OrFr_nearest_suspnode(LOCAL_top_or_fr) = LOCAL_top_or_fr;
       }
       UNLOCK_OR_FRAME(LOCAL_top_or_fr);
-      unbind_variables(TR, LOCAL_top_cp->cp_tr);
+      unbind_variables(TR, Get_LOCAL_top_cp()->cp_tr);
       resume_suspension_frame(resume_fr, LOCAL_top_or_fr);
       return FALSE;
     }
@@ -384,9 +366,8 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
     OrFr_nearest_suspnode(LOCAL_top_or_fr) = LOCAL_top_or_fr;
   }
   
-   
   /* top node frozen ? */
-  if (B_FZ == LOCAL_top_cp) {
+  if (B_FZ == Get_LOCAL_top_cp()) {
     if (nearest_livenode)
       OrFr_nearest_livenode(LOCAL_top_or_fr) = nearest_livenode;
     BITMAP_delete(OrFr_members(LOCAL_top_or_fr), worker_id);
@@ -420,32 +401,24 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
   update_local_tops2:
 #endif /* TABLING_INNER_CUTS */
     SCH_update_local_or_tops();
-    if (LOCAL_prune_request)
+    if (Get_LOCAL_prune_request())
       pruning_over_tabling_data_structures();
     return TRUE;
   }
 
-
-#ifdef OPTYAP_ERRORS
-  if (OrFr_alternative(LOCAL_top_or_fr) && ! YAMOP_SEQ(OrFr_alternative(LOCAL_top_or_fr)))
-    OPTYAP_ERROR_MESSAGE("OrFr_alternative(LOCAL_top_or_fr) not sequential (move_up_one_node)");
-  if (LOCAL_top_cp == DepFr_cons_cp(LOCAL_top_dep_fr))
-    OPTYAP_ERROR_MESSAGE("LOCAL_top_cp == DepFr_cons_cp(LOCAL_top_dep_fr) (move_up_one_node)");
-  if (LOCAL_top_cp != LOCAL_top_cp_on_stack)
-    OPTYAP_ERROR_MESSAGE("LOCAL_top_cp != LOCAL_top_cp_on_stack (move_up_one_node)");
-#endif /* OPTYAP_ERRORS */
-
+  OPTYAP_ERROR_CHECKING(move_up_one_node, OrFr_alternative(LOCAL_top_or_fr) && ! YAMOP_SEQ(OrFr_alternative(LOCAL_top_or_fr)));
+  OPTYAP_ERROR_CHECKING(move_up_one_node, Get_LOCAL_top_cp() == DepFr_cons_cp(LOCAL_top_dep_fr));
+  OPTYAP_ERROR_CHECKING(move_up_one_node, Get_LOCAL_top_cp() != Get_LOCAL_top_cp_on_stack());
 
   /* no frozen nodes */
-  LOCAL_top_cp_on_stack = OrFr_node(OrFr_next_on_stack(LOCAL_top_or_fr));
-
+  Set_LOCAL_top_cp_on_stack(GetOrFr_node(OrFr_next_on_stack(LOCAL_top_or_fr)));
 
   /* no more owners ? */
   if (OrFr_owners(LOCAL_top_or_fr) == 1) {
     if (OrFr_suspensions(LOCAL_top_or_fr)) {
       complete_suspension_frames(LOCAL_top_or_fr);
     }
-    if (LOCAL_top_sg_fr && LOCAL_top_cp == SgFr_gen_cp(LOCAL_top_sg_fr)) {
+    if (LOCAL_top_sg_fr && Get_LOCAL_top_cp() == SgFr_gen_cp(LOCAL_top_sg_fr)) {
       mark_as_completed(LOCAL_top_sg_fr);
       LOCAL_top_sg_fr = SgFr_next(LOCAL_top_sg_fr);
     }
@@ -453,7 +426,7 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
   /* last member worker in node ? */
   if (BITMAP_alone(OrFr_members(LOCAL_top_or_fr), worker_id)) {
 #endif /* TABLING */
-    if (LOCAL_prune_request) {
+    if (Get_LOCAL_prune_request()) {
       CUT_free_solution_frames(OrFr_qg_solutions(LOCAL_top_or_fr));
 #ifdef TABLING_INNER_CUTS
       CUT_free_tg_solution_frames(OrFr_tg_solutions(LOCAL_top_or_fr));
@@ -498,7 +471,6 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
     return TRUE;
   }
 
-
   /* more owners */
   if (nearest_livenode)
     OrFr_nearest_livenode(LOCAL_top_or_fr) = nearest_livenode;
@@ -512,7 +484,7 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
       or_fr_ptr leftmost_until;
       tg_solutions = OrFr_tg_solutions(LOCAL_top_or_fr);
       leftmost_until = CUT_leftmost_until(LOCAL_top_or_fr, OrFr_depth(TgSolFr_gen_cp(tg_solutions)->cp_or_fr));
-      if (LOCAL_prune_request)
+      if (Get_LOCAL_prune_request())
         pruning_over_tabling_data_structures();
       OrFr_tg_solutions(LOCAL_top_or_fr) = NULL;
       UNLOCK_OR_FRAME(LOCAL_top_or_fr);
@@ -526,7 +498,7 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
       goto update_local_tops3;
     }
 #endif /* TABLING_INNER_CUTS */
-    if (LOCAL_prune_request)
+    if (Get_LOCAL_prune_request())
       pruning_over_tabling_data_structures();
   }
 #endif /* TABLING */
@@ -535,7 +507,7 @@ int move_up_one_node(or_fr_ptr nearest_livenode) {
 #ifdef TABLING_INNER_CUTS
   update_local_tops3:
 #endif /* TABLING_INNER_CUTS */
-  if (LOCAL_top_sg_fr && LOCAL_top_cp == SgFr_gen_cp(LOCAL_top_sg_fr)) {
+  if (LOCAL_top_sg_fr && Get_LOCAL_top_cp() == SgFr_gen_cp(LOCAL_top_sg_fr)) {
     LOCAL_top_sg_fr = SgFr_next(LOCAL_top_sg_fr);
   }
 #endif /* TABLING */
@@ -556,7 +528,7 @@ int get_work_below(void){
   BITMAP_difference(idle_below, OrFr_members(LOCAL_top_or_fr), busy_below);
   BITMAP_delete(idle_below, worker_id);
   for (i = 0; i < number_workers; i++) {
-    if (BITMAP_member(idle_below ,i) && YOUNGER_CP(REMOTE_top_cp(i), LOCAL_top_cp))
+    if (BITMAP_member(idle_below ,i) && YOUNGER_CP(REMOTE_top_cp(i), Get_LOCAL_top_cp()))
       BITMAP_minus(busy_below, OrFr_members(REMOTE_top_or_fr(i)));
   }
   if (BITMAP_empty(busy_below))
@@ -664,7 +636,7 @@ int search_for_hidden_shared_work(bitmap stable_busy){
   BITMAP_intersection(idle_below, OrFr_members(LOCAL_top_or_fr), GLOBAL_bm_idle_workers);
   BITMAP_delete(idle_below, worker_id);
   for (i = 0; i < number_workers; i++) {
-    if (BITMAP_member(idle_below ,i) && YOUNGER_CP(REMOTE_top_cp(i), LOCAL_top_cp))
+    if (BITMAP_member(idle_below ,i) && YOUNGER_CP(REMOTE_top_cp(i), Get_LOCAL_top_cp()))
       BITMAP_minus(invisible_work, OrFr_members(REMOTE_top_or_fr(i)));
   }
   if (BITMAP_empty(invisible_work))

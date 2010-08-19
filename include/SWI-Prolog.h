@@ -20,6 +20,19 @@ extern "C" {
 //=== includes ===============================================================
 #ifdef          _YAP_NOT_INSTALLED_
 #include	"config.h"
+
+#ifdef __cplusplus
+}
+#endif
+
+#if USE_GMP
+#include <gmp.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include	"YapInterface.h"
 #else
 #include	<Yap/config.h>
@@ -80,34 +93,60 @@ stuff.
 #endif /*HAVE_DECLSPEC*/
 #endif /*_PL_EXPORT_DONE*/
 
-typedef	unsigned long    term_t;
-typedef	void *module_t;
-typedef	void *record_t;
-typedef unsigned long	atom_t;
-typedef	YAP_Term    *predicate_t;
-typedef struct  open_query_struct *qid_t;
-typedef long    functor_t;
-typedef int     (*PL_agc_hook_t)(atom_t);
-typedef unsigned long	foreign_t;	/* return type of foreign functions */
-typedef wchar_t pl_wchar_t;             /* wide character support */
-#ifdef WIN32
+
+                 /*******************************
+                 *        GCC ATTRIBUTES        *
+                 *******************************/
+
+#if __GNUC__ >= 4
+#define WUNUSED __attribute__((warn_unused_result))
+#else
+#define WUNUSED
+#endif
+
+
+                 /*******************************
+                 *             TYPES            *
+                 *******************************/
+
+
+#ifdef __WINDOWS__
+#ifndef INT64_T_DEFINED
+#define INT64_T_DEFINED 1
 typedef __int64 int64_t;
 typedef unsigned __int64 uint64_t;
+#if (_MSC_VER < 1300) && !defined(__MINGW32__)
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#endif
+#endif
 #else
 #include <inttypes.h>			/* more portable than stdint.h */
 #endif
+
+typedef	uintptr_t    term_t;
+typedef	void *module_t;
+typedef	void *record_t;
+typedef uintptr_t	atom_t;
+typedef	YAP_Term    *predicate_t;
+typedef struct  open_query_struct *qid_t;
+typedef uintptr_t    functor_t;
+typedef int     (*PL_agc_hook_t)(atom_t);
+typedef unsigned long	foreign_t;	/* return type of foreign functions */
+typedef wchar_t pl_wchar_t;             /* wide character support */
+#include <inttypes.h>			/* more portable than stdint.h */
 #if  !defined(_MSC_VER) 
 typedef uintptr_t	PL_fid_t;	/* opaque foreign context handle */
 #endif
 
-typedef void *function_t;
+typedef void *pl_function_t;
 
 #define fid_t PL_fid_t			/* avoid AIX name-clash */
 
 typedef struct _PL_extension
 { const char 		*predicate_name;	/* Name of the predicate */
   short		arity;			/* Arity of the predicate */
-  function_t	function;		/* Implementing functions */
+  pl_function_t	function;		/* Implementing functions */
   short		flags;			/* Or of PL_FA_... */
 } PL_extension;
 
@@ -181,6 +220,7 @@ typedef void *PL_engine_t;
 #define CVT_NUMBER	(CVT_INTEGER|CVT_FLOAT)
 #define CVT_ATOMIC	(CVT_NUMBER|CVT_ATOM|CVT_STRING)
 #define CVT_WRITE	0x0040		/* as of version 3.2.10 */
+#define CVT_WRITE_CANONICAL	0x0080		/* as of version 3.2.10 */
 #define CVT_ALL		(CVT_ATOMIC|CVT_LIST)
 #define CVT_MASK	0x00ff
 
@@ -191,7 +231,8 @@ typedef void *PL_engine_t;
 #define BUF_RING	0x0100
 #define BUF_MALLOC	0x0200
 
-#define PL_ENGINE_CURRENT   ((PL_engine_t)-1)
+#define PL_ENGINE_MAIN      ((PL_engine_t)0x1)
+#define PL_ENGINE_CURRENT   ((PL_engine_t)0x2)
 
 #define PL_ENGINE_SET   0               /* engine set successfully */
 #define PL_ENGINE_INVAL 2               /* engine doesn't exist */
@@ -240,19 +281,6 @@ typedef struct foreign_context *control_t;
         foreign_t \
         pl_ ## fname ## _va(term_t PL__t0, int PL__ac, control_t PL__ctx)
 
-#define Arg(N)  (PL__t0+((n)-1))
-#define A1      (PL__t0)
-#define A2      (PL__t0+1)
-#define A3      (PL__t0+2)
-#define A3      (PL__t0+2)
-#define A4      (PL__t0+3)
-#define A5      (PL__t0+4)
-#define A6      (PL__t0+5)
-#define A7      (PL__t0+6)
-#define A8      (PL__t0+7)
-#define A9      (PL__t0+8)
-#define A10     (PL__t0+9)
-
 #define CTX_CNTRL ForeignControl(PL__ctx)
 #define CTX_PTR   ForeignContextPtr(PL__ctx)
 #define CTX_INT   ForeignContextInt(PL__ctx)
@@ -286,6 +314,33 @@ typedef struct foreign_context *control_t;
 
 /* end from pl-itf.h */
 
+typedef struct PL_blob_t
+{ uintptr_t		magic;		/* PL_BLOB_MAGIC */
+  uintptr_t		flags;		/* PL_BLOB_* */
+  char *		name;		/* name of the type */
+  int			(*release)(atom_t a);
+  int			(*compare)(atom_t a, atom_t b);
+#ifdef SIO_MAGIC
+  int			(*write)(IOSTREAM *s, atom_t a, int flags);
+#else
+  int			(*write)(void *s, atom_t a, int flags);
+#endif
+  void			(*acquire)(atom_t a);
+#ifdef SIO_MAGIC
+  int			(*save)(atom_t a, IOSTREAM *s);
+  atom_t		(*load)(IOSTREAM *s);
+#else
+  int			(*save)(atom_t a, void*);
+  atom_t		(*load)(void *s);
+#endif
+					/* private */
+  void *		reserved[10];	/* for future extension */
+  int			registered;	/* Already registered? */
+  int			rank;		/* Rank for ordering atoms */
+  struct PL_blob_t *    next;		/* next in registered type-chain */
+  atom_t		atom_name;	/* Name as atom */
+} PL_blob_t;
+
 		 /*******************************
 		 *	     CALL-BACK		*
 		 *******************************/
@@ -306,14 +361,17 @@ typedef struct foreign_context *control_t;
 
 extern X_API PL_agc_hook_t PL_agc_hook(PL_agc_hook_t);
 extern X_API char* PL_atom_chars(atom_t);
+extern X_API char* PL_atom_nchars(atom_t, size_t *);
 extern X_API term_t PL_copy_term_ref(term_t);
 extern X_API term_t PL_new_term_ref(void);
 extern X_API term_t PL_new_term_refs(int);
 extern X_API void PL_reset_term_refs(term_t);
 /* begin PL_get_* functions =============================*/
 extern X_API int PL_get_arg(int, term_t, term_t);
+extern X_API int _PL_get_arg(int, term_t, term_t);
 extern X_API int PL_get_atom(term_t, atom_t *);
 extern X_API int PL_get_atom_chars(term_t, char **);
+extern X_API int PL_get_atom_nchars(term_t, size_t *, char **);
 extern X_API int PL_get_bool(term_t, int *);
 extern X_API int PL_get_chars(term_t, char **, unsigned);
 extern X_API int PL_get_nchars(term_t, size_t *, char **, unsigned);
@@ -335,12 +393,12 @@ extern X_API int PL_get_name_arity(term_t, atom_t *, int *);
 extern X_API int PL_get_nil(term_t);
 extern X_API int PL_get_pointer(term_t, void **);
 extern X_API int PL_get_intptr(term_t, intptr_t *);
-extern X_API int PL_get_string(term_t, char **, int *);
 extern X_API int PL_get_tail(term_t, term_t);
 /* end PL_get_* functions  =============================*/
 /* begin PL_new_* functions =============================*/
 extern X_API atom_t PL_new_atom(const char *);
-extern X_API atom_t PL_new_atom_wchars(int, const pl_wchar_t *);
+extern X_API atom_t PL_new_atom_nchars(size_t, const char *);
+extern X_API atom_t PL_new_atom_wchars(size_t, const pl_wchar_t *);
 extern X_API char *PL_atom_nchars(atom_t, size_t *);
 extern X_API pl_wchar_t *PL_atom_wchars(atom_t, size_t *);
 extern X_API functor_t PL_new_functor(atom_t, int);
@@ -353,6 +411,7 @@ extern X_API int PL_cons_functor_v(term_t, functor_t,term_t);
 extern X_API int PL_cons_list(term_t, term_t, term_t);
 extern X_API int PL_put_atom(term_t, atom_t);
 extern X_API int PL_put_atom_chars(term_t, const char *);
+extern X_API int PL_put_atom_nchars(term_t, size_t ,const char *);
 extern X_API int PL_put_float(term_t, double);
 extern X_API int PL_put_functor(term_t, functor_t t);
 extern X_API int PL_put_int64(term_t, int64_t);
@@ -362,6 +421,7 @@ extern X_API int PL_put_list_chars(term_t, const char *);
 extern X_API void PL_put_nil(term_t);
 extern X_API int PL_put_pointer(term_t, void *);
 extern X_API int PL_put_string_chars(term_t, const char *);
+extern X_API int PL_put_string_nchars(term_t, size_t, const char *);
 extern X_API int PL_put_term(term_t, term_t);
 extern X_API int PL_put_variable(term_t);
 extern X_API  int PL_compare(term_t, term_t);
@@ -378,9 +438,11 @@ extern X_API  int PL_unify_int64(term_t, int64_t);
 extern X_API  int PL_unify_integer(term_t, long);
 extern X_API  int PL_unify_list(term_t, term_t, term_t);
 extern X_API  int PL_unify_list_chars(term_t, const char *);
+extern X_API  int PL_unify_list_ncodes(term_t, size_t, const char *);
 extern X_API  int PL_unify_nil(term_t);
 extern X_API  int PL_unify_pointer(term_t, void *);
 extern X_API  int PL_unify_string_chars(term_t, const char *);
+extern X_API  int PL_unify_string_nchars(term_t, size_t, const char *);
 extern X_API  int PL_unify_term(term_t,...);
 extern X_API  int PL_unify_chars(term_t, int, size_t, const char *);
 extern X_API  int PL_unify_chars_diff(term_t, term_t, int, size_t, const char *);
@@ -394,6 +456,7 @@ extern X_API  int PL_is_compound(term_t);
 extern X_API  int PL_is_float(term_t);
 extern X_API  int PL_is_functor(term_t, functor_t);
 extern X_API  int PL_is_ground(term_t);
+extern X_API  int PL_is_callable(term_t);
 extern X_API  int PL_is_integer(term_t);
 extern X_API  int PL_is_list(term_t);
 extern X_API  int PL_is_number(term_t);
@@ -410,6 +473,7 @@ extern X_API void PL_discard_foreign_frame(fid_t);
 extern X_API void PL_rewind_foreign_frame(fid_t);
 extern X_API fid_t PL_open_foreign_frame(void);
 extern X_API int PL_raise_exception(term_t);
+extern X_API int PL_throw(term_t);
 extern X_API void PL_clear_exception(void);
 extern X_API void PL_register_atom(atom_t);
 extern X_API void PL_unregister_atom(atom_t);
@@ -425,30 +489,91 @@ extern X_API term_t PL_exception(qid_t);
 extern X_API term_t PL_exception(qid_t);
 extern X_API int PL_call_predicate(module_t, int, predicate_t, term_t);
 extern X_API int PL_call(term_t, module_t);
-extern X_API void PL_register_foreign(const char *, int, foreign_t (*)(void), int);
-extern X_API void PL_register_foreign_in_module(const char *, const char *, int, foreign_t (*)(void), int);
+extern X_API void PL_register_foreign(const char *, int, pl_function_t, int);
+extern X_API void PL_register_foreign_in_module(const char *, const char *, int, pl_function_t, int);
 extern X_API void PL_register_extensions(const PL_extension *);
 extern X_API void PL_load_extensions(const PL_extension *);
 extern X_API int PL_handle_signals(void);
 extern X_API int  PL_thread_self(void);
+extern X_API int  PL_unify_thread_id(term_t, int);
 extern X_API int PL_thread_attach_engine(const PL_thread_attr_t *);
 extern X_API int PL_thread_destroy_engine(void);
 extern X_API int PL_thread_at_exit(void (*)(void *), void *, int);
 extern X_API PL_engine_t PL_create_engine(const PL_thread_attr_t *);
 extern X_API int PL_destroy_engine(PL_engine_t);
 extern X_API int PL_set_engine(PL_engine_t,PL_engine_t *);
-extern X_API int PL_get_string_chars(term_t, char **, int *);
+extern X_API int PL_get_string(term_t, char **, size_t *);
+extern X_API int PL_get_string_chars(term_t, char **, size_t *);
 extern X_API record_t PL_record(term_t);
 extern X_API int PL_recorded(record_t, term_t);
 extern X_API void PL_erase(record_t);
+/* only partial implementation, does not guarantee export between different architectures and versions of YAP */
+extern X_API char *PL_record_external(term_t, size_t *);
+extern X_API int PL_recorded_external(char *, term_t);
+extern X_API int PL_erase_external(char *);
 extern X_API int PL_action(int,...);
+extern X_API void PL_on_halt(void (*)(int, void *), void *);
 extern X_API void *PL_malloc(int);
 extern X_API void *PL_realloc(void*,int);
 extern X_API void PL_free(void *);
 extern X_API int  PL_eval_expression_to_int64_ex(term_t t, int64_t *val);
+extern X_API void  PL_cleanup_fork(void);
+extern X_API int PL_get_signum_ex(term_t sig, int *n);
+
+extern X_API size_t PL_utf8_strlen(const char *s, size_t len);
+
+extern X_API int PL_unify_list_codes(term_t l, const char *chars);
+
+extern X_API int PL_is_blob(term_t t, PL_blob_t **type);
+extern X_API void *PL_blob_data(term_t t, size_t *len, PL_blob_t **type);
+
+#define PL_SIGSYNC	0x00010000	/* call handler synchronously */
+#define PL_SIGNOFRAME	0x00020000	/* Do not create a Prolog frame */
+
+extern X_API void (*PL_signal(int sig, void (*func)(int)))(int);
+extern X_API void  PL_fatal_error(const char *msg);
 
 extern X_API int Sprintf(const char * fm,...);
 extern X_API int Sdprintf(const char *,...);
+
+extern X_API int PL_get_file_name(term_t n, char **name, int flags);
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+NOTE: the functions in this section are   not  documented, as as yet not
+adviced for public usage.  They  are   intended  to  provide an abstract
+interface for the GNU readline  interface   as  defined in pl-rl.c. This
+abstract interface is necessary to make an embeddable system without the
+readline overhead.
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+					/* PL_dispatch() modes */
+#define PL_DISPATCH_NOWAIT    0		/* Dispatch only once */
+#define PL_DISPATCH_WAIT      1		/* Dispatch till input available */
+#define PL_DISPATCH_INSTALLED 2		/* dispatch function installed? */
+
+extern X_API int PL_dispatch(int fd, int wait);
+
+typedef int  (*PL_dispatch_hook_t)(int fd);
+
+		/********************************
+		*         QUERY PROLOG          *
+		*********************************/
+
+#define PL_QUERY_ARGC		1	/* return main() argc */
+#define PL_QUERY_ARGV		2	/* return main() argv */
+					/* 3: Obsolete PL_QUERY_SYMBOLFILE */
+					/* 4: Obsolete PL_QUERY_ORGSYMBOLFILE*/
+#define PL_QUERY_GETC		5	/* Read character from terminal */
+#define PL_QUERY_MAX_INTEGER	6	/* largest integer */
+#define PL_QUERY_MIN_INTEGER	7	/* smallest integer */
+#define PL_QUERY_MAX_TAGGED_INT	8	/* largest tagged integer */
+#define PL_QUERY_MIN_TAGGED_INT	9	/* smallest tagged integer */
+#define PL_QUERY_VERSION        10	/* 207006 = 2.7.6 */
+#define PL_QUE_MAX_THREADS	11	/* maximum thread count */
+#define PL_QUERY_ENCODING	12	/* I/O encoding */
+#define PL_QUERY_USER_CPU	13	/* User CPU in milliseconds */
+#define PL_QUERY_HALTING	14	/* If TRUE, we are in PL_cleanup() */
+
+X_API intptr_t		PL_query(int);	/* get information from Prolog */
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Output   representation   for   PL_get_chars()     and    friends.   The
@@ -468,6 +593,23 @@ UNICODE file functions.
 
 #define PL_DIFF_LIST	0x20000		/* PL_unify_chars() */
 
+#define PL_WRT_QUOTED		0x01	/* quote atoms */
+#define PL_WRT_IGNOREOPS	0x02	/* ignore list/operators */
+#define PL_WRT_NUMBERVARS	0x04	/* print $VAR(N) as a variable */
+#define PL_WRT_PORTRAY		0x08	/* call portray */
+#define PL_WRT_CHARESCAPES	0x10	/* Output ISO escape sequences */
+#define PL_WRT_BACKQUOTED_STRING 0x20	/* Write strings as `...` */
+					/* Write attributed variables */
+#define PL_WRT_ATTVAR_IGNORE	0x040	/* Default: just write the var */
+#define PL_WRT_ATTVAR_DOTS	0x080	/* Write as Var{...} */
+#define PL_WRT_ATTVAR_WRITE	0x100	/* Write as Var{Attributes} */
+#define PL_WRT_ATTVAR_PORTRAY	0x200	/* Use Module:portray_attrs/2 */
+#define PL_WRT_ATTVAR_MASK \
+	(PL_WRT_ATTVAR_IGNORE | \
+	 PL_WRT_ATTVAR_DOTS | \
+	 PL_WRT_ATTVAR_WRITE | \
+	 PL_WRT_ATTVAR_PORTRAY)
+
 #ifdef SIO_MAGIC			/* defined from <SWI-Stream.h> */
 					/* Make IOSTREAM known to Prolog */
 PL_EXPORT(int)  	PL_open_stream(term_t t, IOSTREAM *s);
@@ -476,10 +618,18 @@ PL_EXPORT(int)  	PL_unify_stream(term_t t, IOSTREAM *s);
 PL_EXPORT(int)  	PL_get_stream_handle(term_t t, IOSTREAM **s);
 PL_EXPORT(int) 		PL_release_stream(IOSTREAM *s);
 
+PL_EXPORT(int)          PL_write_term(IOSTREAM *s,term_t term,int precedence,int flags);
+
 #endif
 
-#define succeed			return TRUE
-#define fail			return FALSE
+
+#if USE_GMP
+
+PL_EXPORT(int)		PL_get_mpz(term_t t, mpz_t mpz);
+PL_EXPORT(int)		PL_unify_mpz(term_t t, mpz_t mpz);
+PL_EXPORT(int)		PL_get_mpq(term_t t, mpq_t mpz);
+PL_EXPORT(int)		PL_unify_mpq(term_t t, mpq_t mpz);
+#endif
 
 extern X_API  const char *PL_cwd(void);
 
@@ -513,7 +663,18 @@ PL_EXPORT(int)	 	PL_foreign_control(control_t);
 PL_EXPORT(intptr_t)	PL_foreign_context(control_t);
 PL_EXPORT(void *)	PL_foreign_context_address(control_t);
 
+typedef struct SWI_IO {
+  functor_t f; 
+  void *get_c;
+  void *put_c;
+  void *get_w;
+  void *put_w;
+  void *flush_s;
+  void *close_s;
+} swi_io_struct;
 
+/*  SWI stream info */
+PL_EXPORT(void)         PL_YAP_InitSWIIO(struct SWI_IO *swio);
 
 #ifdef __cplusplus
 }

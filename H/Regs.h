@@ -31,12 +31,12 @@
 #undef  PUSH_X
 #endif
 
-#ifdef __x86_64__
-#undef  PUSH_REGS
+#ifdef sparc
+#define PUSH_REGS 1
 #undef  PUSH_X
 #endif
 
-#if defined(sparc) || defined(__sparc)
+#ifdef __x86_64__
 #undef  PUSH_REGS
 #undef  PUSH_X
 #endif
@@ -80,6 +80,7 @@ EXTERN void save_B(void);
 
 typedef struct
   {
+    Int     CurSlot_;
     CELL    CreepFlag_;		/* 13                                         */
     CELL   *HB_;		/* 4 heap (global) stack top at latest c.p.   */
 #if defined(SBA) || defined(TABLING)
@@ -109,7 +110,7 @@ typedef struct
     CELL  *AuxSp_;		/* 9 Auxiliary stack pointer                  */
     ADDR   AuxTop_;		/* 10 Auxiliary stack top                     */
 /* visualc*/
-    CELL   EX_;	    	        /* 18                                         */
+    struct DB_TERM   * EX_;     /* 18                                         */
     Term  CurrentModule_;
 #if defined(SBA) || defined(TABLING)
     CELL *H_FZ_;
@@ -202,66 +203,7 @@ extern int Yap_stack_overflows;
 #define YENV_ADDRESS (&(YENV))
 #define MEM2YENV  
 
-#if defined(__GNUC__) && defined(sparc) && !defined(__NetBSD__) && !defined(THREADS)
-
-#define P    Yap_REGS.P_		/* prolog machine program counter         */
-#define YENV Yap_REGS.YENV_	/* current environment (may differ from   ENV)*/
-#define S    Yap_REGS.S_		/* structure pointer                      */
-
-register CELL *H asm ("g5");
-#define TR         Yap_REGS.TR_	/* latest choice point            */
-#define  B         Yap_REGS.B_	/* latest choice point            */
-#define CP         Yap_REGS.CP_	/* continuation   program counter         */
-#define HB         Yap_REGS.HB_	/* heap (global) stack top at time of latest c.p. */
-#define CreepFlag  Yap_REGS.CreepFlag_
-
-EXTERN inline void save_machine_regs(void) {
-  Yap_REGS.H_   = H;
-}
-
-EXTERN inline void restore_machine_regs(void) {
-  H = Yap_REGS.H_;
-}
-
-#define BACKUP_MACHINE_REGS()           \
-  CELL     *BK_H = H;                   \
-  restore_machine_regs()
-
-#define RECOVER_MACHINE_REGS()          \
-  save_machine_regs();                  \
-  H = BK_H
-
-EXTERN inline void save_H(void) {
-  Yap_REGS.H_   = H;
-}
-
-EXTERN inline void restore_H(void) {
-  H = Yap_REGS.H_;
-}
-
-#define BACKUP_H()  CELL *BK_H = H;  restore_H()
-
-#define RECOVER_H()   save_H(); H = BK_H
-
-EXTERN inline void save_B(void) {
-}
-
-EXTERN inline void restore_B(void) {
-}
-
-#if defined(__svr4__)
-#define BACKUP_B()
-
-#define RECOVER_B()
-#else
-#define BACKUP_B()  
-
-#define RECOVER_B()   
-#endif
-
-#define restore_TR() 
-
-#elif defined(__GNUC__) && defined(__alpha)
+#if defined(__GNUC__) && defined(__alpha)
 
 #define P               Yap_REGS.P_	/* prolog machine program counter */
 #define YENV            Yap_REGS.YENV_	/* current environment (may differ from ENV) */
@@ -668,11 +610,10 @@ EXTERN inline void restore_B(void) {
 
 #endif
 
+#define	CurSlot       Yap_REGS.CurSlot_
 #define	AuxBase       Yap_REGS.AuxBase_
 #define	AuxSp         Yap_REGS.AuxSp_
 #define	AuxTop        Yap_REGS.AuxTop_
-#define TopB          Yap_REGS.TopB_
-#define DelayedB      Yap_REGS.DelayedB_
 #define EX            Yap_REGS.EX_
 #define DEPTH	      Yap_REGS.DEPTH_
 #if defined(SBA) || defined(TABLING)

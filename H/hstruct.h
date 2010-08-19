@@ -1,4 +1,8 @@
 
+  /* This file, hstruct.h, was generated automatically by "yap -L misc/buildheap"
+     please do not update, update misc/HEAPFIELDS instead */
+
+
 
 
 
@@ -86,6 +90,7 @@
   Term  charsio_module;
   Term  terms_module;
   Term  system_module;
+  Term  operating_system_module;
   Term  readutil_module;
   Term  hacks_module;
   Term  arg_module;
@@ -287,7 +292,11 @@
   UInt  prof_preds;
 #endif /* LOW_PROF */
 
-  void  *foreign_code_loaded;
+  struct ForeignLoadItem  *foreign_code_loaded;
   ADDR  foreign_code_base;
   ADDR  foreign_code_top;
   ADDR  foreign_code_max;
+
+  Atom  swi_atoms[N_SWI_ATOMS];
+  Functor  swi_functors[N_SWI_FUNCTORS];
+  struct swi_reverse_hash  swi_reverse_hash[N_SWI_HASH];

@@ -130,12 +130,15 @@ print_usage(void)
   fprintf(stderr,"  -l   load Prolog file\n");
   fprintf(stderr,"  -L   run Prolog file and exit\n");
   fprintf(stderr,"  -p   extra path for file-search-path\n");
-  fprintf(stderr,"  -h   Heap area in Kbytes (default: %d, minimum: %d)\n",
+  fprintf(stderr,"  -hSize   Heap area in Kbytes (default: %d, minimum: %d)\n",
 	  DefHeapSpace, MinHeapSpace);
-  fprintf(stderr,"  -s   Stack area in Kbytes (default: %d, minimum: %d)\n",
+  fprintf(stderr,"  -sSize   Stack area in Kbytes (default: %d, minimum: %d)\n",
 	  DefStackSpace, MinStackSpace);
-  fprintf(stderr,"  -t   Trail area in Kbytes (default: %d, minimum: %d)\n",
+  fprintf(stderr,"  -tSize   Trail area in Kbytes (default: %d, minimum: %d)\n",
 	  DefTrailSpace, MinTrailSpace);
+  fprintf(stderr,"  -GSize  Max Area for Global Stack\n");
+  fprintf(stderr,"  -LSize   Max Area for Local Stack (number must follow L)\n");
+  fprintf(stderr,"  -TSize   Max Area for Trail (number must follow L)\n");
   fprintf(stderr,"\n[Execution Modes]\n");
   fprintf(stderr,"  -J0  Interpreted mode (default)\n");
   fprintf(stderr,"  -J1  Mixed mode only for user predicates\n");
@@ -194,11 +197,11 @@ add_end_dot(char arg[])
 static int
 dump_runtime_variables(void)
 {
-  fprintf(stderr,"CC=\"%s\"\n",YAP_CC);
-  fprintf(stderr,"YAP_ROOTDIR=\"%s\"\n",YAP_ROOTDIR);
-  fprintf(stderr,"YAP_LIBS=\"%s\"\n",YAP_LIBS);
-  fprintf(stderr,"YAP_SHLIB_SUFFIX=\"%s\"\n",YAP_SHLIB_SUFFIX);
-  fprintf(stderr,"YAP_VERSION=%d\n",YAP_VERSION);
+  fprintf(stdout,"CC=\"%s\"\n",YAP_CC);
+  fprintf(stdout,"YAP_ROOTDIR=\"%s\"\n",YAP_ROOTDIR);
+  fprintf(stdout,"YAP_LIBS=\"%s\"\n",YAP_LIBS);
+  fprintf(stdout,"YAP_SHLIB_SUFFIX=\"%s\"\n",YAP_SHLIB_SUFFIX);
+  fprintf(stdout,"YAP_VERSION=%d\n",YAP_VERSION);
   exit(0);
   return 1;
 }
@@ -298,6 +301,11 @@ parse_yap_arguments(int argc, char *argv[], YAP_init_args *iap)
 	    }
 	    break;
 #endif /* EMACS */
+	  case 'F':
+	    /* just ignore for now */
+	      argc--;
+	      argv++;
+	      break;
 	  case 'f':
 	    if (argc > 1 && argv[1][0] != '-') {
 	      argc--;

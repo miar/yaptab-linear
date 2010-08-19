@@ -297,6 +297,46 @@ Yap_LookupMaybeWideAtom(wchar_t *atom)
 }
 
 Atom
+Yap_LookupMaybeWideAtomWithLength(wchar_t *atom, size_t len)
+{				/* lookup atom in atom table            */
+  wchar_t *p = atom, c;
+  size_t len0 = 0;
+  Atom at;
+  int wide = FALSE;
+
+  while ((c = *p++)) { 
+    if (c > 255) wide = TRUE;
+    len0++;
+    if (len0 == len) break;
+  }
+  if (p[0] == '\0' && wide) return LookupWideAtom(atom);
+  else if (wide) {
+    wchar_t *ptr, *ptr0;
+    p = atom;
+    ptr0 = ptr = (wchar_t *)Yap_AllocCodeSpace(sizeof(wchar_t)*(len+1));
+    if (!ptr)
+      return NIL;
+    while (len--) {*ptr++ = *p++;}
+    ptr[0] = '\0';
+    at = LookupWideAtom(ptr0);
+    Yap_FreeCodeSpace((char *)ptr0);
+    return at;
+  } else {
+    char *ptr, *ptr0;
+    /* not really a wide atom */
+    p = atom;
+    ptr0 = ptr = Yap_AllocCodeSpace(len+1);
+    if (!ptr)
+      return NIL;
+    while (len--) {*ptr++ = *p++;}
+    ptr[0] = '\0';
+    at = LookupAtom(ptr0);
+    Yap_FreeCodeSpace(ptr0);
+    return at;
+  }
+}
+
+Atom
 Yap_LookupAtom(char *atom)
 {				/* lookup atom in atom table            */
   return LookupAtom(atom);
@@ -712,7 +752,7 @@ Yap_NewPredPropByFunctor(FunctorEntry *fe, Term cur_mod)
       PredHash[hsh] = p;
     }
     WRITE_UNLOCK(PredHashRWLock);
-    /* make sure that we have something here */
+    /* make sure that we have something here: note that this is not a valid pointer!! */
     RepPredProp(fe->PropsOfFE)->NextOfPE = fe->PropsOfFE;
   } else {
     fe->PropsOfFE = AbsPredProp(p);
@@ -1095,10 +1135,10 @@ Term
 Yap_NStringToList(char *s, size_t len)
 {
   Term t;
-  char *cp = s + len;
+  unsigned char *cp = (unsigned char *)s + len;
 
   t = MkAtomTerm(AtomNil);
-  while (cp > s) {
+  while (cp > (unsigned char *)s) {
     t = MkPairTerm(MkIntegerTerm(*--cp), t);
   }
   return t;
@@ -1135,6 +1175,7 @@ Yap_StringToDiffList(char *s, Term t)
 {
   register unsigned char *cp = (unsigned char *)s + strlen(s);
 
+ t = Yap_Globalise(t);
   while (cp > (unsigned char *)s) {
     t = MkPairTerm(MkIntTerm(*--cp), t);
   }
@@ -1146,6 +1187,7 @@ Yap_NStringToDiffList(char *s, Term t, size_t len)
 {
   register unsigned char *cp = (unsigned char *)s + len;
 
+  t = Yap_Globalise(t);
   while (cp > (unsigned char *)s) {
     t = MkPairTerm(MkIntTerm(*--cp), t);
   }
@@ -1157,6 +1199,7 @@ Yap_WideStringToDiffList(wchar_t *s, Term t)
 {
  wchar_t *cp = s + wcslen(s);
 
+  t = Yap_Globalise(t);
   while (cp > s) {
     t = MkPairTerm(MkIntegerTerm(*--cp), t);
   }
@@ -1168,6 +1211,7 @@ Yap_NWideStringToDiffList(wchar_t *s, Term t, size_t len)
 {
  wchar_t *cp = s + len;
 
+ t = Yap_Globalise(t);
   while (cp > s) {
     t = MkPairTerm(MkIntegerTerm(*--cp), t);
   }
@@ -1246,7 +1290,7 @@ Yap_NWideStringToDiffListOfAtoms(wchar_t *s, Term t0, size_t len)
   wchar_t *cp = s + len;
 
   so[1] = '\0';
-  t = t0;
+  t = Yap_Globalise(t0);
   while (cp > s) {
     so[0] = *--cp;
     t = MkPairTerm(MkAtomTerm(LookupWideAtom(so)), t);
@@ -1332,7 +1376,7 @@ ArgsOfSFTerm(Term t)
 
 #endif
 
-long
+Int
 Yap_NewSlots(int n)
 {
   Int old_slots = IntOfTerm(ASP[0]), oldn = n;
@@ -1342,15 +1386,17 @@ Yap_NewSlots(int n)
     n--;
   }
   ASP[0] = MkIntTerm(old_slots+oldn);
+  CurSlot = LCL0-ASP;
   return((ASP+1)-LCL0);
 }
 
-long
+Int
 Yap_InitSlot(Term t)
 {
   Int old_slots = IntOfTerm(ASP[0]);
   *ASP = t;
   ASP--;
+  CurSlot ++;
   ASP[0] = MkIntTerm(old_slots+1);
   return((ASP+1)-LCL0);
 }
@@ -1363,30 +1409,31 @@ Yap_RecoverSlots(int n)
     return FALSE;
   }
   ASP += n;
+  CurSlot -= n;
   ASP[0] = MkIntTerm(old_slots-n);
   return TRUE;
 }
 
 Term
-Yap_GetFromSlot(long slot)
+Yap_GetFromSlot(Int slot)
 {
   return(Deref(LCL0[slot]));
 }
 
 Term
-Yap_GetPtrFromSlot(long slot)
+Yap_GetPtrFromSlot(Int slot)
 {
   return(LCL0[slot]);
 }
 
 Term *
-Yap_AddressFromSlot(long slot)
+Yap_AddressFromSlot(Int slot)
 {
   return(LCL0+slot);
 }
 
 void
-Yap_PutInSlot(long slot, Term t)
+Yap_PutInSlot(Int slot, Term t)
 {
   LCL0[slot] = t;
 }

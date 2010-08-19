@@ -20,6 +20,11 @@
 // Stuff that must be considered local to a thread or worker
 START_WORKER_LOCAL
 
+// Streams
+int			c_input_stream		Yap_c_input_stream	=0
+int			c_output_stream		Yap_c_output_stream	=1
+int			c_error_stream		Yap_c_error_stream	=2
+
 /* shifts and restore: per local data-structure */
 restoreinfo	rinfo
 .	rinfo.old_ASP	OldASP				=NULL
@@ -127,7 +132,7 @@ Term				*new_tr		new_TR		=NULL
 #endif
 struct gc_mark_continuation*	conttop0	cont_top0	=NULL
 struct gc_mark_continuation*	conttop		cont_top	=NULL
-int				disc_trail_entries	discard_trail_entries		=NULL
+int				disc_trail_entries	discard_trail_entries		=0
 gc_ma_hash_entry		Gc_ma_hash_table[GC_MAVARS_HASH_SIZE]	gc_ma_hash_table	void
 gc_ma_hash_entry*		Gc_ma_h_top	gc_ma_h_top	=NULL
 gc_ma_hash_entry*		Gc_ma_h_list	gc_ma_h_list	=NULL
@@ -145,16 +150,37 @@ struct static_array_entry*	static_arrays		StaticArrays	=NULL PtoArraySAdjust
 struct global_entry*		global_variables	GlobalVariables	=NULL PtoGlobalEAdjust
 int				allow_restart		Yap_AllowRestart	=FALSE
 
+// Thread Local Area for Fast Storage of Intermediate Compiled Code.
+struct mem_blk*			cmem_first_block	Yap_CMemFirstBlock	=NULL
+UInt				cmem_first_block_sz	Yap_CMemFirstBlockSz	=0L
+
+// Thread Local Area for Labels.
+Int*				label_first_array	Yap_LabelFirstArray	=NULL
+UInt				label_first_array_sz	Yap_LabelFirstArraySz	=0L
+
+// Thread Local Area for SWI-Prolog emulation routines.
+char*				putc_curp_		putc_curp		=NULL
+char*				putc_cur_buf_		putc_cur_buf		=NULL
+char*				putc_cur_lim_		putc_cur_lim		=NULL
+UInt				putc_cur_flags_		putc_cur_flags		=0L
+char*				SWI_buffers_[1+SWI_BUF_RINGS] SWI_buffers	InitSWIBuffers(wid)
+size_t				SWI_buffers_sz_[1+SWI_BUF_RINGS] SWI_buffers_sz	void
+int				SWI_buf_index_		SWI_buf_index		=0
+
+
+struct open_query_struct*	_execution		execution		=NULL
+
 // Ricardo's stuff
 #if (defined(YAPOR) || defined(TABLING)) && defined(THREADS)
 struct worker			worker			WORKER		void
 #endif
 
 #ifdef THREADS
-struct thandle			thread_handle		ThreadHandle	InitThreadHandle	
+struct thandle			thread_handle		ThreadHandle	InitThreadHandle(wid)
 #define FOREIGN_ThreadHandle(wid)  (Yap_WLocal[(wid)].thread_handle)		       						
 #define MY_ThreadHandle	       (Yap_WLocal[worker_id].thread_handle)
 #endif
+
 // END WORKER LOCAL STUFF
 END_WORKER_LOCAL
 
@@ -176,6 +202,14 @@ UInt  threads_total_time		ThreadsTotalTime =0L
 // protect long critical regions
 lockvar		bgl			BGL		MkLock
 #endif
+
+Functor			f_swi_stream		FSWIStream	=NULL
+SWI_GetFunction		swi_getc		SWIGetc		=NULL
+SWI_PutFunction		swi_putc		SWIPutc		=NULL
+SWI_GetWideFunction	swi_wgetc		SWIWideGetc	=NULL
+SWI_PutWideFunction	swi_wputc		SWIWidePutc	=NULL
+SWI_CloseFunction	swi_close		SWIClose	=NULL
+SWI_FlushFunction	swi_flush		SWIFlush	=NULL
 
 // stack overflow expansion/gc control
 int		allow_local_expansion	Yap_AllowLocalExpansion =TRUE
@@ -204,6 +238,12 @@ lockvar		thread_handles_lock	ThreadHandlesLock	MkLock
 struct global_data	global			GLOBAL		void	
 struct local_data	remote[MAX_WORKERS]	REMOTE		void
 #endif
+
+// initialization: tell whether the system has been initialised and by whom.
+int		initialised		Yap_Initialised		=FALSE
+int		initialised_from_pl	Yap_InitialisedFromPL	=FALSE
+int		pl_argc			Yap_PL_Argc		=0
+char	      **pl_argv			Yap_PL_Argv		=NULL
 
 END_WORKER_SHARED
 

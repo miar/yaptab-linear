@@ -102,12 +102,17 @@ true :- true.
 	% '$set_read_error_handler'(error), let the user do that
 	nb_setval('$open_expands_filename',true),
 	nb_setval('$trace',off),
+	nb_setval('$system_mode',off),
+	nb_setval('$chr_toplevel_show_store',false),
 	nb_setval('$assert_all',off),
 	nb_setval('$if_skip_mode',no_skip),
-	b_setval('$spy_glist',[]).
+	b_setval('$spy_glist',[]),
+	nb_setval('$spy_gn',1),
+	nb_setval('$debug_run',off),
+	nb_setval('$debug_jump',off).
 
 '$init_consult' :-
-	nb_setval('$lf_verbose',informational),
+	set_value('$lf_verbose',informational),
 	nb_setval('$if_level',0),
 	nb_setval('$endif',off),
 	nb_setval('$consulting_file',[]),
@@ -116,13 +121,13 @@ true :- true.
 	nb_setval('$included_file',[]).
 	
 '$init_or_threads' :-
-	'$yapor_threads'(W), !,
+	'$c_yapor_threads'(W), !,
 	'$start_orp_threads'(W).
 '$init_or_threads'.
 
 '$start_orp_threads'(1) :- !.
 '$start_orp_threads'(W) :-
-	thread_create('$worker',_,[detached(true)]),
+	thread_create('$c_worker',_,[detached(true)]),
 	W1 is W-1,
 	'$start_orp_threads'(W1).
 
@@ -190,9 +195,9 @@ true :- true.
 	nb_setval('$spy_gn',1),
 		% stop at spy-points if debugging is on.
 	nb_setval('$debug_run',off),
-	nb_setval('$debug_zip',off),
+	nb_setval('$debug_jump',off),
 	prompt(_,'   |: '),
-	'$command'((?-Command),Varnames,Pos,top),
+	'$command'(Command,Varnames,Pos,top),
 	'$sync_mmapped_arrays',
 	set_value('$live','$false').
 
@@ -352,16 +357,19 @@ true :- true.
 	 '$nb_getval'('$if_skip_mode', skip, fail),
 	 \+ '$if_directive'(Command),
 	 !.
- '$execute_command'((:-G),_,_,Option,_) :- !,
+ '$execute_command'((:-G),_,_,Option,_) :-
+%          !,
+	 Option \= top, !,
 	 '$current_module'(M),
 	 % allow user expansion
 	 expand_term((:- G), O),
          O = (:- G1),
 	 '$process_directive'(G1, Option, M).
- '$execute_command'((?-G),V,Pos,_,Source) :- !,
-	 '$execute_command'(G,V,Pos,top,Source).
- '$execute_command'(G,V,Pos,Option,Source) :-
-	 '$continue_with_command'(Option,V,Pos,G,Source).
+ '$execute_command'((?-G), V, Pos, Option, Source) :-
+	 Option \= top, !,
+	 '$execute_command'(G, V, Pos, top, Source).
+ '$execute_command'(G, V, Pos, Option, Source) :-
+	 '$continue_with_command'(Option, V, Pos, G, Source).
 
  %
  % This command is very different depending on the language mode we are in.
@@ -495,9 +503,9 @@ true :- true.
  % ***************************
 
 '$query'(G,V) :-
-	 \+ '$undefined'('$yapor_on', prolog),
-	 '$yapor_on',
-	 \+ '$undefined'('$start_yapor', prolog),
+	 \+ '$undefined'('$c_yapor_on', prolog),
+	 '$c_yapor_on',
+	 \+ '$undefined'('$c_start_yapor', prolog),
 	 '$parallelizable'(G), !,
 	 '$parallel_query'(G,V),
 	 fail.
@@ -1009,6 +1017,8 @@ break :-
 	nb_getval('$system_mode',SystemMode),
 	nb_getval('$trace',Trace),
 	nb_setval('$trace',off),
+	nb_getval('$debug_jump',Jump),
+	nb_getval('$debug_run',Run),
 	'$debug_on'(Debug),
 	'$debug_on'(false),
 	nb_getval('$break',BL), NBL is BL+1,
@@ -1025,6 +1035,8 @@ break :-
 	nb_setval('$spy_gn',SPY_GN),
 	'$set_input'(InpStream), '$set_output'(OutStream),
 	'$debug_on'(Debug),
+	nb_setval('$debug_jump',Jump),
+	nb_setval('$debug_run',Run),
 	nb_setval('$trace',Trace),
 	nb_setval('$break',BL),
 	nb_setval('$system_mode',SystemMode).
@@ -1032,10 +1044,10 @@ break :-
 '$silent_bootstrap'(F) :-
 	'$init_globals',
 	nb_setval('$if_level',0),
-	nb_getval('$lf_verbose',OldSilent),
-	nb_setval('$lf_verbose',silent),
+	get_value('$lf_verbose',OldSilent),
+	set_value('$lf_verbose',silent),
 	bootstrap(F),
-	nb_setval('$lf_verbose', OldSilent).
+	set_value('$lf_verbose', OldSilent).
 
 bootstrap(F) :-
 	'$open'(F, '$csult', Stream, 0, 0, F),
@@ -1045,7 +1057,7 @@ bootstrap(F) :-
 	getcwd(OldD),
 	cd(Dir),
 	(
-	  nb_getval('$lf_verbose',silent)
+	  get_value('$lf_verbose',silent)
 	->
 	  true
 	;
@@ -1056,7 +1068,7 @@ bootstrap(F) :-
 	cd(OldD),
 	'$end_consult',
 	(
-	  nb_getval('$lf_verbose',silent)
+	  get_value('$lf_verbose',silent)
 	->
 	  true
 	;
@@ -1108,29 +1120,6 @@ bootstrap(F) :-
 	'$do_error'(type_error(callable,H),P).
 '$check_head'(_,_).
 
-% Path predicates
-
-access_file(F,Mode) :-
-	'$exists'(F,Mode).
-
-'$exists'(_,none) :- !.
-'$exists'(F,exist) :- !,
-	'$access'(F).
-'$exists'(F,Mode) :-
-	get_value(fileerrors,V),
-	set_value(fileerrors,0),
-	system:true_file_name(F, F1),
-	(
-	 '$open'(F1, Mode, S, 0, 1, F)
-	->
-	 '$close'(S),
-	 set_value(fileerrors,V)
-	;
-	 set_value(fileerrors,V),
-	 fail
-	).
-
-
 % term expansion
 %
 % return two arguments: Expanded0 is the term after "USER" expansion.
@@ -1152,6 +1141,8 @@ access_file(F,Mode) :-
 expand_term(Term,Expanded) :-
 	( '$current_module'(Mod), \+ '$undefined'(term_expansion(_,_), Mod),
 	  '$notrace'(Mod:term_expansion(Term,Expanded))
+        ; \+ '$undefined'(term_expansion(_,_), system),
+	  '$notrace'(system:term_expansion(Term,Expanded))
         ; \+ '$undefined'(term_expansion(_,_), user),
 	  '$notrace'(user:term_expansion(Term,Expanded))
         ;

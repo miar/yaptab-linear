@@ -77,6 +77,7 @@ typedef enum compiler_op {
   unify_last_dbterm_op,
   unify_last_longint_op,
   unify_last_bigint_op,
+  ensure_space_op,
   native_op,
   f_var_op,
   f_val_op,
@@ -251,6 +252,8 @@ typedef struct CEXPENTRY {
 typedef struct intermediates {
   char *freep;
   char *freep0;
+  struct mem_blk *blks;
+  char *blk_cur, *blk_top;
   struct PSEUDO *cpc;
   struct PSEUDO *CodeStart;
   struct PSEUDO *icpc;
@@ -268,6 +271,8 @@ typedef struct intermediates {
   /* for expanding code */
   yamop **current_try_lab, **current_trust_lab;
   yamop *try_instructions;
+  struct StructClauseDef *cls;
+  /* for expanding code */
   union { 
     struct static_index *si;
     struct logic_upd_index *lui;
@@ -317,12 +322,13 @@ typedef enum special_label_op_enum {
 #define Two	 2
 
 
-yamop  *STD_PROTO(Yap_assemble,(int,Term,struct pred_entry *,int, struct intermediates *));
+yamop  *STD_PROTO(Yap_assemble,(int,Term,struct pred_entry *,int, struct intermediates *, UInt));
 void	STD_PROTO(Yap_emit,(compiler_vm_op,Int,CELL, struct intermediates *));
 void	STD_PROTO(Yap_emit_3ops,(compiler_vm_op,CELL,CELL,CELL, struct intermediates *));
 void	STD_PROTO(Yap_emit_4ops,(compiler_vm_op,CELL,CELL,CELL,CELL, struct intermediates *));
 CELL   *STD_PROTO(Yap_emit_extra_size,(compiler_vm_op,CELL,int, struct intermediates *));
-char   *STD_PROTO(Yap_AllocCMem,(int, struct intermediates *));
+char   *STD_PROTO(Yap_AllocCMem,(UInt, struct intermediates *));
+void    STD_PROTO(Yap_ReleaseCMem, (struct intermediates *));
 int	STD_PROTO(Yap_is_a_test_pred,(Term, Term));
 void    STD_PROTO(Yap_bip_name,(Int, char *));
 #ifdef DEBUG

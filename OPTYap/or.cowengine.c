@@ -1,19 +1,15 @@
-/*************************************************************************
-*									 *
-*	 YAP Prolog 							 *
-*									 *
-*	Yap Prolog was developed at NCCUP - Universidade do Porto	 *
-*									 *
-* Copyright L.Damas, V.S.Costa and Universidade do Porto 1985-1997	 *
-*									 *
-**************************************************************************
-*									 *
-* File:		or.cowengine.c						 *
-* Last rev:								 *
-* mods:									 *
-* comments:                                                              *
-*									 *
-*************************************************************************/
+/************************************************************************
+**                                                                     **
+**                   The YapTab/YapOr/OPTYap systems                   **
+**                                                                     **
+** YapTab extends the Yap Prolog engine to support sequential tabling  **
+** YapOr extends the Yap Prolog engine to support or-parallelism       **
+** OPTYap extends the Yap Prolog engine to support or-parallel tabling **
+**                                                                     **
+**                                                                     **
+**      Yap Prolog was developed at University of Porto, Portugal      **
+**                                                                     **
+************************************************************************/
 
 /* ------------------ **
 **      Includes      **
@@ -125,11 +121,7 @@ int q_share_work(int worker_p) {
     UNLOCK_OR_FRAME(LOCAL_top_or_fr);
     return FALSE;
   }
-#ifdef YAPOR_ERRORS
-  if (OrFr_pend_prune_cp(LOCAL_top_or_fr) &&
-      BRANCH_LTT(worker_p, OrFr_depth(LOCAL_top_or_fr)) < OrFr_pend_prune_ltt(LOCAL_top_or_fr))
-    YAPOR_ERROR_MESSAGE("prune ltt > worker_p branch ltt (q_share_work)");
-#endif /* YAPOR_ERRORS */
+  YAPOR_ERROR_CHECKING(q_share_work, OrFr_pend_prune_cp(LOCAL_top_or_fr) && BRANCH_LTT(worker_p, OrFr_depth(LOCAL_top_or_fr)) < OrFr_pend_prune_ltt(LOCAL_top_or_fr));
   /* there is no pending prune with worker p at right --> safe move to worker p branch */
   BRANCH(worker_id, OrFr_depth(LOCAL_top_or_fr)) = BRANCH(worker_p, OrFr_depth(LOCAL_top_or_fr));
   LOCAL_prune_request = NULL;

@@ -37,9 +37,7 @@ float_to_int(Float v)
   if (i-v == 0.0) {
     return MkIntegerTerm(i);
   } else {
-    MP_INT o;
-    mpz_init_set_d(&o, v);
-    return Yap_MkBigIntTerm(&o);
+    return Yap_gmp_float_to_big(v);
   }
 #else
   return MkIntegerTerm(v);
@@ -47,24 +45,6 @@ float_to_int(Float v)
 }
 
 #define RBIG_FL(v)  return(float_to_int(v))
-
-#if USE_GMP
-static Term
-process_iso_error(MP_INT *big, Term t, char *operation)
-{ /* iso */
-  Int sz = 2+mpz_sizeinbase(big,10);
-  char *s = Yap_AllocCodeSpace(sz);
-
-  if (s != NULL) {
-    mpz_get_str(s, 10, big);
-    Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is %s(%s)", operation, s);
-    Yap_FreeCodeSpace(s);
-    RERROR();
-  } else {
-    return Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is %s(t)",operation);
-  }
-}
-#endif
 
 typedef struct init_un_eval {
   char          *OpName;
@@ -104,7 +84,7 @@ get_float(Term t) {
   }
 #ifdef USE_GMP
   if (IsBigIntTerm(t)) {
-    return mpz_get_d(Yap_BigIntOfTerm(t));
+    return Yap_gmp_to_float(t);
   }
 #endif
   return 0.0;
@@ -150,7 +130,7 @@ msb(Int inp)	/* calculate the most significant bit for an integer */
   }
 
   while (off) {
-    Int limit = 1L << (off);
+    Int limit = ((CELL)1) << (off);
     if (inp >= limit) {
       out += off;
       inp >>= off;
@@ -179,7 +159,7 @@ lsb(Int inp)	/* calculate the least significant bit for an integer */
   if (!(inp &       0xffL)) {inp >>=  8; out +=  8;}
   if (!(inp &   0xfL)) {inp >>=  4; out +=  4;}
   if (!(inp &        0x3L)) {inp >>=  2; out +=  2;}
-  if (!(inp &        0x1L)) out++;
+  if (!(inp &        ((CELL)0x1))) out++;
 
   return out;
 }
@@ -188,7 +168,7 @@ static Int
 popcount(Int inp)	/* calculate the least significant bit for an integer */
 {
   /* the obvious solution: do it by using binary search */
-  Int c = 0, j = 0, m = 1L;
+  Int c = 0, j = 0, m = ((CELL)1);
 
   if (inp < 0) {
     return Yap_ArithError(DOMAIN_ERROR_NOT_LESS_THAN_ZERO, MkIntegerTerm(inp),
@@ -218,11 +198,7 @@ eval1(Int fi, Term t) {
 	Int i = IntegerOfTerm(t);
       
 	if (i == Int_MIN) {
-	  MP_INT new;
-
-	  mpz_init_set_si(&new, i);
-	  mpz_neg(&new, &new);
-	  RBIG(&new);	
+	  return Yap_gmp_neg_int(i);
 	}
 	else
 #endif
@@ -232,13 +208,7 @@ eval1(Int fi, Term t) {
       RFLOAT(-FloatOfTerm(t));
     case big_int_e:
 #ifdef USE_GMP
-      {
-	MP_INT new;
-
-	mpz_init_set(&new, Yap_BigIntOfTerm(t));
-	mpz_neg(&new, &new);
-	RBIG(&new);
-      }
+      return Yap_gmp_neg_big(t);
 #endif
     default:
       RERROR();
@@ -248,16 +218,10 @@ eval1(Int fi, Term t) {
     case long_int_e:
       RINT(~IntegerOfTerm(t));
     case double_e:
-      return Yap_ArithError(TYPE_ERROR_INTEGER, t, "\\(f)", FloatOfTerm(t));
+      return Yap_ArithError(TYPE_ERROR_INTEGER, t, "\\(%f)", FloatOfTerm(t));
     case big_int_e:
 #ifdef USE_GMP
-      {
-	MP_INT new;
-
-	mpz_init_set(&new, Yap_BigIntOfTerm(t));
-	mpz_com(&new, &new);
-	RBIG(&new);
-      }
+      return Yap_gmp_unot_big(t);
 #endif
     default:
       RERROR();
@@ -452,33 +416,13 @@ eval1(Int fi, Term t) {
 
       switch (ETypeOfTerm(t)) {
       case long_int_e:
-	if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	  return Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is floor(%f)", IntegerOfTerm(t));
-	} else {
-	  RFLOAT(IntegerOfTerm(t));
-	}
+	return t;
       case double_e:
 	dbl = FloatOfTerm(t);
 	break;
       case big_int_e:
 #ifdef USE_GMP
-	if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	  MP_INT *big = Yap_BigIntOfTerm(t);
-	  Int sz = 2+mpz_sizeinbase(big,10);
-	  char *s = Yap_AllocCodeSpace(sz);
-
-	  if (s != NULL) {
-	    mpz_get_str(s, 10, big);
-	    Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is floor(%s)", s);
-	    Yap_FreeCodeSpace(s);
-	    RERROR();
-	  } else {
-	    return Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is floor(t)");
-	  }
-	} else {
-	  dbl = mpz_get_d(Yap_BigIntOfTerm(t));
-	}
-	break;
+	return Yap_gmp_floor(t);
 #endif
       default:
 	RERROR();
@@ -488,7 +432,7 @@ eval1(Int fi, Term t) {
 	return Yap_ArithError(DOMAIN_ERROR_OUT_OF_RANGE, t, "integer(%f)", dbl);
       }
 #endif
-#if HAVE_ISNAN
+#if HAVE_ISINF
       if (isinf(dbl)) {
 	return Yap_ArithError(EVALUATION_ERROR_INT_OVERFLOW, MkFloatTerm(dbl), "integer\
 (%f)",dbl);
@@ -501,22 +445,13 @@ eval1(Int fi, Term t) {
       Float dbl;
       switch (ETypeOfTerm(t)) {
       case long_int_e:
-	if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	  return Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is ceiling(%f)", IntegerOfTerm(t));
-	} else {
-	  RFLOAT(IntegerOfTerm(t));
-	}
+	return t;
       case double_e:
 	dbl = FloatOfTerm(t);
 	break;
       case big_int_e:
 #ifdef USE_GMP
-	if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	  return process_iso_error(Yap_BigIntOfTerm(t), t, "ceiling");
-	} else {
-	  dbl = mpz_get_d(Yap_BigIntOfTerm(t));
-	}
-	break;
+	return Yap_gmp_ceiling(t);
 #endif
       default:
 	RERROR();
@@ -526,7 +461,7 @@ eval1(Int fi, Term t) {
 	return Yap_ArithError(DOMAIN_ERROR_OUT_OF_RANGE, t, "integer(%f)", dbl);
       }
 #endif
-#if HAVE_ISNAN
+#if HAVE_ISINF
       if (isinf(dbl)) {
 	return Yap_ArithError(EVALUATION_ERROR_INT_OVERFLOW, MkFloatTerm(dbl), "integer\
 (%f)",dbl);
@@ -540,23 +475,15 @@ eval1(Int fi, Term t) {
 
       switch (ETypeOfTerm(t)) {
       case long_int_e:
-	if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	  return Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is round(%ld)", IntegerOfTerm(t));
-	} else {
-	  return t;
-	}
+	return t;
       case double_e:
 	dbl = FloatOfTerm(t);
 	break;
       case big_int_e:
 #ifdef USE_GMP
-	if (yap_flags[LANGUAGE_MODE_FLAG] == 1) {
-	  return process_iso_error(Yap_BigIntOfTerm(t), t, "round");
-	}
-	return t;
-	break;
-      default:
+	return Yap_gmp_round(t);
 #endif
+      default:
 	RERROR();
       }
 #if HAVE_ISNAN
@@ -564,7 +491,7 @@ eval1(Int fi, Term t) {
 	return Yap_ArithError(DOMAIN_ERROR_OUT_OF_RANGE, t, "integer(%f)", dbl);
       }
 #endif
-#if HAVE_ISNAN
+#if HAVE_ISINF
       if (isinf(dbl)) {
 	return Yap_ArithError(EVALUATION_ERROR_INT_OVERFLOW, MkFloatTerm(dbl), "integer\
 (%f)",dbl);
@@ -578,21 +505,15 @@ eval1(Int fi, Term t) {
       Float dbl;
       switch (ETypeOfTerm(t)) {
       case long_int_e:
-	if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	  return Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is round(%ld)", IntegerOfTerm(t));
-	}
 	return t;
       case double_e:
 	dbl = FloatOfTerm(t);
 	break;
-#ifdef USE_GMP
       case big_int_e:
-	if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	  return Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is round(BIGNUM)");
-	}
-	return t;
-      default:
+#ifdef USE_GMP
+	return Yap_gmp_trunc(t);
 #endif
+      default:
 	RERROR();
       }
 #if HAVE_ISNAN
@@ -600,24 +521,16 @@ eval1(Int fi, Term t) {
 	return Yap_ArithError(DOMAIN_ERROR_OUT_OF_RANGE, t, "integer(%f)", dbl);
       }
 #endif
-#if HAVE_ISNAN
+#if HAVE_ISINF
       if (isinf(dbl)) {
 	return Yap_ArithError(EVALUATION_ERROR_INT_OVERFLOW, MkFloatTerm(dbl), "integer\
 (%f)",dbl);
       }
 #endif
-      if (dbl <= (Float)Int_MAX && dbl >= (Float)Int_MIN) {
-	RINT((Int) dbl);
-      } else {
-#ifdef USE_GMP
-	MP_INT new;
-
-	mpz_init_set_d(&new, dbl);
-	RBIG(&new);
-#else
-	return Yap_ArithError(EVALUATION_ERROR_INT_OVERFLOW, MkFloatTerm(dbl), "integer/1");
-#endif
-      }
+      if (dbl < 0.0)
+	RBIG_FL(ceil(dbl));
+      else
+	RBIG_FL(floor(dbl));      
     }
   case op_float:
     switch (ETypeOfTerm(t)) {
@@ -627,8 +540,34 @@ eval1(Int fi, Term t) {
       return t;
     case big_int_e:
 #ifdef USE_GMP
-      RFLOAT(mpz_get_d(Yap_BigIntOfTerm(t)));
+      RFLOAT(Yap_gmp_to_float(t));
 #endif
+    default:
+      RERROR();
+    }
+  case op_rational:
+    switch (ETypeOfTerm(t)) {
+    case long_int_e:
+      return t;
+#ifdef USE_GMP
+    case double_e:
+      return Yap_gmp_float_to_rational(FloatOfTerm(t));
+#endif
+    case big_int_e:
+      return t;
+    default:
+      RERROR();
+    }
+  case op_rationalize:
+    switch (ETypeOfTerm(t)) {
+    case long_int_e:
+      return t;
+#ifdef USE_GMP
+    case double_e:
+      return Yap_gmp_float_rationalize(FloatOfTerm(t));
+#endif
+    case big_int_e:
+      return t;
     default:
       RERROR();
     }
@@ -640,13 +579,7 @@ eval1(Int fi, Term t) {
       RFLOAT(fabs(FloatOfTerm(t)));
     case big_int_e:
 #ifdef USE_GMP
-      {
-	MP_INT new;
-
-	mpz_init_set(&new, Yap_BigIntOfTerm(t));
-	mpz_abs(&new, &new);
-	RBIG(&new);
-      }
+      return Yap_gmp_abs_big(t);
 #endif
     default:
       RERROR();
@@ -659,13 +592,7 @@ eval1(Int fi, Term t) {
       return Yap_ArithError(TYPE_ERROR_INTEGER, t, "msb(%f)", FloatOfTerm(t));
     case big_int_e:
 #ifdef USE_GMP
-      { MP_INT *big = Yap_BigIntOfTerm(t);
-	if ( mpz_sgn(big) <= 0 ) {
-	  return Yap_ArithError(DOMAIN_ERROR_NOT_LESS_THAN_ZERO, t,
-	      "msb/1 received bignum");
-	}
-	RINT(mpz_sizeinbase(big,2));
-      }
+      return Yap_gmp_msb(t);
 #endif
     default:
       RERROR();
@@ -678,13 +605,7 @@ eval1(Int fi, Term t) {
       return Yap_ArithError(TYPE_ERROR_INTEGER, t, "lsb(%f)", FloatOfTerm(t));
     case big_int_e:
 #ifdef USE_GMP
-      { MP_INT *big = Yap_BigIntOfTerm(t);
-	if ( mpz_sgn(big) <= 0 ) {
-	  return Yap_ArithError(DOMAIN_ERROR_NOT_LESS_THAN_ZERO, t,
-	      "lsb/1 received bignum");
-	}
-	RINT(mpz_scan1(big,0));
-      }
+      return Yap_gmp_lsb(t);
 #endif
     default:
       RERROR();
@@ -697,13 +618,7 @@ eval1(Int fi, Term t) {
       return Yap_ArithError(TYPE_ERROR_INTEGER, t, "popcount(%f)", FloatOfTerm(t));
     case big_int_e:
 #ifdef USE_GMP
-      { MP_INT *big = Yap_BigIntOfTerm(t);
-	if ( mpz_sgn(big) <= 0 ) {
-	  return Yap_ArithError(DOMAIN_ERROR_NOT_LESS_THAN_ZERO, t,
-	      "popcount/1 received negative bignum");
-	}
-	RINT(mpz_popcount(big));
-      }
+      return Yap_gmp_popcount(t);
 #endif
     default:
       RERROR();
@@ -725,11 +640,7 @@ eval1(Int fi, Term t) {
       break;
     case big_int_e:
 #ifdef USE_GMP
-      if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	return process_iso_error(Yap_BigIntOfTerm(t), t, "float_fractional_part");
-      } else {
-	RFLOAT(0.0);
-      }
+      return Yap_gmp_float_fractional_part(t);
 #endif
     default:
       RERROR();
@@ -737,21 +648,13 @@ eval1(Int fi, Term t) {
   case op_fintp:
     switch (ETypeOfTerm(t)) {
     case long_int_e:
-      if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	return Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is float_integer_part(%f)", IntegerOfTerm(t));
-      } else {
-	RFLOAT(IntegerOfTerm(t));
-      }
+      return Yap_ArithError(TYPE_ERROR_FLOAT, t, "X is float_integer_part(%f)", IntegerOfTerm(t));
     case double_e:
       RFLOAT(rint(FloatOfTerm(t)));
       break;
     case big_int_e:
 #ifdef USE_GMP
-      if (yap_flags[LANGUAGE_MODE_FLAG] == 1) { /* iso */
-	return process_iso_error(Yap_BigIntOfTerm(t), t, "float_integer_part");
-      } else {
-	RFLOAT(mpz_get_d(Yap_BigIntOfTerm(t)));
-      }
+      return Yap_gmp_float_integer_part(t);
 #endif
     default:
       RERROR();
@@ -773,7 +676,7 @@ eval1(Int fi, Term t) {
       }
     case big_int_e:
 #ifdef USE_GMP
-      RINT(mpz_sgn(Yap_BigIntOfTerm(t)));
+      return Yap_gmp_sign(t);
 #endif
     default:
       RERROR();
@@ -836,6 +739,8 @@ static InitUnEntry InitUnTab[] = {
   {"lgamma", op_lgamma},
   {"erf",op_erf},
   {"erfc",op_erfc},
+  {"rational",op_rational},
+  {"rationalize",op_rationalize},
   {"random", op_random1}
 };
 

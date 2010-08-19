@@ -4,6 +4,45 @@ dnl
 
 AC_PREREQ([2.50])
 
+dnl VARIABLES EXPORTED 
+dnl
+dnl ARCH
+dnl
+dnl DefHeapSpace= Default DB space
+dnl DefStackSpace= Default global+local
+dnl DefTrailSpace= Default trail
+dnl
+dnl  CPLINT
+dnl
+dnl CPLINT_LIBS= 
+dnl CPLINT_LIBS= 
+dnl CPLINT_LDFLAGS= 
+dnl CPLINT_SHLIB_LD= 
+dnl
+dnl  ENVIRONMENT to run YAP before Install is complete
+dnl PRE_INSTALL_ENV= prefix to run YAP after libYap.so and yap are available
+dnl    but before make install
+dnl INSTALL_ENV= prefix to run YAP while doing make install
+dnl
+dnl EXEC_SUFFIX=suffix for executable (.exe)
+dnl
+dnl INSTALL_DLLS= we can do dynamic linking
+dnl SO= suffix for loadable binary (.so,.dll,.o)
+dnl MERGE_DLL_OBJS= we need to merge several .o files into a single dll.
+dnl
+dnl CXXFLAGS= C++-flags
+dnl SHLIB_FLAGS= C-flags used to compile a file that will be loaded dynamically
+dnl DO_SECOND_LD= call a separate dll ld
+dnl YAPLIB_LD= construct libYap.DLL
+dnl SHLIB_LD= dll ld (C)
+dnl SHLIB_CXX_LD= dll ld (C++)
+dnl SHLIB_CFLAGS= cflags to use when constructing a DLL
+dnl SHLIB_CXX_CFLAGS= c++flags to use when constructing a DLL
+dnl YAPLIB_CFLAGS=flags to construct libYap
+dnl EXTRA_LIBS_FOR_DLLS= libs that are required when lding a so
+dnl EXTRA_LIBS_FOR_SWIDLLS= libs that are required when lding a SWI so
+
+
 AC_INIT(console/yap.c)
 AC_CONFIG_HEADER(config.h)
 
@@ -74,6 +113,9 @@ AC_ARG_ENABLE(chr,
 AC_ARG_ENABLE(clpqr,
 	[ --enable-clpqr            install clpqr library ],
 	use_clpqr="$enableval", use_clpqr=yes)
+AC_ARG_ENABLE(win64,
+	[ --enable-win64            compile YAP for win64 ],
+	target_win64="$enableval", target_win64=no)
 
 AC_ARG_ENABLE(april,
 	[ --enable-april             compile Yap to support April ILP system],
@@ -96,7 +138,9 @@ AC_ARG_WITH(gmp,
 	else
 		yap_cv_gmp=$with_gmp
 		LDFLAGS="$LDFLAGS -L${yap_cv_gmp}/lib"
+		LIBS="$LIBS -L${yap_cv_gmp}/lib"
 		CPPFLAGS="$CPPFLAGS -I${yap_cv_gmp}/include"
+		CFLAGS="$CFLAGS -I${yap_cv_gmp}/include"
 	fi,
 	[yap_cv_gmp=yes])
 
@@ -154,22 +198,22 @@ AC_ARG_ENABLE(myddas-top-level,
 		myddastoplevel="$enableval"
 	fi, myddastoplevel=no)
 
-AC_ARG_WITH(jpl,
-	[ --with-jpl=JAVA_HOME       use Java instalation in JAVA_HOME],
+AC_ARG_WITH(java,
+	[ --with-java=JAVA_HOME       use Java instalation in JAVA_HOME],
 	if test "$withval" = yes; then
-		yap_cv_jpl="$JAVA_HOME"
+		yap_cv_java="$JAVA_HOME"
 		dynamic_loading=yes
 		maxmemory=yes
 dnl		threads=yes
 	elif test "$withval" = no; then
-		yap_cv_jpl=no
+		yap_cv_java=no
 	else
-		yap_cv_jpl=$with_jpl
+		yap_cv_java=$with_java
 		dynamic_loading=yes
 		maxmemory=yes
 dnl		threads=yes
 	fi,
-	[yap_cv_jpl=no])
+	[yap_cv_java=no])
 
 AC_ARG_WITH(readline,
 	[ --with-readline[=DIR]      use GNU Readline Library in DIR],
@@ -301,16 +345,9 @@ AC_ARG_WITH(junit, [  --with-junit=PATH	  Specify location of the junit JAR file
 			;;
 	     esac])
 
-if test "$tabling" = yes -o "$orparallelism" = yes -o "$threads" = yes
-then
-  AC_DEFINE(MinHeapSpace, (1000*SIZEOF_INT_P))
-  AC_DEFINE(MinStackSpace,(300*SIZEOF_INT_P)) 
-  AC_DEFINE(MinTrailSpace,( 48*SIZEOF_INT_P))
-else
-  AC_DEFINE(MinHeapSpace, (300*SIZEOF_INT_P))
-  AC_DEFINE(MinStackSpace,(200*SIZEOF_INT_P))
-  AC_DEFINE(MinTrailSpace,( 32*SIZEOF_INT_P))
-fi
+AC_DEFINE(MinHeapSpace, (1000*SIZEOF_INT_P))
+AC_DEFINE(MinStackSpace,(300*SIZEOF_INT_P)) 
+AC_DEFINE(MinTrailSpace,( 48*SIZEOF_INT_P))
 
 AC_DEFINE_UNQUOTED(DefHeapSpace,$yap_cv_heap_space)
 AC_DEFINE_UNQUOTED(DefStackSpace,$yap_cv_stack_space)
@@ -394,21 +431,19 @@ fi
 dnl Compilation Flags
 if test "$GCC" = "yes"
 then
-   if test -z "${mycflags}"
-   then
      if test "$debugyap" = "yes" 
      then
-       CFLAGS="-O -g -Wall -Wstrict-prototypes -Wmissing-prototypes"
-       CXXFLAGS="-O -g -Wall"
-       C_INTERF_FLAGS="-O -g -Wall -Wstrict-prototypes -Wmissing-prototypes"
+       CXXFLAGS="-O -g -Wall $CFLAGS"
+       C_INTERF_FLAGS="-O -g -Wall -Wstrict-prototypes -Wmissing-prototypes $CFLAGS"
+       CFLAGS="-O -g -Wall -Wstrict-prototypes -Wmissing-prototypes $CFLAGS"
      else
-       CFLAGS="-O3 -fomit-frame-pointer -Wall -Wstrict-prototypes -Wmissing-prototypes"
-       CXXFLAGS="-O3 -fomit-frame-pointer -Wall"
+       CXXFLAGS="-O3 -fomit-frame-pointer -Wall $CFLAGS"
+       C_INTERF_FLAGS="-O3 -Wall -Wstrict-prototypes -Wmissing-prototypes $CFLAGS"
+       C_PARSER_FLAGS="-O3 -Wall -Wstrict-prototypes -Wmissing-prototypes $CFLAGS"
+       CFLAGS="-O3 -fomit-frame-pointer -Wall -Wstrict-prototypes -Wmissing-prototypes $CFLAGS"
        case "`$CC --version < /dev/null`" in	
 	  *3.4*) CFLAGS="-fno-gcse -fno-crossjumping $CFLAGS" ;;
        esac
-       C_INTERF_FLAGS="-O3 -Wall -Wstrict-prototypes -Wmissing-prototypes"
-       C_PARSER_FLAGS="-O3 -Wall -Wstrict-prototypes -Wmissing-prototypes"
        case "$target_cpu" in
         i*86*)
            CFLAGS="-DBP_FREE $CFLAGS"
@@ -451,26 +486,24 @@ then
           ;;
          esac
        fi
-     fi
    fi
    if test "$CC" = "sslittle-na-sstrix-gcc"
    then
     RANLIB="sslittle-na-sstrix-ranlib"
     AR="sslittle-na-sstrix-ar"
-    PRE_DYNLOADER_PATH="sim-fast"
+    PRE_INSTALL_ENV="sim-fast"
+    INSTALL_ENV="sim-fast"
    fi
 else
-   if test -z "${mycflags}"
-   then
      case "$target_cpu" in
        i?86*)
         if test "$CC" = "lcc"
         then
-          CFLAGS="-A -A"
+          CFLAGS="-A -A $CFLAGS"
         elif test "$CC" = "cl"
         then
-          CFLAGS="/nologo"
-          CXXFLAGS="-/nologo"
+          CXXFLAGS="-/nologo $CFLAGS"
+          CFLAGS="/nologo $CFLAGS"
           CPP="/nologo /E"
         fi
         ;;
@@ -479,17 +512,16 @@ else
          then
            if test "$debugyap" = "yes"
            then
-             CFLAGS="-Ae -g -O"
-             CXXFLAGS="-Ae -g -O"
+             CXXFLAGS="-Ae -g -O $CFLAGS"
+             CFLAGS="-Ae -g -O $CFLAGS"
            else
-             CFLAGS="-Ae +O3 +Onolimit"
-             CXXFLAGS="-Ae +O3 +Onolimit"
+             CXXFLAGS="-Ae +O3 +Onolimit  $CFLAGS"
+             CFLAGS="-Ae +O3 +Onolimit $CFLAGS"
            fi
         fi
 dnl	LDFLAGS="+e UserCPredicate $LDFLAGS"
         ;;
      esac
-   fi
    C_INTERF_FLAGS="$CFLAGS"
    C_PARSER_FLAGS="$CFLAGS"
 fi
@@ -513,23 +545,43 @@ then
   INSTALL_COMMAND=install_win32
   if test "$cygwin" = "no" -o "$target_os" = "mingw32"
   then
-    if test "$target_os" = "cygwin"
+    if test "$target_win64" = yes
+    then
+      AC_CHECK_LIB(ws2_32,main)
+      EXTRA_LIBS_FOR_DLLS="-lws2_32 \$(abs_top_builddir)/yap.dll"
+    elif test "$target_os" = "cygwin"
     then
       CC="${CC}  -mno-cygwin"
       CXX="${CXX}  -mno-cygwin"
+      AC_CHECK_LIB(wsock32,main)
+      EXTRA_LIBS_FOR_DLLS="\$(abs_top_builddir)/yap.dll"
+    else
+      AC_CHECK_LIB(wsock32,main)
+      EXTRA_LIBS_FOR_DLLS="\$(abs_top_builddir)/yap.dll"
     fi
-    AC_CHECK_LIB(wsock32,main)
     AC_CHECK_LIB(psapi,main)
     yap_cv_readline=no
+    if test "$target_win64" = yes
+	CLIB_NETLIBS="-lws2_32 -lpsapi -lgdi32"
+    then
+	CLIB_NETLIBS="-lwsock32 -lpsapi -lgdi32"
+    fi
     if test "$prefix" = "NONE"
     then
-      prefix="\${SYSTEMDRIVE}/Yap"
+      if test "$target_win64" = yes
+      then
+        prefix="\${SYSTEMDRIVE}/Yap64"
+	CLIB_NETLIBS="-lwsock32 -lpsapi -lgdi32"
+      else
+        prefix="\${SYSTEMDRIVE}/Yap"
+      fi
     fi
     ENABLE_WINCONSOLE=""   
   else
     ENABLE_WINCONSOLE="#"   
     LIBS="-lcygwin"
-   fi
+    EXTRA_LIBS_FOR_DLLS="\$(abs_top_builddir)/yap.dll"
+  fi
 else
   INSTALL_COMMAND="install_unix"
   ENABLE_WINCONSOLE="#"
@@ -542,6 +594,7 @@ else
 	have_nsl=yes
 	,
 	have_nsl=no)
+  AC_CHECK_LIB(crypt,main)
 fi
 
 if test "$yap_cv_readline" != "no"
@@ -663,38 +716,62 @@ else
   ENABLE_CLPQR="@# "
 fi
 
-if test "$yap_cv_jpl" = no; then
+dnl
+dnl java is hard
+dnl
+if test "$yap_cv_java" = no; then
 	ENABLE_JPL="@#"   
 elif test -e "$srcdir"/packages/jpl/Makefile.in; then
 	ENABLE_JPL=""
 	JAVA=java
-	JAVA_HOME="$yap_cv_jpl"
-	if test "x$JAVALIBS" = "x"; then
-	  case "$target_os" in
+	JAVA_HOME="$yap_cv_java"
+	case "$target_os" in
 	    *cygwin*|*mingw*)
-	       JAVALIBS="\"$JAVA_HOME\"/lib/jvm.lib -lpthread  ../PLStream/plstream.dll"
+	       if test $threads = yes; then
+	         JAVALIBPATH="\"$JAVA_HOME\"/lib/jvm.lib -lpthread"
+               else
+	         JAVALIBPATH="\"$JAVA_HOME\"/lib/jvm.lib"
+               fi
+	       JAVAINCPATH="-I\"$JAVA_HOME\"/include -I\"$JAVA_HOME\"/include/win32"
 	       	  ;;
 	       *darwin*)
-	       JAVALIBS="-Wl,-framework,JavaVM"
-	       	  ;;
-	       *powerpc-linux*)
-	       JAVALIBS="-ljava -ljvm"
+	       LIBS="$LIBS -framework JavaVM"
+	       JAVALIBPATH="-L/System/Library/Frameworks/JavaVM.framework/Libraries -Wl,-framework,JavaVM"
+	       JAVAINCPATH="-I/System/Library/Frameworks/JavaVM.framework/Headers"
 	       	  ;;
 	       *)
-	       JAVALIBS="-ljava -lverify -ljvm"
+              case "$target_os" in
+	         *linux*)
+		   JAVAINCPATH="-I\"$JAVA_HOME\"/include -I\"$JAVA_HOME\"/include/linux"
+                ;;
+	         *solaris*)
+	        JAVAINCPATH="-I\"$JAVA_HOME\"/include -I\"$JAVA_HOME\"/include/solaris"
+                ;;
+              esac
+              case "$target_cpu" in
+	        i*86*)
+                JAVA_TARGET=i386
+                ;;
+                x86*)
+                JAVA_TARGET=amd64
+               ;;
+               sparc*)
+               JAVA_TARGET=sparc
+                ;;
+               esac
+	       JAVALIBPATH="-L$JAVA_HOME/jre/lib/$JAVA_TARGET -L$JAVA_HOME/jre/lib/$JAVA_TARGET/client  -L$JAVA_HOME/jre/lib/$JAVA_TARGET/server   -Wl,-R,$JAVA_HOME/jre/lib/$JAVA_TARGET -ljava -lverify -ljvm "
 	       	  ;;
-	    esac
-        fi
-	if test "$yap_cv_jpl" = ""; then
+	esac
+	if test "$yap_cv_java" = ""; then
 	  JAVA=java
           JAR=jar
           JAVAC=javac
           JAVADOC=javadoc
         else
-	  JAVA="$yap_cv_jpl"/bin/java
-	  JAR="$yap_cv_jpl"/bin/jar
-	  JAVAC="$yap_cv_jpl"/bin/javac
-	  JAVADOC="$yap_cv_jpl"/bin/javadoc
+	  JAVA="$yap_cv_java"/bin/java
+	  JAR="$yap_cv_java"/bin/jar
+	  JAVAC="$yap_cv_java"/bin/javac
+	  JAVADOC="$yap_cv_java"/bin/javadoc
         fi
 else
       ENABLE_JPL="@#"
@@ -763,9 +840,7 @@ dnl defaults
 INSTALL_DLLS="#"
 EXTRA_OBJS=""
 SHLIB_LD="#"
-SHLIB_LOWER_LD="#"
-SHLIB_LOWER_CXX_LD="#"
-SHLIB_SWI_LD="#"
+SHLIB_CXX_LD="#"
 DO_SECOND_LD="#"
 M4="m4"
 MERGE_DLL_OBJS="#"
@@ -774,6 +849,8 @@ IN_UNIX=""
 dnl This has to be before $target_os
 YAPLIB="libYap.a"
 
+dnl now this is where things get nasty.
+dnl trying to get the libraries
 case "$target_os" in
       *linux*)
         if test "$use_condor" = "no"
@@ -784,28 +861,16 @@ case "$target_os" in
 	     have_dl=no)
           if test "$have_dl" = "yes"
 	  then
-	    SHLIB_SUFFIX=".so"
+	    SO="so"
             SHLIB_LD="$CC -shared -export-dynamic"
-            SHLIB_LOWER_LD="$SHLIB_LD"
-            SHLIB_LOWER_CXX_LD="$CXX -shared -export-dynamic"
-            SHLIB_SWI_LD="$CC -shared -export-dynamic"
+            SHLIB_CXX_LD="$CXX -shared -export-dynamic"
             DO_SECOND_LD=""
 	    LIBS="$LIBS -ldl"
 	    case "$target_cpu" in
 	      alpha*)
 	        LDFLAGS="-dynamic $LDFLAGS"
               ;;
-	      x86*)
-	      	JAVALIBPATH="-L$JAVA_HOME/jre/lib/amd64 -L$JAVA_HOME/jre/lib/amd64/client -L$JAVA_HOME/jre/lib/amd64/server"
-		JAVAINCPATH="-I$JAVA_HOME/include -I$JAVA_HOME/include/linux"
-	        if test "$CC" != "lcc"
-                then
-	          LDFLAGS="-rdynamic $LDFLAGS"
-                fi
-              ;;
               *)
-	      	JAVALIBPATH="-L$JAVA_HOME/jre/lib/i386 -L$JAVA_HOME/jre/lib/i386/client -L$JAVA_HOME/jre/lib/i386/server"
-		JAVAINCPATH="-I$JAVA_HOME/include -I$JAVA_HOME/include/linux"
 	        if test "$CC" != "lcc"
                 then
 	          LDFLAGS="-rdynamic $LDFLAGS"
@@ -815,13 +880,28 @@ case "$target_os" in
           fi
 	  if test "$ac_cv_prog_gcc" = "yes"
 	  then
-	   SHLIB_CFLAGS="-shared -fPIC"
+	   SHLIB_CFLAGS="-shared -fPIC $CFLAGS"
+	   SHLIB_CXXFLAGS="-shared -fPIC $CXXFLAGS"
 	   INSTALL_DLLS=""
           fi
         fi
         if test "$have_nsl" = yes
 	 then
 	 LIBS="$LIBS -lnsl"
+        fi
+	LDFLAGS="$LDFLAGS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(LIBDIR) -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR)"
+        DYNYAPLIB=libYap."$SO"
+        if test "$dynamic_loading" = "yes"
+        then 
+           YAPLIB_LD="\$(CC) -shared"
+           EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -lYap -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+           INSTALL_ENV="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
+           PRE_INSTALL_ENV="LD_LIBRARY_PATH=\$(abs_top_builddir)"
+        else
+           YAPLIB_LD="\$(CC)"
+           EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+           INSTALL_ENV="YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
+           PRE_INSTALL_ENV=""
         fi
 	;;
       *sunos4*)
@@ -831,8 +911,13 @@ case "$target_os" in
 	 then
 	 LIBS="$LIBS -lnsl"
         fi
-        SHLIB_SUFFIX=".o"
+        SO="o"
 	INSTALL_DLLS=""
+	LDFLAGS="$LDFLAGS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(LIBDIR) -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR)"
+        DYNYAPLIB=libYap."$SO"
+        EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -lYap -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+        PRE_INSTALL_ENV="LD_LIBRARY_PATH=\$(abs_top_builddir)"
+        INSTALL_ENV="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
 	;;
       *hpux*)
 	#do not use the first memory quadrant
@@ -846,12 +931,11 @@ case "$target_os" in
 	    #this tells ld to export all non-static symbols,
 	    #otherwise no external predicates.
             SHLIB_LD="$CC -shared -export-dynamic"
-            SHLIB_LOWER_LD="$SHLIB_LD"
-            SHLIB_LOWER_CXX_LD="$CXX -shared -export-dynamic"
-            SHLIB_SWI_LD="$CC -shared -export-dynamic"
+            SHLIB_CXX_LD="$CXX -shared -export-dynamic"
             DO_SECOND_LD=""
-            SHLIB_SUFFIX=".sl"
-	    SHLIB_CFLAGS="+z"
+            SO="sl"
+	    SHLIB_CFLAGS="+z $CFLAGS"
+	    SHLIB_CXXFLAGS="+z $CXXFLAGS"
 	    INSTALL_DLLS=""
 	    # If the xnet library was found, turn on X/Open networking
 	    if test "$ac_cv_lib_xnet_getsockname" = yes
@@ -868,14 +952,24 @@ case "$target_os" in
 	then
 	  AC_DEFINE(MPI_AVOID_REALLOC,1)
 	fi
+	LDFLAGS="$LDFLAGS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(LIBDIR) -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR)"
+        DYNYAPLIB=libYap."$SO"
+        EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -lYap -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+        PRE_INSTALL_ENV="LD_LIBRARY_PATH=\$(abs_top_builddir)"
+        INSTALL_ENV="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
 	;;
       *aix*)
 	# To actually use dlls in AIX I'd need to build YAP as a DLL first.
 	# I won't bother for now.
 	#
-        # SHLIB_SUFFIX=".a"
+        # SO="a"
         #SHLIB_LD="\$(srcdir)/../../ldAix /bin/ld -bhalt:4 -bM:SRE -bE:lib.exp -H512 -T512 -bnoentry"
 	#INSTALL_DLLS=""
+	LDFLAGS="$LDFLAGS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(LIBDIR) -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR)"
+        DYNYAPLIB=libYap."$SO"
+        EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -lYap -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+        PRE_INSTALL_ENV="LD_LIBRARY_PATH=\$(abs_top_builddir)"
+        INSTALL_ENV="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
 	;;
       *osf*)
         if ${use_condor} = no
@@ -885,21 +979,29 @@ dnl Linux has both elf and a.out, in this case we found elf
 	     have_dl=yes
 	   ,
 	     have_dl=no)
-          SHLIB_SUFFIX=".so"
+          SO="so"
           SHLIB_LD="ld -shared -expect_unresolved '*'"
-          SHLIB_SWI_LD="ld -shared -expect_unresolved '*'"
           DO_SECOND_LD=""
         fi
+	LDFLAGS="$LDFLAGS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(LIBDIR) -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR)"
+        DYNYAPLIB=libYap."$SO"
+        EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -lYap -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+        PRE_INSTALL_ENV="LD_LIBRARY_PATH=\$(abs_top_builddir)"
+        INSTALL_ENV="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
 	;;
       *irix6*)
-	SHLIB_CFLAGS=""
-	SHLIB_SUFFIX=".so"
+	SHLIB_CFLAGS="$CFLAGS"
+	SHLIB_CXXFLAGS="$CXXFLAGS"
+	SO="so"
         DO_SECOND_LD=""
 	SHLIB_LD="ld -n32 -shared -rdata_shared"
-        SHLIB_LOWER_LD="$SHLIB_LD"
-        SHLIB_LOWER_CXX_LD="$SHLIB_LD"
-	SHLIB_SWI_LD="ld -n32 -shared -rdata_shared"
+        SHLIB_CXX_LD="$SHLIB_LD"
 	INSTALL_DLLS=""
+	LDFLAGS="$LDFLAGS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(LIBDIR) -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR)"
+        DYNYAPLIB=libYap."$SO"
+        EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -lYap -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+        PRE_INSTALL_ENV="LD_LIBRARY_PATH=\$(abs_top_builddir)"
+        INSTALL_ENV="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
 	;;
       *darwin*)
 	if test ${use_dlcompat} = yes
@@ -913,71 +1015,103 @@ dnl Linux has both elf and a.out, in this case we found elf
 	    LIBS="$LIBS -ldl"	  
 	  fi
 	fi
-	LIBS="$LIBS -framework JavaVM"
-	SHLIB_CFLAGS="-fno-common"
-	SHLIB_SUFFIX=".dylib"
+	SO="dylib"
         DO_SECOND_LD=""
-# 	SHLIB_LD="$CC -bundle -bundle_loader \$(abs_top_builddir)/yap -L\$(abs_top_builddir) -lYap -undefined dynamic_lookup -Wl,-x -dead-strip -dead_strip_dylibs"
-# 	LDFLAGS="-Wl,-x -dead_strip -dead_strip_dylibs $LDFLAGS"
-	SHLIB_LD="$CC -bundle -flat_namespace -undefined suppress"
-        SHLIB_LOWER_LD="$SHLIB_LD"
-        SHLIB_LOWER_CXX_LD="$CXX -bundle -flat_namespace -undefined suppress"
-	SHLIB_SWI_LD="$CC -bundle -flat_namespace -undefined suppress"
-	INSTALL_DLLS=""
+        if test "$dynamic_loading" = "yes"
+        then 
+	   SHLIB_LD="$CC  -dynamiclib"
+           SHLIB_CXX_LD="$CXX  -dynamiclib"
+           EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -lYap   -Wl,-install_name,\$(DESTDIR)\$(YAPLIBDIR)/\$@"
+           INSTALL_ENV="DYLD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
+        else
+	   SHLIB_LD="$CC  -dynamiclib -Wl,-undefined,dynamic_lookup"
+           SHLIB_CXX_LD="$CXX  -dynamiclib -Wl,-undefined,dynamic_lookup"
+           EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS   -Wl,-install_name,\$(DESTDIR)\$(YAPLIBDIR)/\$@"
+           INSTALL_ENV="YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
+        fi
+	if test "$ac_cv_prog_gcc" = "yes"
+	then
+	   SHLIB_CFLAGS="-shared -fPIC $CFLAGS"
+	   SHLIB_CXXFLAGS="-shared -fPIC $CXXFLAGS"
+	   INSTALL_DLLS=""
+        fi
         CC="$CC -fstrict-aliasing -freorder-blocks -fsched-interblock -Wall -Wstrict-aliasing=2"
-	JAVALIBPATH="-L/System/Library/Frameworks/JavaVM.framework/Libraries"
-	JAVAINCPATH="-I/System/Library/Frameworks/JavaVM.framework/Headers"
+        DYNYAPLIB=libYap."$SO"
+        YAPLIB_LD="$CC -dynamiclib -Wl,-install_name,$prefix/lib/libYap.dylib"
+        PRE_INSTALL_ENV="DYLD_LIBRARY_PATH=\$(abs_top_builddir)"
 	;;
       *netbsd*|*freebsd*)
 	if echo __ELF__ | ${CC:-cc} -E - | grep -q __ELF__
         then
 	  #an a.out system 	
-	  SHLIB_CFLAGS=""
-	  SHLIB_SUFFIX=".o"
+	  SHLIB_CFLAGS="$CFLAGS"
+	  SHLIB_CXXFLAGS="$CXXFLAGS"
+	  SO="o"
         else
 	  #an elf system
 	  LDFLAGS="-Wl,--export-dynamic $LDFLAGS"
-	  SHLIB_CFLAGS="-fPIC"
-	  SHLIB_LD="ld -Bshareable -x"
-          SHLIB_LOWER_LD="$SHLIB_LD"
-          SHLIB_LOWER_CXX_LD="$SHLIB_LOWER_LD"
-	  SHLIB_SWI_LD="ld -Bshareable -x"
+	  SHLIB_CFLAGS="-fPIC $CFLAGS"
+	  SHLIB_CXXFLAGS="-fPIC $CXXFLAGS"
+	  SHLIB_LD="$CC -shared -export-dynamic"
+          SHLIB_CXX_LD="$CXX -shared -export-dynamic"
           DO_SECOND_LD=""
-	  SHLIB_SUFFIX=".so"
+	  SO="so"
 	  INSTALL_DLLS=""
         fi
+	LDFLAGS="$LDFLAGS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+        DYNYAPLIB=libYap."$SO"
+        EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR)"
+        PRE_INSTALL_ENV="LD_LIBRARY_PATH=\$(abs_top_builddir)"
+        INSTALL_ENV="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
 	;;
       *solaris*)
        #an elf system
         LDFLAGS="-dynamic $LDFLAGS"
-	SHLIB_CFLAGS="-fPIC"
+	SHLIB_CFLAGS="-fPIC $CFLAGS"
+	SHLIB_CXXFLAGS="-fPIC $CXXFLAGS"
 	SHLIB_LD="$CC -shared"
-        SHLIB_LOWER_LD="$SHLIB_LD"
-        SHLIB_LOWER_CXX_LD="$CXX -shared"
-	SHLIB_SWI_LD="$CC -shared"
+        SHLIB_CXX_LD="$CXX -shared"
         DO_SECOND_LD=""
-	SHLIB_SUFFIX=".so"
+	SO="so"
 	INSTALL_DLLS=""
+	LDFLAGS="$LDFLAGS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(LIBDIR) -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR)"
+        DYNYAPLIB=libYap."$SO"
+        if test "$dynamic_loading" = "yes"
+        then 
+           YAPLIB_LD="\$(CC)"
+           EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -lYap -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+           PRE_INSTALL_ENV="LD_LIBRARY_PATH=\$(abs_top_builddir)"
+           INSTALL_ENV="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
+        else
+           EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+           PRE_INSTALL_ENV=""
+           YAPLIB_LD="\$(CC) -shared"
+           INSTALL_ENV="YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
+        fi
 	;;
       *cyg*|*mingw*)
 	# gcc on cygwin seems to have trouble with longjmp
         # and -fomit-frame-point -DBP_FREE
-	JAVALIBPATH=""
-	JAVAINCPATH="-I\"$JAVA_HOME\"/include -I\"$JAVA_HOME\"/include/win32"
-	YAPLIB="libWYap.a"
-	SHLIB_CFLAGS=""
-        SHLIB_LD="\$(CC) -shared -Wl,--export-all-symbols ../../yap.dll"
-        SHLIB_LOWER_LD="\$(CC) -shared -Wl,--export-all-symbols ../../../yap.dll"
-        SHLIB_LOWER_CXX_LD="\$(CXX) -shared -Wl,--export-all-symbols ../../../yap.dll"
-        SHLIB_SWI_LD="\$(CC) -shared -Wl,--export-all-symbols ../../yap.dll  ../../packages/PLStream/plstream.dll"
-	SHLIB_SUFFIX=".dll"
+	YAPLIB="yap.dll"
+	DYNYAPLIB="yap.dll"
+	SHLIB_CFLAGS="$CFLAGS"
+	SHLIB_CXXFLAGS="$CXXFLAGS"
+        if test "$target_win64" = no
+        then
+	  LDFLAGS="-Wl,--large-address-aware $LDFLAGS"
+        fi
+        SHLIB_LD="\$(CC) -shared -Wl,--export-all-symbols"
+        SHLIB_CXX_LD="\$(CXX) -shared -Wl,--export-all-symbols"
+	SO="dll"
 	C_PARSER_FLAGS="$C_INTERF_FLAGS"
-	LDFLAGS="-Wl,--large-address-aware $LDFLAGS"
 	EXEC_SUFFIX=".exe"
 	INSTALL_DLLS=""
 	DO_SECOND_LD=""
 	MERGE_DLL_OBJS=""
-	IN_UNIX="#"
+        IN_UNIX="#"
+        YAPLIB_LD="\$(CC) -shared -Wl,--export-all-symbols"
+        PRE_INSTALL_ENV=""
+        INSTALL_ENV=""
 	;;
       *)
 	AC_CHECK_LIB(dl,dlopen,
@@ -986,62 +1120,35 @@ dnl Linux has both elf and a.out, in this case we found elf
 	   have_dl=no)
         if test "$have_dl" = yes
 	 then
-         SHLIB_SUFFIX=".o"
+         SO="o"
 	 LIBS="$LIBS -ldl"
 	 INSTALL_DLLS=""
 	 if test "$GCC" = "yes"
 	 then
-	   SHLIB_CFLAGS="-fPIC"
+	   SHLIB_CXXFLAGS="-fPIC $CXXFLAGS"
 	 fi
         fi
         if test "$have_nsl" = yes
 	 then
 	 LIBS="$LIBS -lnsl"
         fi
+	LDFLAGS="$LDFLAGS -L\$(abs_top_builddir) -Wl,-R,\$(DESTDIR)\$(LIBDIR) -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR)"
+        DYNYAPLIB=libYap."$SO"
+        EXTRA_LIBS_FOR_DLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir) -lYap -Wl,-R,\$(DESTDIR)\$(YAPLIBDIR) -Wl,-R,\$(DESTDIR)\$(LIBDIR)"
+        PRE_INSTALL_ENV="LD_LIBRARY_PATH=\$(abs_top_builddir)"
+        INSTALL_ENV="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
 	;;
 esac
 
+EXTRA_LIBS_FOR_SWIDLLS="$EXTRA_LIBS_FOR_DLLS -L\$(abs_top_builddir)/packages/PLStream -lplstream"
+
+
 if test "$dynamic_loading" = "yes"
 then 
-  DYNLIB_LD="$SHLIB_LD"
-  YAP_EXTRAS="$SHLIB_CFLAGS $YAP_EXTRAS"
-  case "$target_os" in
-  *cygwin*|*mingw*)
-    DYNLIB_LD="\$(CC) -shared -Wl,--export-all-symbols"
-    EXTEND_DYNLOADER_PATH=""
-    PRE_DYNLOADER_PATH=""
-    ;;
-  *darwin*)
-    DYNYAPLIB=libYap"$SHLIB_SUFFIX"
-    YAPLIB="$DYNYAPLIB"
-    DYNLIB_LD="$CC -dynamiclib -Wl,-install_name,$prefix/lib/libYap.dylib"
-    PRE_DYNLOADER_PATH="DYLD_LIBRARY_PATH=\$(abs_top_builddir)"
-    EXTEND_DYNLOADER_PATH="DYLD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
-#    CROSS_SIMULATOR="DYLD_LIBRARY_PATH=."
-    ;;
-  *)
-       case "$target_cpu" in
-        i*86*)
-        JAVA_TARGET=i386
-        ;;
-        x86*)
-        JAVA_TARGET=amd64
-        ;;
-        sparc*)
-        JAVA_TARGET=sparc
-        ;;
-       esac
-    EXTEND_DYNLOADER_PATH="LD_LIBRARY_PATH=\$(DESTDIR)\$(LIBDIR): YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
-    PRE_DYNLOADER_PATH="LD_LIBRARY_PATH=\$(abs_top_builddir)"
-    LDFLAGS="$LDFLAGS -Wl,-R,$JAVA_HOME/jre/lib/$JAVA_TARGET"
-    DYNYAPLIB=libYap"$SHLIB_SUFFIX"
-    YAPLIB="$DYNYAPLIB"
-    ;;
-  esac
+  YAPLIB_CFLAGS="$SHLIB_CFLAGS"
+  YAPLIB="$DYNYAPLIB"
 else
-  PRE_DYNLOADER_PATH=""
-  EXTEND_DYNLOADER_PATH="YAPSHAREDIR=\$(DESTDIR)\$(SHAREDIR) YAPLIBDIR=\$(DESTDIR)\$(YAPLIBDIR)"
-  DYNYAPLIB=libYap.notused
+  YAPLIB_CFLAGS="$CFLAGS"
 fi
 
 if test "$coroutining" = "yes"
@@ -1133,55 +1240,89 @@ if test ! "$yap_cv_cplint" = "no"
 		LDFLAGS=${LDFLAGS}" `echo $GLIBS | awk '{print $1}'` -L$prefix/lib/"
 	if test ! "$yap_cv_cplint" = "yes"
 	then
-		LDFLAGS+=" -L${yap_cv_cplint}/lib"
-		CPLINT_LDFLAGS+=" -L${yap_cv_cplint}/lib"
+		CPLINT_LDFLAGS+=" -L${yap_cv_cplint}/cudd -L${yap_cv_cplint}/mtr -L${yap_cv_cplint}/st -L${yap_cv_cplint}/util -L${yap_cv_cplint}/epd "
 		CPLINT_CFLAGS+=" -I${yap_cv_cplint}/include"
+		CPLINT_LIBS="-lcudd  -lmtr -lst -lepd -lutil -lm "$CPLINT_LIBS
 	fi
-	AC_SEARCH_LIBS([g_hash_table_new], [glib-2.0], [CPLINT_LIBS="-lglib-2.0 "], [AC_MSG_ERROR([This package needs glib >=2.0.], [1])], [])
-	AC_SEARCH_LIBS([array_do_alloc], [glu], [CPLINT_LIBS="-lglu "$CPLINT_LIBS], [AC_MSG_ERROR([This package needs glu.], [1])], [])
-	AC_SEARCH_LIBS([Cudd_Init], [cu], [CPLINT_LIBS="-lcu "$CPLINT_LIBS], [AC_MSG_ERROR([This package needs glu.], [1])], [-lglu -lm])
-	AC_SEARCH_LIBS([pow], [m], [CPLINT_LIBS="-lm "$CPLINT_LIBS], [AC_MSG_ERROR([This package needs m.], [1])], [-lglu -lm])
+	#AC_SEARCH_LIBS([g_hash_table_new], [glib-2.0], [], [AC_MSG_ERROR([This package needs glib >=2.0.], [1])], [])
+	#AC_SEARCH_LIBS([Cudd_Init], [cudd], [], [AC_MSG_ERROR([This package needs CUDD.], [1])], [-lcudd -lmtr -lst -lutil -lepd -lm])
+	#AC_SEARCH_LIBS([pow], [m], [], [AC_MSG_ERROR([This package needs m.], [1])], [-lm])
 ENABLE_CPLINT=""
 	if test "$target_os" = "cygwin" -o "$target_os" = "mingw32"
 	then
-		CPLINT_SHLIB_LD="gcc -shared ../yap.dll"
+		CPLINT_SHLIB_LD="gcc -shared ../../yap.dll"
+		SHLIB_SUFFIX="dll"
 	else
 		CPLINT_SHLIB_LD=$SHLIB_LD
+		SHLIB_SUFFIX="so"
 	fi
 	AC_SUBST(CPLINT_LIBS)
 	AC_SUBST(CPLINT_CFLAGS)
 	AC_SUBST(CPLINT_LDFLAGS)
 	AC_SUBST(CPLINT_SHLIB_LD)
+	AC_SUBST(SHLIB_SUFFIX)
 else
 	ENABLE_CPLINT="@#"
 fi
 AC_SUBST(ENABLE_CPLINT)
-AC_SUBST(PRE_DYNLOADER_PATH)
-AC_SUBST(EXTEND_DYNLOADER_PATH)
+
+AC_SUBST(INSTALL_ENV)
+AC_SUBST(PRE_INSTALL_ENV)
+
+AC_CHECK_LIB(z, zlibVersion,
+	     ZLIBS="-lz"
+	     ZLIB=yes,
+	     ZLIB=no)
+
+if test "$ZLIB" = yes; then
+  ZLIB_TARGETS="zlib4pl.$SO"
+  ZLIB_PLTARGETS='$(srcdir)/zlib.pl'
+  ZLIB_INSTALL=install
+else
+  ZLIB_TARGETS=nolib
+  ZLIB_INSTALL=nolib
+  cat << EOF
+##################################################################
+# ERROR: Could not find library zlib (-lz).  Dropped library(zlib)
+# Library zlib is available from http://www.zlib.net/
+# Most Unix/Linux distributions are shipped with binaries.  Make
+# sure to have the development library installed.
+##################################################################
+EOF
+fi
+
+AC_SUBST(ZLIBS)
+AC_SUBST(ZLIB_TARGETS)
+AC_SUBST(ZLIB_PLTARGETS)
+AC_SUBST(ZLIB_INSTALL)
+
 
 # LAM
 OLD_CC=${CC}	
 CC=${LAM_MPI_CC}
 AC_CHECK_LIB([lam], [main],
-	LAMOBJS=yap_mpi"$SHLIB_SUFFIX",
+	LAMOBJS=yap_mpi."$SO",
 	LAMOBJS=no)
 CC=${OLD_CC}
 
 dnl Checks for header files.
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS(arpa/inet.h ctype.h direct.h dirent.h dlfcn.h)
-AC_CHECK_HEADERS(errno.h fcntl.h fenv.h)
+AC_CHECK_HEADERS(arpa/inet.h alloca.h crypt.h)
+AC_CHECK_HEADERS(ctype.h direct.h dirent.h dlfcn.h)
+AC_CHECK_HEADERS(errno.h execinfo.h fcntl.h fenv.h)
 AC_CHECK_HEADERS(float.h fpu_control.h ieeefp.h io.h limits.h)
 AC_CHECK_HEADERS(locale.h malloc.h math.h memory.h mpi.h)
-AC_CHECK_HEADERS(netdb.h netinet/in.h pwd.h regex.h)
+AC_CHECK_HEADERS(netdb.h netinet/in.h netinet/tcp.h pwd.h regex.h)
 AC_CHECK_HEADERS(siginfo.h signal.h stdarg.h string.h stropts.h)
-AC_CHECK_HEADERS(sys/conf.h sys/file.h)
-AC_CHECK_HEADERS(sys/mman.h sys/param.h sys/resource.h sys/select.h)
+AC_CHECK_HEADERS(sys/conf.h sys/dir.h sys/file.h)
+AC_CHECK_HEADERS(sys/mman.h sys/ndir.h sys/param.h)
+AC_CHECK_HEADERS(sys/resource.h sys/select.h)
 AC_CHECK_HEADERS(sys/shm.h sys/socket.h sys/stat.h)
 AC_CHECK_HEADERS(sys/time.h sys/times.h sys/types.h)
 AC_CHECK_HEADERS(sys/ucontext.h sys/un.h sys/wait.h)
-AC_CHECK_HEADERS(time.h unistd.h wctype.h winsock.h winsock2.h)
+AC_CHECK_HEADERS(time.h unistd.h utime.h wctype.h winsock.h winsock2.h)
+AC_CHECK_HEADERS(zlib.h zutil.h)
 AC_CHECK_HEADERS(mach-o/dyld.h)
 if test "$yap_cv_gmp" != "no"
 then
@@ -1282,18 +1423,19 @@ AC_SUBST(MERGE_DLL_OBJS)
 dnl C-flags used to compile a file that will be loaded dynamically
 AC_SUBST(CXXFLAGS)
 AC_SUBST(SHLIB_CFLAGS)
+AC_SUBST(SHLIB_CXXFLAGS)
 dnl suffix for loadable binary (.so,.dll,.o)
-AC_SUBST(SHLIB_SUFFIX)
+AC_SUBST(SO)
 dnl suffix for executable (.exe)
-EXEC_SUFFIX=""
 AC_SUBST(EXEC_SUFFIX)
 dnl how to call the loader
 AC_SUBST(DO_SECOND_LD)
 AC_SUBST(SHLIB_LD)
-AC_SUBST(SHLIB_LOWER_LD)
-AC_SUBST(SHLIB_LOWER_CXX_LD)
-AC_SUBST(SHLIB_SWI_LD)
-AC_SUBST(DYNLIB_LD)
+AC_SUBST(SHLIB_CXX_LD)
+AC_SUBST(YAPLIB_LD)
+AC_SUBST(YAPLIB_CFLAGS)
+AC_SUBST(EXTRA_LIBS_FOR_DLLS)
+AC_SUBST(EXTRA_LIBS_FOR_SWIDLLS)
 dnl objects in YAP library
 AC_SUBST(YAPLIB)
 AC_SUBST(DYNYAPLIB)
@@ -1311,7 +1453,6 @@ AC_SUBST(JAVA_HOME)
 AC_SUBST(JUNIT)
 AC_SUBST(JAVAC)
 AC_SUBST(JAVADOC)
-AC_SUBST(JAVALIBS)
 AC_SUBST(JAR)
 AC_SUBST(IN_UNIX)
 AC_SUBST(YAPMPILIB)
@@ -1478,13 +1619,13 @@ fi
 
 dnl Checks for library functions.
 AC_TYPE_SIGNAL
-AC_CHECK_FUNCS(access)
-AC_CHECK_FUNCS(acosh asinh atanh chdir ctime dlopen dup2)
+AC_CHECK_FUNCS(_NSGetEnviron access acosh)
+AC_CHECK_FUNCS(alloca asinh atanh chdir ctime dlopen dup2)
 AC_CHECK_FUNCS(erf feclearexcept)
 AC_CHECK_FUNCS(fesettrapenable fgetpos finite fpclass ftime getcwd getenv)
-AC_CHECK_FUNCS(gethostbyname gethostid gethostname)
+AC_CHECK_FUNCS(gethostbyname gethostent gethostid gethostname)
 AC_CHECK_FUNCS(gethrtime getpagesize)
-AC_CHECK_FUNCS(getpwnam getrusage gettimeofday getwd)
+AC_CHECK_FUNCS(getpwnam getrlimit getrusage gettimeofday getwd)
 AC_CHECK_FUNCS(isatty isnan isinf kill labs link lgamma)
 AC_CHECK_FUNCS(localtime lstat mallinfo)
 AC_CHECK_FUNCS(mbsnrtowcs)
@@ -1492,11 +1633,11 @@ AC_CHECK_FUNCS(memcpy memmove mkstemp mktemp)
 AC_CHECK_FUNCS(nanosleep mktime opendir)
 AC_CHECK_FUNCS(putenv rand random readlink regexec)
 AC_CHECK_FUNCS(rename rint rl_set_prompt sbrk select)
-AC_CHECK_FUNCS(setbuf setitimer setlinebuf sigaction)
+AC_CHECK_FUNCS(setbuf setitimer setsid setlinebuf sigaction)
 AC_CHECK_FUNCS(siggetmask siginterrupt)
 AC_CHECK_FUNCS(signal sigprocmask socket stat)
 AC_CHECK_FUNCS(strchr strerror stricmp strncat strncpy strtod)
-AC_CHECK_FUNCS(time times tmpnam usleep vsnprintf)
+AC_CHECK_FUNCS(time times tmpnam usleep utime vsnprintf)
 
 AC_CHECK_FUNC(regexec, [NO_BUILTIN_REGEXP="#"], [NO_BUILTIN_REGEXP=""])
 
@@ -1610,13 +1751,128 @@ dnl SWI compatibility support!
 PROLOG_SYSTEM=yap
 IN_YAP=
 IN_SWI="#"
-CHR_TARGETS=chr_support"$SHLIB_SUFFIX"
+CHR_TARGETS=chr_support."$SO"
 
 AC_SUBST(PROLOG_SYSTEM)
 AC_SUBST(IN_YAP)
 AC_SUBST(IN_SWI)
+AC_SUBST(TARGETS)
+AC_SUBST(PLTARGETS)
 AC_SUBST(CHR_TARGETS)
 
+CLIB_TARGETS="random.$SO socket.$SO cgi.$SO memfile.$SO files.$SO mime.$SO crypt.$SO"
+CLIB_PLTARGETS="\$(srcdir)/random.pl \$(srcdir)/socket.pl \$(srcdir)/cgi.pl \$(srcdir)/memfile.pl \$(srcdir)/filesex.pl \$(srcdir)/mime.pl \$(srcdir)/crypt.pl"
+
+if test "$ac_cv_func_setitimer" = "yes"; then
+  CLIB_TARGETS="$CLIB_TARGETS time.$SO"
+  CLIB_PLTARGETS="$CLIB_PLTARGETS \$(srcdir)/time.pl"
+else
+  echo "WARNING: no setitimer(); dropping time.pl from targets"
+fi
+
+if test "$IN_UNIX" = ""; then
+CLIB_TARGETS="unix.$SO $CLIB_TARGETS"
+CLIB_PLTARGETS="\$(srcdir)/unix.pl $CLIB_PLTARGETS"
+CLIB_NETLIBS=
+else
+AC_CHECK_FUNC(socket, [], [
+             AC_CHECK_LIB(socket, socket,
+                      [CLIB_NETLIBS="$CLIB_NETLIBS -lsocket"]
+                      AC_DEFINE(HAVE_LIBSOCKET, 1,
+                      "Define if you have the socket library (-lsocket)."))])
+AC_CHECK_FUNC(gethostent, [], [
+             AC_CHECK_LIB(nsl, gethostent,
+                      [CLIB_NETLIBS="$CLIB_NETLIBS -lnsl"]
+                      AC_DEFINE(HAVE_LIBNSL, 1,
+                      "Define if you have the nsl library (-lnsl)."))])
+fi
+
+
+oldlibs="$LIBS"
+AC_CHECK_LIB(crypt, crypt)
+CLIB_CRYPTLIBS="$LIBS"
+AC_CHECK_FUNCS(crypt)
+LIBS="$oldlibs"
+
+AC_SUBST(CLIB_TARGETS)
+AC_SUBST(CLIB_PLTARGETS)
+AC_SUBST(CLIB_NETLIBS)
+AC_SUBST(CLIB_CRYPTLIBS)
+
+AC_CHECK_TYPES(socklen_t, [], [],
+[
+#include <sys/types.h>
+#include <sys/socket.h>
+])
+AC_CHECK_TYPES(ssize_t, [], [],
+[
+#include <sys/types.h>
+#include <sys/socket.h>
+])
+
+dnl tszet and timezone trouble
+
+AC_MSG_CHECKING("variable timezone in tzset")
+AC_TRY_RUN(
+[ #include <time.h>
+  #include <stdlib.h>
+  #ifdef __CYGWIN__
+  #define timezone _timezone
+  #endif
+  extern long timezone;
+
+  main()
+  { tzset();
+
+    if ( timezone > -15*3600 &&
+	 timezone < 15*3600 &&
+	 timezone % 60 == 0 )
+      return 0;
+
+    exit(1);
+  }
+],
+AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_VAR_TIMEZONE, 1,
+	  [Define if tzset sets timezone variable]),
+AC_MSG_RESULT(no),
+AC_MSG_RESULT(assuming no))
+
+AC_CHECK_MEMBER(struct tm.tm_gmtoff,
+		AC_DEFINE(HAVE_STRUCT_TIME_TM_GMTOFF, [],
+			  [Define is struct tm has tm_gmtoff]),
+		[],
+		[#include <time.h>])
+
+AC_MSG_CHECKING(_XOPEN_SOURCE)
+AC_TRY_COMPILE(
+[
+#define _XOPEN_SOURCE
+#include <unistd.h>
+],
+[
+], AC_DEFINE(DEFINE_XOPEN_SOURCE, 1,
+	     "Define if _XOPEN_SOURCE is needed")
+   AC_MSG_RESULT(yes),
+   AC_MSG_RESULT(no))
+
+if test "$with_time" = yes; then
+  if test "$ac_cv_func_setitimer" = "yes"; then
+    TARGETS="$TARGETS time.$SO"
+  else
+    echo "WARNING: no setitimer(); dropping time.pl from targets"
+  fi
+fi
+
+if test "$ac_cv_func_getrlimit" = "yes"; then
+  TARGETS="$TARGETS rlimit.$SO"
+else
+  echo "WARNING: no getrlimit(); dropping rlimit.pl from targets"
+fi
+
+
+
+mkdir -p  library/lammpi
 mkdir -p  library/matrix
 mkdir -p  library/matlab
 mkdir -p  library/mpi
@@ -1625,17 +1881,22 @@ mkdir -p  library/regex
 mkdir -p  library/system
 mkdir -p  library/tries
 mkdir -p  library/rltree
-mkdir -p  library/lammpi
 mkdir -p  library/yap2swi
 mkdir -p  LGPL/clp
 mkdir -p  LGPL/swi_console
 mkdir -p  GPL
-mkdir -p  packages/chr
+mkdir -p  packages/
+mkdir -p  packages/clib
+mkdir -p  packages/clib/sha1
+mkdir -p  packages/clib/maildrop
+mkdir -p  packages/clib/maildrop/rfc822
+mkdir -p  packages/clib/maildrop/rfc2045
 mkdir -p  packages/CLPBN
 mkdir -p  packages/clpqr
 mkdir -p  packages/cplint
 mkdir -p  packages/cplint/approx
 mkdir -p  packages/cplint/approx/simplecuddLPADs
+mkdir -p  packages/http
 mkdir -p  packages/jpl
 mkdir -p  packages/jpl/src/java
 mkdir -p  packages/jpl/src/java/jpl
@@ -1643,11 +1904,16 @@ mkdir -p  packages/jpl/src/java/jpl/fli
 mkdir -p  packages/jpl/src/java/jpl/test
 mkdir -p  packages/jpl/examples
 mkdir -p  packages/jpl/examples/java
+mkdir -p  packages/tai
+mkdir -p  packages/tai/libtai
 mkdir -p  packages/PLStream
 mkdir -p  packages/plunit
 mkdir -p  packages/ProbLog
 mkdir -p  packages/ProbLog/simplecudd
+mkdir -p  packages/RDF
+mkdir -p  packages/semweb
 mkdir -p  packages/sgml
+mkdir -p  packages/zlib
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([GPL/Makefile])
@@ -1665,13 +1931,22 @@ AC_CONFIG_FILES([library/yap2swi/Makefile])
 AC_CONFIG_FILES([LGPL/Makefile])
 AC_CONFIG_FILES([LGPL/clp/Makefile])
 AC_CONFIG_FILES([LGPL/swi_console/Makefile])
+AC_CONFIG_FILES([packages/clib/Makefile])
+AC_CONFIG_FILES([packages/clib/maildrop/rfc822/Makefile])
+AC_CONFIG_FILES([packages/clib/maildrop/rfc2045/Makefile])
 AC_CONFIG_FILES([packages/CLPBN/Makefile])
 AC_CONFIG_FILES([packages/cplint/Makefile])
 AC_CONFIG_FILES([packages/cplint/approx/simplecuddLPADs/Makefile])
+AC_CONFIG_FILES([packages/http/Makefile])
+AC_CONFIG_FILES([packages/tai/Makefile])
+AC_CONFIG_FILES([packages/tai/libtai/Makefile])
 AC_CONFIG_FILES([packages/PLStream/Makefile])
 AC_CONFIG_FILES([packages/plunit/Makefile])
 AC_CONFIG_FILES([packages/ProbLog/Makefile ])
+AC_CONFIG_FILES([packages/RDF/Makefile])
+AC_CONFIG_FILES([packages/semweb/Makefile])
 AC_CONFIG_FILES([packages/sgml/Makefile])
+AC_CONFIG_FILES([packages/zlib/Makefile])
 
 if test "$ENABLE_CHR" = ""; then
 AC_CONFIG_FILES([packages/chr/Makefile])
@@ -1682,7 +1957,7 @@ AC_CONFIG_FILES([packages/clpqr/Makefile])
 fi
 
 if test "$ENABLE_JPL" = ""; then
-AC_CONFIG_FILES([packages/jpl/Makefile packages/jpl/jpl_paths.yap packages/jpl/src/java/Makefile])
+AC_CONFIG_FILES([packages/jpl/Makefile packages/jpl/jpl_paths.yap packages/jpl/src/java/Makefile packages/pyswip/Makefile ])
 fi
 
 if test "$USE_CUDD" = ""; then

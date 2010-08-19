@@ -30,94 +30,6 @@ typedef YAP_Atom		Atom;
 
 typedef uintptr_t	PL_atomic_t;	/* same a word */
 
-
-#ifdef __SWI_PROLOG__
-
-/* just to make clear how it would look in SWI */
-
-#define INIT_DEF(Type, Name, Size) \
-  static void init_ ## Name (void) {}		\
-  static const Type Name[] {
-
-#define ADD_DEF2(Atom, Type) \
-  { Atom, Type },
-#define ADD_DEF5(Atom, Type, Reverse, Arity, Ctx) \
-  { Atom, Type, Reverse, Arity, Ctx },
-			     \
-#define END_DEFS(Atom, F) \
-  { Atom, F }			 
-}
-
-#endif
-
-#define INIT_DEF(Type, Name, Size) \
-  static Type Name[Size];	     \
-  static void init_ ## Name (void) { \
-  int i = 0;
-
-#define ADD_DEF2(Atom, Type) \
-  char_types[i].name = Atom; \
-  char_types[i].test = Type; \
-  i++;
-#define ADD_DEF5(Atom, Type, Reverse, Arity, Ctx) \
-  char_types[i].name = Atom; \
-  char_types[i].test = Type; \
-  char_types[i].reverse = Reverse; \
-  char_types[i].arity = Arity; \
-  char_types[i].ctx_type = Ctx; \
-  i++;
-#define END_DEFS(Atom, F) \
-  char_types[i].name = Atom; \
-  char_types[i].test = F; \
-}
-
-#define ADD_ENCODING(Atom, Type) \
-  encoding_names[i].code = Atom;	 \
-  encoding_names[i].name = Type; \
-  i++;
-#define END_ENCODINGS(Atom, F) \
-  encoding_names[i].code = Atom; \
-  encoding_names[i].name = F; \
-}
-
-#define ADD_OPEN4_OPT(Atom, Type) \
-  open4_options[i].name = Atom;	 \
-  open4_options[i].type = Type; \
-  i++;
-#define END_OPEN4_DEFS(Atom, F) \
-  open4_options[i].name = Atom; \
-  open4_options[i].type = F; \
-}
-
-#define ADD_CLOSE2_OPT(Atom, Type) \
-  close2_options[i].name = Atom;	 \
-  close2_options[i].type = Type; \
-  i++;
-#define END_CLOSE2_DEFS(Atom, F) \
-  close2_options[i].name = Atom; \
-  close2_options[i].type = F; \
-}
-
-#define ADD_SPROP(F1, F2) \
-  sprop_list[i].functor = F1;	 \
-  sprop_list[i].function = F2; \
-  i++;
-#define END_SPROP_DEFS(F1, F2) \
-  sprop_list[i].functor = F1;	 \
-  sprop_list[i].function = F2; \
-}
-
-#define ADD_STDSTREAM(Atom) \
-  standardStreams[i] = Atom;	 \
-  i++;
-#define END_STDSTREAMS(Atom) \
-  standardStreams[i] = Atom; \
-}
-
-
-#define MK_ATOM(X) ((atom_t)YAP_LookupAtom(X))
-#define MKFUNCTOR(X,Y) ((functor_t)YAP_MkFunctor((YAP_Atom)(X),Y))
-
 /*** memory allocation stuff: SWI wraps around malloc  */
 
 #define allocHeap(X) YAP_AllocSpaceFromYap(X)
@@ -130,6 +42,9 @@ typedef uintptr_t	PL_atomic_t;	/* same a word */
 /* TBD */
 
 extern atom_t codeToAtom(int chrcode);
+
+extern word globalString(size_t size, char *s);
+extern word globalWString(size_t size, wchar_t *s);
 
 static inline word
 INIT_SEQ_CODES(size_t n)
@@ -149,7 +64,7 @@ EXTEND_SEQ_ATOMS(word gstore, int c) {
 
 static inline int 
 CLOSE_SEQ_OF_CODES(word gstore, word lp, word arg2, word arg3, term_t l) {
-  if (arg3 == (word)ATOM_nil) {
+  if (arg2 == 0) {
     if (!YAP_CloseList((YAP_Term)gstore, YAP_TermNil()))
       return FALSE;
   } else {
@@ -164,7 +79,10 @@ valHandle(term_t tt)
 {
   return (word)YAP_GetFromSlot(tt);
 }
-#define arityFunctor(f) YAP_ArityOfFunctor((YAP_Functor)f)
+
+YAP_Int YAP_PLArityOfSWIFunctor(functor_t f);
+
+#define arityFunctor(f) YAP_PLArityOfSWIFunctor(f)
 
 #define stringAtom(w)	YAP_AtomName((YAP_Atom)(w))
 #define isInteger(A) (YAP_IsIntTerm((A)) && YAP_IsBigNumTerm((A)))
@@ -179,7 +97,7 @@ valHandle(term_t tt)
 #define valReal(w) YAP_FloatOfTerm((w))
 #define valFloat(w) YAP_FloatOfTerm((w))
 #define AtomLength(w) YAP_AtomNameLength(w)
-#define atomValue(atom) ((YAP_Atom)atom)
+#define atomValue(atom) YAP_AtomOfTerm(atom)
 #define argTermP(w,i) ((Word)((YAP_ArgsOfTerm(w)+(i))))
 #define deRef(t) (t = YAP_Deref(t))
 #define canBind(t) FALSE

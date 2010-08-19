@@ -19,6 +19,7 @@ static char     SccsId[] = "%W% %G%";
 #endif
 
 #include <stdlib.h>
+#include <math.h>
 #include "Yap.h"
 #include "Yatom.h"
 #include "YapHeap.h"
@@ -46,8 +47,8 @@ static wtype lastw;
 typedef  int      (*wrf) (int, wchar_t);
 
 typedef struct union_slots {
-  long old;
-  long ptr;
+  Int old;
+  Int ptr;
 } uslots;
 
 typedef struct union_direct {
@@ -98,17 +99,9 @@ wrputn(Int n, wrf writewch)	/* writes an integer	 */
       wrputc(' ', writewch);
   }
 #if HAVE_SNPRINTF
-#if SHORT_INTS
-  snprintf(s, 256, "%ld", n);
+  snprintf(s, 256, Int_FORMAT, n);
 #else
-  snprintf(s, 256, "%d", n);
-#endif
-#else
-#if SHORT_INTS
-  sprintf(s, "%ld", n);
-#else
-  sprintf(s, "%d", n);
-#endif
+  sprintf(s, Int_FORMAT, n);
 #endif
   while (*s1)
     wrputc(*s1++, writewch);
@@ -130,16 +123,121 @@ wrputws(wchar_t *s, wrf writewch)		/* writes a string	 */
     wrputc(*s++, writewch);
 }
 
+#ifdef USE_GMP
+
+static char *
+ensure_space(size_t sz) {
+  char *s;
+
+  s = (char *) Yap_PreAllocCodeSpace();
+  while (s+sz >= (char *)AuxSp) {
+#if USE_SYSTEM_MALLOC
+    /* may require stack expansion */
+    if (!Yap_ExpandPreAllocCodeSpace(sz, NULL, TRUE)) {
+      s = NULL;
+      break;
+    }
+    s = (char *) Yap_PreAllocCodeSpace();
+#else
+    s = NULL;
+#endif
+  }
+  if (!s) {
+    s = (char *)TR;
+    while (s+sz >= Yap_TrailTop) {
+      if (!Yap_growtrail(sz/sizeof(CELL), FALSE)) {
+	s = NULL;
+	break;
+      }
+      s = (char *)TR;
+    }
+  }
+  if (!s) {
+    s = (char *)H;
+    if (s+sz >= (char *)ASP) {
+      Yap_Error(OUT_OF_STACK_ERROR,TermNil,"not enough space to write bignum: it requires %d bytes", sz);
+      s = NULL;
+    }
+  }
+  return s;
+}
+
+static void
+write_mpint(MP_INT *big, wrf writewch) {
+  char *s;
+
+  s = ensure_space(3+mpz_sizeinbase(big, 10));
+  if (mpz_sgn(big) < 0) {
+    if (lastw == symbol)
+      wrputc(' ', writewch);  
+  } else {
+    if (lastw == alphanum)
+      wrputc(' ', writewch);
+  }
+  if (!s) {
+    s = mpz_get_str(NULL, 10, big);
+    if (!s)
+      return;
+    wrputs(s,writewch);
+    free(s);
+  } else {
+    mpz_get_str(s, 10, big);
+    wrputs(s,writewch);
+  }
+}
+#endif
+
+	/* writes a bignum	 */
+static void 
+writebig(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, struct rewind_term *rwt)
+{
+#ifdef USE_GMP
+  CELL *pt = RepAppl(t)+1;
+  if (pt[0] == BIG_INT) 
+  {
+    MP_INT *big = Yap_BigIntOfTerm(t);
+    write_mpint(big, wglb->writewch);
+    return;
+  } else if (pt[0] == BIG_RATIONAL) {
+    Term trat = Yap_RatTermToApplTerm(t);
+    writeTerm(trat, p, depth, rinfixarg, wglb, rwt);
+    return;
+  }
+#endif
+  wrputs("0",wglb->writewch);
+}	                  
+
 static void 
 wrputf(Float f, wrf writewch)		/* writes a float	 */
 	                  
 {
   char            s[256], *pt = s, ch;
 
+#if HAVE_ISNAN || defined(__WIN32)
+  if (isnan(f)) {
+    wrputs("(nan)", writewch);
+    lastw = separator;
+    return;
+  }
+#endif
   if (f < 0) {
+#if HAVE_ISINF || defined(_WIN32)
+    if (isinf(f)) {
+      wrputs("(-inf)", writewch);
+      lastw = separator;
+      return;
+    }
+#endif
     if (lastw == symbol)
       wrputc(' ', writewch);  
   } else {
+#if HAVE_ISINF || defined(_WIN32)
+    if (isinf(f)) {
+      wrputs("(+inf)", writewch);
+      lastw = separator;
+      return;
+    }
+#endif
     if (lastw == alphanum)
       wrputc(' ', writewch);
   }
@@ -148,14 +246,7 @@ wrputf(Float f, wrf writewch)		/* writes a float	 */
   sprintf(s, RepAtom(AtomFloatFormat)->StrOfAE, f);
   while (*pt == ' ')
     pt++;
-  if (*pt == 'i' || *pt == 'n')  /* inf or nan */ {
-    wrputc('(', writewch);    
-    wrputc('+', writewch);    
-    wrputs(pt, writewch);
-    wrputc(')', writewch);    
-  } else {    
-    wrputs(pt, writewch);
-  }
+  wrputs(pt, writewch);
   if (*pt == '-') pt++;
   while ((ch = *pt) != '\0') {
     if (ch < '0' || ch > '9')
@@ -416,7 +507,7 @@ write_var(CELL *t,  struct write_globs *wglb, struct rewind_term *rwt)
       Yap_Portray_delays = FALSE;
       if (ext == attvars_ext) {
 	attvar_record *attv = RepAttVar(t);
-	long sl = 0;
+	Int sl = 0;
 	Term l = attv->Atts;
 
 	wrputs("$AT(",wglb->writewch);
@@ -496,7 +587,7 @@ write_list(Term t, int direction, int depth, struct write_globs *wglb, struct re
   nrwt.u.s.ptr = 0;
 
   while (1) {
-    long            sl= 0;
+    Int            sl= 0;
     int ndirection;
     int do_jump;
 
@@ -565,7 +656,7 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
     putAtom(Atom3Dots, wglb->Quote_illegal, wglb->writewch);
     return;
   }
-  if (EX != 0)
+  if (EX)
     return;
   t = Deref(t);
   if (IsVarTerm(t)) {
@@ -577,17 +668,17 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
   } else if (IsPairTerm(t)) {
     if (wglb->Use_portray) {
       Term targs[1];
-      Term old_EX = 0L;
-      long sl = 0;
+      struct DB_TERM *old_EX = NULL;
+      Int sl = 0;
 
       targs[0] = t;
       Yap_PutValue(AtomPortray, MkAtomTerm(AtomNil));
-      if (EX != 0L) old_EX = EX;
+      if (EX) old_EX = EX;
       sl = Yap_InitSlot(t);      
       Yap_execute_goal(Yap_MkApplTerm(FunctorPortray, 1, targs), 0, 1);
       t = Yap_GetFromSlot(sl);
       Yap_RecoverSlots(1);
-      if (old_EX != 0L) EX = old_EX;
+      if (old_EX != NULL) EX = old_EX;
       if (Yap_GetValue(AtomPortray) == MkAtomTerm(AtomTrue))
 	return;
     }
@@ -622,64 +713,9 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
       case (CELL)FunctorLongInt:
 	wrputn(LongIntOfTerm(t),wglb->writewch);
 	return;
-      case (CELL)FunctorBigInt:
-#ifdef USE_GMP
-	{
-	  MP_INT *big = Yap_BigIntOfTerm(t);
-	  char *s;
-	  s = (char *) Yap_PreAllocCodeSpace();
-	  while (s+3+mpz_sizeinbase(big, 10) >= (char *)AuxSp) {
-#if USE_SYSTEM_MALLOC
-	    /* may require stack expansion */
-	    if (!Yap_ExpandPreAllocCodeSpace(3+mpz_sizeinbase(big, 10), NULL, TRUE)) {
-	      s = NULL;
-	      break;
-	    }
-	    s = (char *) Yap_PreAllocCodeSpace();
-#else
-	    s = NULL;
-#endif
-	  }
-	  if (!s) {
-	    s = (char *)TR;
-	    while (s+3+mpz_sizeinbase(big, 10) >= Yap_TrailTop) {
-	      if (!Yap_growtrail((3+mpz_sizeinbase(big, 10))/sizeof(CELL), FALSE)) {
-		s = NULL;
-		break;
-	      }
-	      s = (char *)TR;
-	    }
-	  }
-	  if (!s) {
-	    s = (char *)H;
-	    if (s+3+mpz_sizeinbase(big, 10) >= (char *)ASP) {
-	      Yap_Error(OUT_OF_STACK_ERROR,TermNil,"not enough space to write bignum: it requires %d bytes", 3+mpz_sizeinbase(big, 10));
-	      s = NULL;
-	    }
-	  }
-	  if (mpz_sgn(big) < 0) {
-	    if (lastw == symbol)
-	      wrputc(' ', wglb->writewch);  
-	  } else {
-	    if (lastw == alphanum)
-	      wrputc(' ', wglb->writewch);
-	  }
-	  if (!s) {
-	    s = mpz_get_str(NULL, 10, big);
-	    if (!s)
-	      return;
-	    wrputs(s,wglb->writewch);
-	    free(s);
-	  } else {
-	    mpz_get_str(s, 10, big);
-	    wrputs(s,wglb->writewch);
-	  }
-	}
-#else
-	{
-	  wrputs("0",wglb->writewch);
-	}
-#endif
+	/* case (CELL)FunctorBigInt: */
+      default:
+	writebig(t, p, depth, rinfixarg, wglb, rwt);
 	return;
       }
     }
@@ -693,7 +729,7 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
       wrputc('(', wglb->writewch);
       lastw = separator;
       while (*p) {
-	long sl = 0;
+	Int sl = 0;
 
 	while (argno < *p) {
 	  wrputc('_', wglb->writewch), wrputc(',', wglb->writewch);
@@ -724,18 +760,18 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
 #endif
     if (wglb->Use_portray) {
       Term targs[1];
-      Term old_EX = 0L;
-      long sl = 0;
+      struct DB_TERM *old_EX = NULL;
+      Int sl = 0;
 
       targs[0] = t;
       Yap_PutValue(AtomPortray, MkAtomTerm(AtomNil));
-      if (EX != 0L) old_EX = EX;
+      if (EX) old_EX = EX;
       sl = Yap_InitSlot(t);      
       Yap_execute_goal(Yap_MkApplTerm(FunctorPortray, 1, targs),0, 1);
       t = Yap_GetFromSlot(sl);
       Yap_RecoverSlots(1);
-      if (old_EX != 0L) EX = old_EX;
-      if (Yap_GetValue(AtomPortray) == MkAtomTerm(AtomTrue) || EX != 0L)
+      if (old_EX) EX = old_EX;
+      if (Yap_GetValue(AtomPortray) == MkAtomTerm(AtomTrue) || EX)
 	return;
     }
     if (!wglb->Ignore_ops &&
@@ -779,7 +815,7 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
 	       Arity == 1 &&
 	       Yap_IsPosfixOp(atom, &op, &lp)) {
       Term  tleft = ArgOfTerm(1, t);
-      long sl = 0;
+      Int sl = 0;
       int            bracket_left =
 	!IsVarTerm(tleft) && IsAtomTerm(tleft) &&
 	LeftOpToProtect(AtomOfTerm(tleft), lp); 
@@ -819,7 +855,7 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
 						 &rp) ) {
       Term  tleft = ArgOfTerm(1, t);
       Term  tright = ArgOfTerm(2, t);
-      long sl = 0;
+      Int sl = 0;
       int   bracket_left =
 	!IsVarTerm(tleft) && IsAtomTerm(tleft) &&
 	LeftOpToProtect(AtomOfTerm(tleft), lp);
@@ -899,7 +935,7 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
 	  putUnquotedString(ti, wglb->writewch);
 	}
       } else {
-	long sl = 0;
+	Int sl = 0;
 
 	wrputs("'$VAR'(",wglb->writewch);
 	lastw = separator;
@@ -925,7 +961,7 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
       wrputc('}', wglb->writewch);
       lastw = separator;
     } else  if (atom == AtomArray) {
-      long sl = 0;
+      Int sl = 0;
 
       wrputc('{', wglb->writewch);
       lastw = separator;
@@ -959,7 +995,7 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
       lastw = separator;
       wrputc('(', wglb->writewch);
       for (op = 1; op <= Arity; ++op) {
-	long sl = 0;
+	Int sl = 0;
 
 	if (op == wglb->MaxArgs) {
 	  wrputc('.', wglb->writewch);

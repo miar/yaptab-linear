@@ -22,6 +22,15 @@
 #include <stdio.h>
 #endif
 
+typedef int (*SWI_PutFunction)(int, void *);
+typedef int (*SWI_GetFunction)(void *);
+typedef int (*SWI_PutWideFunction)(int, void *);
+typedef int (*SWI_GetWideFunction)(void *);
+typedef int (*SWI_CloseFunction)(void *);
+typedef int (*SWI_FlushFunction)(void *);
+
+#include "../include/dswiatoms.h"
+
 #ifndef INT_KEYS_DEFAULT_SIZE
 #define INT_KEYS_DEFAULT_SIZE 256
 #endif
@@ -36,6 +45,10 @@ typedef struct memory_hole {
 } memory_hole_type;
 #endif
 
+typedef struct swi_reverse_hash {
+  ADDR key;
+  Int pos;
+} swi_rev_hash;
 
 #define GC_MAVARS_HASH_SIZE 512
 
@@ -93,6 +106,10 @@ typedef struct restore_info {
   ADDR old_HeapTop;
 } restoreinfo;
 
+/* SWI Emulation */
+#define SWI_BUF_SIZE 512
+#define SWI_TMP_BUF_SIZE 2*SWI_BUF_SIZE
+#define SWI_BUF_RINGS 16
 
 #ifdef THREADS
 typedef struct thandle {
@@ -116,6 +133,9 @@ typedef struct thandle {
   long long int thread_inst_count;
   int been_here1;
   int been_here2;
+#endif
+#ifdef DEBUG
+  int been_here;
 #endif
   pthread_mutex_t tlock;
   pthread_mutex_t tlock_status;

@@ -74,7 +74,10 @@ typedef enum
     EMPTY_ARENA =  0x10,
     ARRAY_INT =    0x21,
     ARRAY_FLOAT =  0x22,
-    CLAUSE_LIST =  0x40
+    CLAUSE_LIST =  0x40,
+    BLOB_STRING =  0x80, /* SWI style strings */
+    BLOB_WIDE_STRING =  0x81, /* SWI style strings */
+    EXTERNAL_BLOB =  0x100 /* for SWI emulation */
   } 
 big_blob_type;
 
@@ -311,6 +314,11 @@ typedef struct {
   mp_limb_t *_mp_d;
 } MP_INT;
 
+typedef struct {
+  MP_INT _mp_num;
+  MP_INT _mp_den;
+} MP_RAT;
+
 #endif
 
 inline EXTERN int IsBigIntTerm (Term);
@@ -325,6 +333,9 @@ IsBigIntTerm (Term t)
 
 Term STD_PROTO (Yap_MkBigIntTerm, (MP_INT *));
 MP_INT *STD_PROTO (Yap_BigIntOfTerm, (Term));
+
+Term STD_PROTO (Yap_MkBigRatTerm, (MP_RAT *));
+MP_RAT *STD_PROTO (Yap_BigRatOfTerm, (Term));
 
 inline EXTERN void MPZ_SET (mpz_t, MP_INT *);
 
@@ -374,6 +385,36 @@ IsLargeIntTerm (Term t)
 
 
 #endif
+
+typedef struct string_struct {
+  size_t len;
+}  blob_string_t;
+
+Term STD_PROTO (Yap_MkBlobStringTerm, (const char *, size_t len));
+Term STD_PROTO (Yap_MkBlobWideStringTerm, (const wchar_t *, size_t len));
+char *STD_PROTO (Yap_BlobStringOfTerm, (Term));
+wchar_t *STD_PROTO (Yap_BlobWideStringOfTerm, (Term));
+char *STD_PROTO (Yap_BlobStringOfTermAndLength, (Term, size_t *));
+
+inline EXTERN int IsBlobStringTerm (Term);
+
+inline EXTERN int
+IsBlobStringTerm (Term t)
+{
+  return (int) (IsApplTerm (t) &&
+		FunctorOfTerm (t) == FunctorBigInt &&
+		(RepAppl(t)[1] & BLOB_STRING) == BLOB_STRING);
+}
+
+inline EXTERN int IsWideBlobStringTerm (Term);
+
+inline EXTERN int
+IsWideBlobStringTerm (Term t)
+{
+  return (int) (IsApplTerm (t) &&
+		FunctorOfTerm (t) == FunctorBigInt &&
+		RepAppl(t)[1] == BLOB_WIDE_STRING);
+}
 
 /* extern Functor FunctorLongInt; */
 
@@ -518,6 +559,8 @@ inline EXTERN int STD_PROTO (unify_extension, (Functor, CELL, CELL *, CELL));
 
 EXTERN int STD_PROTO (unify_extension, (Functor, CELL, CELL *, CELL));
 
+int   STD_PROTO(Yap_gmp_tcmp_big_big,(Term, Term));
+
 inline EXTERN int
 unify_extension (Functor f, CELL d0, CELL * pt0, CELL d1)
 {
@@ -531,11 +574,7 @@ unify_extension (Functor f, CELL d0, CELL * pt0, CELL d1)
       return (pt0[1] == RepAppl (d1)[1]);
     case big_int_e:
 #ifdef USE_GMP
-      {
-	MP_INT *m0 = Yap_BigIntOfTerm (d0);
-	MP_INT *m1 = Yap_BigIntOfTerm (d1);
-	return mpz_cmp (m0, m1) == 0;
-      }
+      return (Yap_gmp_tcmp_big_big(d0,d1) == 0);
 #else
       return d0 == d1;
 #endif /* USE_GMP */
@@ -551,3 +590,41 @@ unify_extension (Functor f, CELL d0, CELL * pt0, CELL d1)
     }
   return (FALSE);
 }
+
+static inline
+CELL Yap_IntP_key(CELL *pt)
+{
+#ifdef USE_GMP
+  if (((Functor)pt[-1] == FunctorBigInt)) {
+    MP_INT *b1 = Yap_BigIntOfTerm(AbsAppl(pt-1));
+    /* first cell in program */
+    CELL val = ((CELL *)(b1+1))[0];
+    return MkIntTerm(val & (MAX_ABS_INT-1));
+  }
+#endif
+  return MkIntTerm(pt[0] & (MAX_ABS_INT-1));
+}
+
+static inline
+CELL Yap_Int_key(Term t)
+{
+  return Yap_IntP_key(RepAppl(t)+1);
+}
+
+static inline
+CELL Yap_DoubleP_key(CELL *pt)
+{
+#if SIZEOF_DOUBLE == 2*SIZEOF_LONG_INT
+  CELL val = pt[0]^pt[1];
+#else
+  CELL val = pt[0];
+#endif
+  return MkIntTerm(val & (MAX_ABS_INT-1));  
+}
+
+static inline
+CELL Yap_Double_key(Term t)
+{
+  return Yap_DoubleP_key(RepAppl(t)+1);
+}
+

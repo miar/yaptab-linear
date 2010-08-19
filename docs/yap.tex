@@ -1,4 +1,4 @@
-a\input texinfo @c -*- mode: texinfo; coding: latin-1; -*-
+´a\input texinfo @c -*- mode: texinfo; coding: latin-1; -*-
 
 @c %**start of header
 @setfilename yap.info
@@ -8,9 +8,9 @@ a\input texinfo @c -*- mode: texinfo; coding: latin-1; -*-
 @c @setchapternewpage odd
 @c %**end of header
 
-@set VERSION 6.0.4
-@set EDITION 4.2.6
-@set UPDATED Feb 2010
+@set VERSION 6.0.7
+@set EDITION 4.2.8
+@set UPDATED Aug 2010
 
 @c Index for C-Prolog compatible predicate
 @defindex cy
@@ -192,14 +192,16 @@ Subnodes of Database
 * BlackBoard:: Storing and Fetching Terms in the BlackBoard
 
 Subnodes of Library
+* Aggregate :: SWI and SICStus compatible aggregate library
 * Apply:: SWI-Compatible Apply library.
-* Apply Macros:: Apply a Predicate to a list or to sub-terms.
 * Association Lists:: Binary Tree Implementation of Association Lists.
 * AVL Trees:: Predicates to add and lookup balanced binary  trees.
 * Heaps:: Labelled binary tree where the key of each node is less
     than or equal to the keys of its children.
+* Lambda:: Ulrich Neumerkel's Lambda Library
 * LineUtilities:: Line Manipulation Utilities
 * Lists:: List Manipulation
+* MapList:: SWI-Compatible Apply library.
 * matrix:: Matrix Objects
 * MATLAB:: Matlab Interface
 * Non-Backtrackable Data Structures:: Queues, Heaps, and Beams.
@@ -210,6 +212,7 @@ Subnodes of Library
 * Read Utilities:: SWI inspired utilities for fast stream scanning.
 * Red-Black Trees:: Predicates to add, lookup and delete in red-black binary  trees.
 * RegExp:: Regular Expression Manipulation
+* shlib:: SWI Prolog shlib library
 * Splay Trees:: Splay Trees
 * String I/O:: Writing To and Reading From Strings
 * System:: System Utilities
@@ -294,6 +297,7 @@ Subnodes of C-Interface
 * Manipulating Strings:: From character arrays to Lists of codes and back
 * Memory Allocation:: Stealing Memory From YAP
 * Controlling Streams:: Control How YAP sees Streams
+* Utility Functions:: From character arrays to Lists of codes and back
 * Calling YAP From C:: From C to YAP to C to YAP 
 * Module Manipulation in C:: Create and Test Modules from within C
 * Writing C:: Writing Predicates in C
@@ -867,12 +871,22 @@ All the arguments and flags are optional and have the following meaning:
 @table @code
 @item -?
 print a short error message.
-@item -s @var{n}
-allocate @var{n} K bytes for local and global stacks
-@item -h @var{n}
-allocate @var{n} K bytes for heap and auxiliary stacks
-@item -t @var{n}
-allocate @var{n} K bytes for the trail stack
+@item -s@var{Size}
+allocate @var{Size} K bytes for local and global stacks. The user may
+ specify @t{M} bytes.
+@item -h@var{Size}
+allocate @var{Size} K bytes for heap and auxiliary stacks
+@item -t@var{Size}
+allocate @var{Size} K bytes for the trail stack
+@item -L@var{Size} 
+SWI-compatible option to allocate @var{Size} K bytes for local and global stacks, the local stack
+ cannot be expanded. To avoid confusion with the load option, @var{Size}
+ must immediately follow the letter @code{L}.
+@item -G@var{Size}
+SWI-compatible option to allocate @var{Size} K bytes for local and global stacks; the global
+stack cannot be expanded
+@item -T@var{Size}
+SWI-compatible option to allocate @var{Size} K bytes for the trail stack; the trail cannot be expanded.
 @item -l @var{YAP_FILE}
 compile the Prolog file @var{YAP_FILE} before entering the top-level.
 @item -L @var{YAP_FILE}
@@ -3163,6 +3177,12 @@ Checks whether @var{T} is a database reference.
 @cnindex float/1
 Checks whether @var{T} is a floating point number.
 
+@item rational(@var{T}) [ISO]
+@findex rational/1
+@syindex rational/1
+@cyindex rational/1
+Checks whether @code{T} is a rational number.
+
 @item integer(@var{T}) [ISO]
 @findex integer/1
 @syindex integer/1
@@ -3179,7 +3199,7 @@ The opposite of @code{var(@var{T})}.
 @findex number/1
 @syindex number/1
 @cyindex number/1
-Checks whether @code{T} is an integer or a float.
+Checks whether @code{T} is an integer, rational or a float.
 
 @item primitive(@var{T})
 @findex primitive/1
@@ -3317,6 +3337,36 @@ in @var{TI} are also duplicated.
 
 Also refer to @code{copy_term/2}.
 
+@item is_list(+@var{List})
+@findex is_list/1
+@syindex is_list/1
+@cnindex is_list/1
+True when @var{List} is a proper list. That is, @var{List}
+is bound to the empty list (nil) or a term with functor '.' and arity 2.
+
+@item ?@var{Term1} =@= ?@var{Term2}
+@findex  =@=/2
+@syindex =@=/2
+@cnindex =@=/2
+
+Same as @code{variant/2}, succeeds if @var{Term1} and @var{Term2} are variant terms.
+
+
+@item subsumes_term(?@var{Subsumer}, ?@var{Subsumed})
+@findex  subsumes_term/2
+@syindex subsumes_term/2
+@cnindex subsumes_term/2
+
+Succeed if @var{Submuser} subsumes @var{Subsuned} but does not bind any
+variable in @var{Subsumer}.
+
+@item acyclic_term(?@var{Term})
+@findex cyclic_term/1
+@syindex cyclic_term/1
+@cnindex cyclic_term/1
+Succeed if the argument @var{Term} is an acyclic term.
+
+
 @end table
 
 @node Predicates on Atoms, Predicates on Characters, Testing Terms, Top
@@ -3404,6 +3454,29 @@ The predicate holds when the first argument is a list of atomic terms, and
 the second unifies with the atom obtained by concatenating all the
 atomic terms in the first list. The first argument thus may contain
 atoms or numbers.
+
+@item atomic_list_concat(?@var{As},+@var{Separator},?@var{A})
+@findex atomic_list_concat/3
+@snindex atomic_list_concat/3
+@cnindex atomic_list_concat/3
+Creates an atom just like @code{atomic_list_concat/2}, but inserts
+@var{Separator} between each pair of atoms. For example:
+
+@example
+?- atomic_list_concat([gnu, gnat], ', ', A).
+
+A = 'gnu, gnat'
+@end example
+
+YAP emulates the SWI-Prolog version of this predicate that can also be
+used to split atoms by instantiating @var{Separator} and @var{Atom} as
+shown below.
+
+@example
+?- atomic_list_concat(L, -, 'gnu-gnat').
+
+L = [gnu, gnat]
+@end example
 
 @item atom_length(+@var{A},?@var{I}) [ISO]
 @findex atom_length/2
@@ -3615,16 +3688,18 @@ variables come before numbers, numbers come before atoms which in turn
 come before compound terms, i.e.: variables @@< numbers @@< atoms @@<
 compound terms.
 @item
-variables are roughly ordered by "age" (the "oldest" variable is put
+Variables are roughly ordered by "age" (the "oldest" variable is put
 first);
 @item
-floating point numbers are sorted in increasing order;
+Floating point numbers are sorted in increasing order;
+@item
+Rational numbers are sorted in increasing order;
 @item
 Integers are sorted in increasing order;
 @item
-atoms are sorted in lexicographic order;
+Atoms are sorted in lexicographic order;
 @item
-compound terms are ordered first by arity of the main functor, then by
+Compound terms are ordered first by arity of the main functor, then by
 the name of the main functor, and finally by their arguments in
 left-to-right order.
 @end itemize
@@ -3732,6 +3807,16 @@ would return:
 S = [1-b,1-a,1-b,2-c,3-a]
 @end example
 
+@item predsort(+@var{Pred}, +@var{List}, -@var{Sorted})
+@findex predsort/3
+@snindex predsort/3
+@cnindex predsort/3
+Sorts similar to sort/2, but determines the order of two terms by
+calling @var{Pred}(-@var{Delta}, +@var{E1}, +@var{E2}) . This call must
+unify @var{Delta} with one of @code{<}, @code{>} or @code{=}. If
+built-in predicate compare/3 is used, the result is the same as
+sort/2.
+
 @item length(?@var{L},?@var{S})
 @findex length/2
 @syindex length/2
@@ -3744,8 +3829,50 @@ of length @var{S}.
 
 @node Arithmetic, I/O, Comparing Terms, Top
 @section Arithmetic
-Arithmetic expressions in YAP may use the following operators
-or @i{evaluable predicates}:
+
+YAP now supposets several different numeric types:
+
+@table @code
+@item integers
+      When YAP is built using the GNU multiple precision arithmetic
+      library (GMP), integer arithmetic is unbounded, which means that
+      the size of integers is limited by available memory only. Without
+      GMP, SWI-Prolog integers have the same size as an address. The
+      type of integer support can be detected using the Prolog flags
+      bounded, min_integer and max_integer. As the use of GMP is
+      default, most of the following descriptions assume unbounded
+      integer arithmetic.
+
+      Internally, SWI-Prolog has three integer representations. Small
+      integers (defined by the Prolog flag max_tagged_integer) are
+      encoded directly. Larger integers are represented as cell values
+      on the global stack. Integers that do not fit in 64-bit are
+      represented as serialised GNU MPZ structures on the global stack.
+
+@item number
+      Rational numbers (Q) are quotients of two integers. Rational
+      arithmetic is only provided if GMP is used (see above). Rational
+      numbers that are returned from is/2 are canonical, which means M
+      is positive and N and M have no common divisors. Rational numbers
+      are introduced in the computation using the rational/1,
+      rationalize/1 or the rdiv/2 (rational division) function. 
+
+@item float
+      Floating point numbers are represented using the C-type double. On most today platforms these are 64-bit IEEE floating point numbers.
+
+@end table
+
+Arithmetic functions that require integer arguments accept, in addition
+to integers, rational numbers with denominator `1' and floating point
+numbers that can be accurately converted to integers. If the required
+argument is a float the argument is converted to float. Note that
+conversion of integers to floating point numbers may raise an overflow
+exception. In all other cases, arguments are converted to the same type
+using the order integer to rational number to floating point number.
+
+
+Arithmetic expressions in YAP may use the following operators or
+@i{evaluable predicates}:
 
 @table @code
 
@@ -3806,11 +3933,8 @@ Arc cosine.
 @item atan(@var{X}) [ISO]
 Arc tangent.
 
-@item atan(@var{X},@var{Y})
-Four-quadrant arc tangent.
-
 @item atan2(@var{X},@var{Y})
-Four-quadrant arc tangent, same as atan/2.
+Four-quadrant arc tangent.
 
 @item sinh(@var{X})
 Hyperbolic sine.
@@ -3831,13 +3955,13 @@ Hyperbolic arc cosine.
 Hyperbolic arc tangent.
 
 @item lgamma(@var{X})
-gamma function.
+Logarithm of gamma function.
 
 @item erf(@var{X})
-gaussian error function.
+Gaussian error function.
 
 @item erfc(@var{X})
-complementary gaussian error function.
+Complementary gaussian error function.
 
 @item random(@var{X}) [ISO]
 An integer random number between 0 and @var{X}.
@@ -3869,13 +3993,13 @@ or @var{X} if @var{X} is an integer. In the @code{iso} language mode,
 The absolute value of @var{X}.
 
 @item ceiling(@var{X}) [ISO]
-The float that is the smallest integral value not smaller than @var{X}.
+The integer that is the smallest integral value not smaller than @var{X}.
 
 In @code{iso} language mode the argument must be a floating
 point-number and the result is an integer.
 
 @item floor(@var{X}) [ISO]
-The float that is the greatest integral value not greater than @var{X}.
+The integer that is the greatest integral value not greater than @var{X}.
 
 In @code{iso} language mode the argument must be a floating
 point-number and the result is an integer.
@@ -3896,8 +4020,42 @@ evaluates to a floating-point number return 1.0 for a positive @var{X},
 0.0 for 0.0, and -1.0 otherwise.
 
 @item truncate(@var{X}) [ISO]
-The float that is the integral value between @var{X} and 0 closest to
+The integral value between @var{X} and 0 closest to
 @var{X}.
+
+@item rational(@var{X})
+Convert the expression @var{X} to a rational number or integer. The
+function returns the input on integers and rational numbers. For
+floating point numbers, the returned rational number exactly represents
+the float. As floats cannot exactly represent all decimal numbers the
+results may be surprising. In the examples below, doubles can represent
+@code{0.25} and the result is as expected, in contrast to the result of
+@code{rational(0.1)}. The function @code{rationalize/1} gives a more
+intuitive result.
+
+@example
+?- A is rational(0.25).
+
+A is 1 rdiv 4
+?- A is rational(0.1).
+A = 3602879701896397 rdiv 36028797018963968
+@end example
+
+@item rationalize(@var{X})
+Convert the Expr to a rational number or integer. The function is
+similar to @code{rational/1}, but the result is only accurate within the
+rounding error of floating point numbers, generally producing a much
+smaller denominator. 
+
+@example
+?- A is rationalize(0.25).
+
+A = 1 rdiv 4
+?- A is rationalize(0.1).
+
+A = 1 rdiv 10
+@end example
+
 
 @item max(@var{X},@var{Y})
 The greater value of @var{X} and @var{Y}.
@@ -4081,16 +4239,54 @@ generator. The argument should be an integer, but floats are acceptable.
 
 @itemize @bullet
 @item 
-In contrast to previous versions of YAP, YAP4 @emph{does not} convert
-automatically between integers and floats.
+Since YAP4, YAP @emph{does not} convert automatically between integers
+and floats.
 @item
 arguments to trigonometric functions are expressed in radians.
 @item
-if a (non-instantiated) variable occurs in an arithmetic expression
-YAP will generate an exception. If no error handler is
-available, execution will be thrown back to the top-level.
+if a (non-instantiated) variable occurs in an arithmetic expression YAP
+will generate an exception. If no error handler is available, execution
+will be thrown back to the top-level.
 @end itemize
 
+
+The following predicates provide counting:
+
+@table @code
+
+@item between(+@var{Low}, +@var{High}, ?@var{Value})
+@findex between/3
+@syindex between/3
+@cnindex between/3
+
+    @var{Low} and @var{High} are integers, @var{High} >=@var{Low}. If
+    @var{Value} is an integer, @var{Low} =<@var{Value}
+    =<@var{High}. When @var{Value} is a variable it is successively
+    bound to all integers between @var{Low} and @var{High}. If
+    @var{High} is inf or infinite @code{between/3} is true iff
+    @var{Value} >= @var{Low}, a feature that is particularly interesting
+    for generating integers from a certain value.
+
+@item succ(?@var{Int1}, ?@var{Int2})
+@findex succ/3
+@syindex succ/3
+@cnindex succ/3
+
+    True if @var{Int2} = @var{Int1} + 1 and @var{Int1} >= 0. At least
+    one of the arguments must be instantiated to a natural number. This
+    predicate raises the domain-error not_less_than_zero if called with
+    a negative integer. E.g. @code{succ(X, 0)} fails silently and succ(X, -1)
+    raises a domain-error. The behaviour to deal with natural numbers
+    only was defined by Richard O'Keefe to support the common
+    count-down-to-zero in a natural way. 
+
+@item plus(?@var{Int1}, ?@var{Int2}, ?@var{Int3})
+@findex plus/3
+@syindex plus/3
+@cnindex plus/3
+    True if @var{Int3} = @var{Int1} + @var{Int2}. At least two of the
+    three arguments must be instantiated to integers.
+@end table
 
 @node I/O, Database, Arithmetic, Top
 @section I/O Predicates
@@ -4256,7 +4452,8 @@ in a directive, it uses the current source-file as reference.
 
     @item access(+@var{Mode})
 Imposes the condition access_file(@var{File}, @var{Mode}).  @var{Mode}
-is on of @code{read}, @code{write}, @code{append}, @code{exist} or @code{none}. 
+is on of @code{read}, @code{write}, @code{append}, @code{exist} or
+@code{none} (default). 
 See also @code{access_file/2}.
 
     @item file_type(+@var{Type})
@@ -4304,6 +4501,19 @@ name is @code{user}.
 @snindex file_base_name/2
 @cnindex file_base_name/2
 Give the path a full path @var{FullPath} extract the @var{FileName}.
+
+@item file_name_extension(?@var{Base},?@var{Extension}, ?@var{Name})
+@findex file_name_extension/3
+@snindex file_name_extension/3
+@cnindex file_name_extension/3
+
+This predicate is used to add, remove or test filename extensions. The
+main reason for its introduction is to deal with different filename
+properties in a portable manner. If the file system is
+case-insensitive, testing for an extension will be done
+case-insensitive too. @var{Extension} may be specified with or
+without a leading dot (.). If an @var{Extension} is generated, it
+will not have a leading dot.
 
 @item current_stream(@var{F},@var{M},@var{S})
 @findex current_stream/3
@@ -4984,6 +5194,46 @@ Print formatted output to the current output stream.
 @cnindex format/3
 Print formatted output to stream @var{S}.
 
+@item with_output_to(+@var{Ouput},:@var{Goal})
+@findex with_output_to/2
+@saindex with_output_to/2
+@cnindex with_output_to/2
+Run @var{Goal} as @code{once/1}, while characters written to the current
+output are sent to @var{Output}. The predicate is SWI-Prolog
+specific.
+
+Applications should generally avoid creating atoms by breaking and
+concatenating other atoms as the creation of large numbers of
+intermediate atoms generally leads to poor performance, even more so in
+multi-threaded applications. This predicate supports creating
+difference-lists from character data efficiently. The example below
+defines the DCG rule @code{term/3} to insert a term in the output:
+
+@example
+ term(Term, In, Tail) :-
+        with_output_to(codes(In, Tail), write(Term)).
+
+?- phrase(term(hello), X).
+
+X = [104, 101, 108, 108, 111]
+@end example
+
+@table @code
+@item A Stream handle or alias
+    Temporary switch current output to the given stream. Redirection using with_output_to/2 guarantees the original output is restored, also if Goal fails or raises an exception. See also call_cleanup/2. 
+@item atom(-@var{Atom})
+    Create an atom from the emitted characters. Please note the remark above. 
+@item string(-@var{String})
+    Create a string-object (not supported in YAP). 
+@item codes(-@var{Codes})
+    Create a list of character codes from the emitted characters, similar to atom_codes/2. 
+@item codes(-@var{Codes}, -@var{Tail})
+    Create a list of character codes as a difference-list. 
+@item chars(-@var{Chars})
+    Create a list of one-character-atoms codes from the emitted characters, similar to atom_chars/2. 
+@item chars(-@var{Chars}, -@var{Tail})
+    Create a list of one-character-atoms as a difference-list. 
+@end table
 
 @end table
 
@@ -7774,6 +8024,13 @@ If @code{true} the @code{open/3} builtin performs filename-expansion
 before opening a file (SICStus Prolog like). If @code{false} it does not
 (SWI-Prolog like).
 
+@item open_shared_object
+@findex open_shared_object (yap_flag/2 option)
+@*
+If true, @code{open_shared_object/2} and friends are implemented,
+providing access to shared libraries (@code{.so} files) or to dynamic link
+libraries (@code{.DLL} files).
+
 @item  profiling
 @findex profiling (yap_flag/2 option)
 @*
@@ -8200,8 +8457,8 @@ most files in the library are from the Edinburgh Prolog library.
 @menu
  
 Library, Extensions, Built-ins, Top
+* Aggregate :: SWI and SICStus compatible aggregate library
 * Apply:: SWI-Compatible Apply library.
-* Apply Macros:: Apply a Predicate to a list or to sub-terms.
 * Association Lists:: Binary Tree Implementation of Association Lists.
 * AVL Trees:: Predicates to add and lookup balanced binary  trees.
 * Cleanup:: Call With registered Cleanup Calls
@@ -8209,8 +8466,10 @@ Library, Extensions, Built-ins, Top
 * Heaps:: Labelled binary tree where the key of each node is less
     than or equal to the keys of its children.
 * LAM:: LAM MPI
+* Lambda:: Ulrich Neumerkel's Lambda Library
 * Lists:: List Manipulation
 * LineUtilities:: Line Manipulation Utilities
+* MapList:: SWI-Compatible Apply library.
 * matrix:: Matrix Objects
 * MATLAB:: Matlab Interface
 * Non-Backtrackable Data Structures:: Queues, Heaps, and Beams.
@@ -8221,6 +8480,7 @@ Library, Extensions, Built-ins, Top
 * Read Utilities:: SWI inspired utilities for fast stream scanning.
 * Red-Black Trees:: Predicates to add, lookup and delete in red-black binary  trees.
 * RegExp:: Regular Expression Manipulation
+* shlib:: SWI Prolog shlib library
 * Splay Trees:: Splay Trees
 * String I/O:: Writing To and Reading From Strings
 * System:: System Utilities
@@ -8235,190 +8495,172 @@ Library, Extensions, Built-ins, Top
 @end menu
 
  
-@node Apply, Apply Macros, , Library
-@section Apply Macros
-@cindex macros
+@node Aggregate, Apply, , Library
+@section Aggregate
+@cindex aggregate
+This is the SWI-Prolog library based on  the Quintus and SICStus 4
+library. Notice that  @code{forall/2}
+is a SWI-Prolog built-in and @code{term_variables/3} is a SWI-Prolog with a
+different definition.  @c To be done - Analysing the aggregation template
+@c and compiling a predicate for the list aggregation can be done at
+@c compile time.  - aggregate_all/3 can be rewritten to run in constant
+@c space using non-backtrackable assignment on a term.
 
-This library provides a SWI-compatible set of utilities for applying a
-predicate to all elements of a list. The library just forwards
-definitions from the @code{apply_macros} library.
+This library provides aggregating operators over the solutions of a
+predicate. The operations are a generalisation of the @code{bagof/3},
+@code{setof/3} and @code{findall/3} built-in predicates. The defined
+aggregation operations are counting, computing the sum, minimum,
+maximum, a bag of solutions and a set of solutions. We first give a
+simple example, computing the country with the smallest area:
 
-@node Apply Macros, Association Lists, Apply, Library
-@section Apply Macros
-@cindex macros
+@example
+smallest_country(Name, Area) :-
+        aggregate(min(A, N), country(N, A), min(Area, Name)).
+@end example
 
-This library provides a set of utilities for applying a predicate to
-all elements of a list or to all sub-terms of a term. They allow to
-easily perform the most common do-loop constructs in Prolog. To avoid
-performance degradation due to apply/2, each call creates an
-equivalent Prolog program, without meta-calls, which is executed by
-the Prolog engine instead. Note that if the equivalent Prolog program
-already exists, it will be simply used. The library is based on code
-by Joachim Schimpf.
-
-The following routines are available once included with the
-@code{use_module(library(apply_macros))} command.
+There are four aggregation predicates, distinguished on two properties.
 
 @table @code
-@item maplist(+@var{Pred}, ?@var{ListIn}, ?@var{ListOut})
-@findex maplist/3
-@snindex maplist/3
-@cnindex maplist/3
-      Creates @var{ListOut} by applying the predicate @var{Pred} to all
-elements of @var{ListIn}.
 
-@item maplist(+@var{Pred}, ?@var{ListIn})
-@findex maplist/3
-@snindex maplist/3
-@cnindex maplist/3
-      Creates @var{ListOut} by applying the predicate @var{Pred} to all
-elements of @var{ListIn}.
+@item aggregate vs. aggregate_all
+    The aggregate predicates use setof/3 (aggregate/4) or bagof/3
+    (aggregate/3), dealing with existential qualified variables
+    (@var{Var}/\@var{Goal}) and providing multiple solutions for the
+    remaining free variables in @var{Goal}. The aggregate_all/3
+    predicate uses findall/3, implicitly qualifying all free variables
+    and providing exactly one solution, while aggregate_all/4 uses
+    sort/2 over solutions and Distinguish (see below) generated using
+    findall/3. 
+@item The @var{Distinguish} argument
+    The versions with 4 arguments provide a @var{Distinguish} argument
+    that allow for keeping duplicate bindings of a variable in the
+    result. For example, if we wish to compute the total population of
+    all countries we do not want to lose results because two countries
+    have the same population. Therefore we use:
 
-@item maplist(+@var{Pred}, ?@var{L1}, ?@var{L2}, ?@var{L3})
-@findex maplist/4
-@snindex maplist/4
-@cnindex maplist/4
-      @var{L1},  @var{L2}, and @var{L3} are such that
-      @code{call(@var{Pred},@var{A1},@var{A2},@var{A3})} holds for every
-      corresponding element in lists @var{L1},  @var{L2}, and @var{L3}.
-
-@item maplist(+@var{Pred}, ?@var{L1}, ?@var{L2}, ?@var{L3}, ?@var{L4})
-@findex maplist/5
-@snindex maplist/5
-@cnindex maplist/5
-      @var{L1}, @var{L2}, @var{L3}, and @var{L4} are such that
-      @code{call(@var{Pred},@var{A1},@var{A2},@var{A3},@var{A4})} holds
-      for every corresponding element in lists @var{L1}, @var{L2}, @var{L3}, and
-      @var{L4}.
-
-@item checklist(+@var{Pred}, +@var{List})
-@findex checklist/2
-@snindex checklist/2
-@cnindex checklist/2
-      Succeeds if the predicate @var{Pred} succeeds on all elements of @var{List}.
-
-@item selectlist(+@var{Pred}, +@var{ListIn}, ?@var{ListOut})
-@findex selectlist/3
-@snindex selectlist/3
-@cnindex selectlist/3
-      Creates @var{ListOut} of all list elements of @var{ListIn} that pass a given test
-
-@item convlist(+@var{Pred}, +@var{ListIn}, ?@var{ListOut})
-@findex convlist/3
-@snindex convlist/3
-@cnindex convlist/3
-      A combination of @code{maplist} and @code{selectlist}: creates @var{ListOut} by
-applying the predicate @var{Pred} to all list elements on which
-@var{Pred} succeeds
-
-@item sumlist(+@var{Pred}, +@var{List}, ?@var{AccIn}, ?@var{AccOut})
-@findex sumlist/4
-@snindex sumlist/4
-@cnindex sumlist/4
-      Calls @var{Pred} on all elements of List and collects a result in
-@var{Accumulator}.
-
-@item mapargs(+@var{Pred}, ?@var{TermIn}, ?@var{TermOut})
-@findex mapargs/3
-@snindex mapargs/3
-@cnindex mapargs/3
-      Creates @var{TermOut} by applying the predicate @var{Pred} to all
-      arguments of @var{TermIn}
-
-@item sumargs(+@var{Pred}, +@var{Term}, ?@var{AccIn}, ?@var{AccOut})
-@findex sumargs/4
-@snindex sumargs/4
-@cnindex sumargs/4
-  Calls the predicate @var{Pred} on all arguments of @var{Term} and
-collects a  result in @var{Accumulator}
-
-@item mapnodes(+@var{Pred}, +@var{TermIn}, ?@var{TermOut}) 
-@findex mapnodes/3
-@snindex mapnodes/3
-@cnindex mapnodes/3
-      Creates @var{TermOut} by applying the predicate @var{Pred}
-      to all sub-terms of @var{TermIn} (depth-first and left-to-right order)
-
-@item checknodes(+@var{Pred}, +@var{Term}) 
-@findex checknodes/3
-@snindex checknodes/3
-@cnindex checknodes/3
-      Succeeds if the predicate @var{Pred} succeeds on all sub-terms of
-      @var{Term} (depth-first and left-to-right order)
-
-@item sumnodes(+@var{Pred}, +@var{Term}, ?@var{AccIn}, ?@var{AccOut})
-@findex sumnodes/4
-@snindex sumnodes/4
-@cnindex sumnodes/4
-      Calls the predicate @var{Pred} on all sub-terms of @var{Term} and
-collect a result in @var{Accumulator} (depth-first and left-to-right
-order)
-
-@item include(+@var{Pred}, +@var{ListIn}, ?@var{ListOut})
-@findex include/3
-@snindex include/3
-@cnindex include/3
-      Same as @code{selectlist/3}.
-
-@item exclude(+@var{Goal}, +@var{List1}, ?@var{List2})
-@findex exclude/3
-@snindex exclude/3
-@cnindex exclude/3
-Filter elements for which @var{Goal} fails. True if @var{List2} contains
-      those elements @var{Xi} of @var{List1} for which @code{call(Goal, Xi)} fails.
-
-@item partition(+@var{Pred},  +@var{List1}, ?@var{Included}, ?@var{Excluded})
-@findex partition/4
-@snindex partition/4
-@cnindex partition/4
-Filter elements of @var{List} according to @var{Pred}. True if
-@var{Included} contains all elements for which @code{call(Pred, X)}
-succeeds and @var{Excluded} contains the remaining elements.
-
-@item partition(+@var{Pred},  +@var{List1}, ?@var{Lesser}, ?@var{Equal}, ?@var{Greater})
-@findex partition/5
-@snindex partition/5
-@cnindex partition/5
-Filter list according to @var{Pred} in three sets. For each element
-@var{Xi} of @var{List}, its destination is determined by
-@code{call(Pred, Xi, Place)}, where @var{Place} must be unified to one
-of @code{<}, @code{=} or @code{>}. @code{Pred} must be deterministic.
+@example
+        aggregate(sum(P), Name, country(Name, P), Total)
+@end example
 
 @end table
 
-Examples:
+All aggregation predicates support the following operator below in
+@var{Template}. In addition, they allow for an arbitrary named compound
+term where each of the arguments is a term from the list below. I.e. the
+term @code{r(min(X), max(X))} computes both the minimum and maximum
+binding for @var{X}.
 
+@table @code
+
+@item count
+    Count number of solutions. Same as @code{sum(1)}. 
+@item sum(@var{Expr})
+    Sum of @var{Expr} for all solutions. 
+@item min(@var{Expr})
+    Minimum of @var{Expr} for all solutions. 
+@item min(@var{Expr}, @var{Witness})
+    A term min(@var{Min}, @var{Witness}), where @var{Min} is the minimal version of @var{Expr}
+    over all Solution and @var{Witness} is any other template applied to
+    Solution that produced @var{Min}. If multiple solutions provide the same
+    minimum, @var{Witness} corresponds to the first solution. 
+@item max(@var{Expr})
+    Maximum of @var{Expr} for all solutions. 
+@item max(@var{Expr}, @var{Witness})
+    As min(@var{Expr}, @var{Witness}), but producing the maximum result. 
+@item set(@var{X})
+    An ordered set with all solutions for @var{X}. 
+@item bag(@var{X})
+    A list of all solutions for @var{X}. 
+@end table
+
+The predicates are:
+@table @code
+
+@item [nondet]aggregate(+@var{Template}, :@var{Goal}, -@var{Result})
+@findex aggregate/3
+@syindex aggregate/3
+@cnindex aggregate/3
+    Aggregate bindings in @var{Goal} according to @var{Template}. The
+    aggregate/3 version performs bagof/3 on @var{Goal}.
+@item [nondet]aggregate(+@var{Template}, +@var{Discriminator}, :@var{Goal}, -@var{Result})
+@findex aggregate/4
+@syindex aggregate/4
+@cnindex aggregate/4
+    Aggregate bindings in @var{Goal} according to @var{Template}. The
+    aggregate/3 version performs setof/3 on @var{Goal}.
+@item [semidet]aggregate_all(+@var{Template}, :@var{Goal}, -@var{Result})
+@findex aggregate_all/3
+@syindex aggregate_all/3
+@cnindex aggregate_all/3
+    Aggregate bindings in @var{Goal} according to @var{Template}. The
+    aggregate_all/3 version performs findall/3 on @var{Goal}.
+@item [semidet]aggregate_all(+@var{Template}, +@var{Discriminator}, :@var{Goal}, -@var{Result})
+@findex aggregate_all/4
+@syindex aggregate_all/4
+@cnindex aggregate_all/4
+    Aggregate bindings in @var{Goal} according to @var{Template}. The
+    aggregate_all/3 version performs findall/3 followed by sort/2 on
+    @var{Goal}.
+@item foreach(:Generator, :@var{Goal})
+@findex foreach/2
+@syindex foreach/2
+@cnindex foreach/2
+    True if the conjunction of instances of @var{Goal} using the
+    bindings from Generator is true. Unlike forall/2, which runs a
+    failure-driven loop that proves @var{Goal} for each solution of
+    Generator, foreach creates a conjunction. Each member of the
+    conjunction is a copy of @var{Goal}, where the variables it shares
+    with Generator are filled with the values from the corresponding
+    solution.
+
+    The implementation executes forall/2 if @var{Goal} does not contain
+    any variables that are not shared with Generator.
+
+    Here is an example:
 @example
-%given
-plus(X,Y,Z) :- Z is X + Y.
-plus_if_pos(X,Y,Z) :- Y > 0, Z is X + Y.
-vars(X, Y, [X|Y]) :- var(X), !.
-vars(_, Y, Y).
-trans(TermIn, TermOut) :-
-  (compound(TermIn) ; atom(TermIn)),
-  TermIn =.. [p|Args],
-  TermOut =..[q|Args],
-  !.
-trans(X,X).
-
-%success
-
-maplist(plus(1), [1,2,3,4], [2,3,4,5]).
-checklist(var, [X,Y,Z]).
-selectlist(<(0), [-1,0,1], [1]).
-convlist(plus_if_pos(1), [-1,0,1], [2]).
-sumlist(plus, [1,2,3,4], 1, 11).
-mapargs(number_atom,s(1,2,3), s('1','2','3')).
-sumargs(vars, s(1,X,2,Y), [], [Y,X]).
-mapnodes(trans, p(a,p(b,a),c), q(a,q(b,a),c)).
-checknodes(\==(T), p(X,p(Y,X),Z)).
-sumnodes(vars, [c(X), p(X,Y), q(Y)], [], [Y,Y,X,X]).
-% another one
-maplist(mapargs(number_atom),[c(1),s(1,2,3)],[c('1'),s('1','2','3')]).
+    ?- foreach(between(1,4,X), dif(X,Y)), Y = 5.
+    Y = 5
+    ?- foreach(between(1,4,X), dif(X,Y)), Y = 3.
+    No
 @end example
 
+    Notice that @var{Goal} is copied repeatetly, which may cause
+    problems if attributed variables are involved.
 
-@node Association Lists, AVL Trees, Apply Macros, Library
+@item [det]free_variables(:Generator, +@var{Template}, +VarList0, -VarList)
+@findex free_variables/4
+@syindex free_variables/4
+@cnindex free_variables/4
+    In order to handle variables properly, we have to find all the universally quantified variables in the Generator. All variables as yet unbound are universally quantified, unless
+
+@enumerate
+@item they occur in the template
+@item they are bound by X/\P, setof, or bagof
+@end enumerate
+
+    @code{free_variables(Generator, Template, OldList, NewList)} finds this set, using OldList as an accumulator.
+@end table
+
+The original author of this code was Richard O'Keefe. Jan Wielemaker
+    made some SWI-Prolog enhancements, sponsored by SecuritEase,
+    http://www.securitease.com. The code is public domain (from DEC10 library).
+    @c To be done
+    @c     - Distinguish between control-structures and data terms.
+    @c     - Exploit our built-in term_variables/2 at some places? 
+
+
+
+@node Apply, Association Lists, Aggregate, Library
+@section Apply Macros
+@cindex apply
+
+This library provides a SWI-compatible set of utilities for applying a
+predicate to all elements of a list. The library just forwards
+definitions from the @code{maplist} library.
+
+
+
+@node Association Lists, AVL Trees, Apply, Library
 @section Association Lists
 @cindex association list
 
@@ -8731,13 +8973,6 @@ L = [1,2,3,4,5,6,7,8] ? ;
 no
 @end example
 
-@item is_list(+@var{List})
-@findex is_list/1
-@syindex is_list/1
-@cnindex is_list/1
-True when @var{List} is a proper list. That is, @var{List}
-is bound to the empty list (nil) or a term with functor '.' and arity 2.
-
 @item last(+@var{List},?@var{Last})
 @findex last/2
 @syindex last/2
@@ -8923,9 +9158,16 @@ If @var{Low} and @var{High} are integers with @var{Low} =<
 @var{High}, unify @var{List} to a list @code{[Low, Low+1, ...High]}. See
 also @code{between/3}.
 
+@item intersection(+@var{Set1}, +@var{Set2}, +@var{Set3})
+@findex intersection/3
+@syindex intersection/3
+@cnindex intersection/3
+Succeeds if @var{Set3} unifies with the intersection of @var{Set1} and
+@var{Set2}. @var{Set1} and @var{Set2} are lists without duplicates. They
+need not be ordered.
 @end table
 
-@node LineUtilities, matrix, Lists, Library
+@node LineUtilities, MapList, Lists, Library
 @section Line Manipulation Utilities
 @cindex Line Utilities Library
 
@@ -9062,19 +9304,203 @@ For every line @var{LineIn} in stream @var{StreamInp}, execute
 stream @var{StreamOut}.
 
 @item file_filter(+@var{FileIn}, +@var{FileOut}, +@var{Goal})
-@findex filter/3
-@snindex filter/3
-@cnindex filter/3
+@findex file_filter/3
+@snindex file_filter/3
+@cnindex file_filter/3
 
 For every line @var{LineIn} in file @var{FileIn}, execute
 @code{call(Goal,LineIn,LineOut)}, and output @var{LineOut} to file
 @var{FileOut}.
 
+@item file_filter(+@var{FileIn}, +@var{FileOut}, +@var{Goal},
++@var{FormatCommand},   +@var{Arguments})
+@findex file_filter_with_init/5
+@snindex file_filter_with_init/5
+@cnindex file_filter_with_init/5
+
+Same as @code{file_filter/3}, but before starting the filter execute
+@code{format/3} on the output stream, using @var{FormatCommand} and
+@var{Arguments}.
+
 @end table
 
 
 
-@node matrix, MATLAB, LineUtilities, Library
+@node MapList, matrix, LineUtilities, Library
+@section Maplist
+@cindex macros
+
+This library provides a set of utilities for applying a predicate to
+all elements of a list or to all sub-terms of a term. They allow to
+easily perform the most common do-loop constructs in Prolog. To avoid
+performance degradation due to @code{apply/2}, each call creates an
+equivalent Prolog program, without meta-calls, which is executed by
+the Prolog engine instead. Note that if the equivalent Prolog program
+already exists, it will be simply used. The library is based on code
+by Joachim Schimpf and on code from SWI-Prolog.
+
+The following routines are available once included with the
+@code{use_module(library(apply_macros))} command.
+
+@table @code
+@item maplist(+@var{Pred}, ?@var{ListIn}, ?@var{ListOut})
+@findex maplist/3
+@snindex maplist/3
+@cnindex maplist/3
+      Creates @var{ListOut} by applying the predicate @var{Pred} to all
+elements of @var{ListIn}.
+
+@item maplist(+@var{Pred}, ?@var{ListIn})
+@findex maplist/3
+@snindex maplist/3
+@cnindex maplist/3
+      Creates @var{ListOut} by applying the predicate @var{Pred} to all
+elements of @var{ListIn}.
+
+@item maplist(+@var{Pred}, ?@var{L1}, ?@var{L2}, ?@var{L3})
+@findex maplist/4
+@snindex maplist/4
+@cnindex maplist/4
+      @var{L1},  @var{L2}, and @var{L3} are such that
+      @code{call(@var{Pred},@var{A1},@var{A2},@var{A3})} holds for every
+      corresponding element in lists @var{L1},  @var{L2}, and @var{L3}.
+
+@item maplist(+@var{Pred}, ?@var{L1}, ?@var{L2}, ?@var{L3}, ?@var{L4})
+@findex maplist/5
+@snindex maplist/5
+@cnindex maplist/5
+      @var{L1}, @var{L2}, @var{L3}, and @var{L4} are such that
+      @code{call(@var{Pred},@var{A1},@var{A2},@var{A3},@var{A4})} holds
+      for every corresponding element in lists @var{L1}, @var{L2}, @var{L3}, and
+      @var{L4}.
+
+@item checklist(+@var{Pred}, +@var{List})
+@findex checklist/2
+@snindex checklist/2
+@cnindex checklist/2
+      Succeeds if the predicate @var{Pred} succeeds on all elements of @var{List}.
+
+@item selectlist(+@var{Pred}, +@var{ListIn}, ?@var{ListOut})
+@findex selectlist/3
+@snindex selectlist/3
+@cnindex selectlist/3
+      Creates @var{ListOut} of all list elements of @var{ListIn} that pass a given test
+
+@item convlist(+@var{Pred}, +@var{ListIn}, ?@var{ListOut})
+@findex convlist/3
+@snindex convlist/3
+@cnindex convlist/3
+      A combination of @code{maplist} and @code{selectlist}: creates @var{ListOut} by
+applying the predicate @var{Pred} to all list elements on which
+@var{Pred} succeeds
+
+@item sumlist(+@var{Pred}, +@var{List}, ?@var{AccIn}, ?@var{AccOut})
+@findex sumlist/4
+@snindex sumlist/4
+@cnindex sumlist/4
+      Calls @var{Pred} on all elements of List and collects a result in
+@var{Accumulator}.
+
+@item mapargs(+@var{Pred}, ?@var{TermIn}, ?@var{TermOut})
+@findex mapargs/3
+@snindex mapargs/3
+@cnindex mapargs/3
+      Creates @var{TermOut} by applying the predicate @var{Pred} to all
+      arguments of @var{TermIn}
+
+@item sumargs(+@var{Pred}, +@var{Term}, ?@var{AccIn}, ?@var{AccOut})
+@findex sumargs/4
+@snindex sumargs/4
+@cnindex sumargs/4
+  Calls the predicate @var{Pred} on all arguments of @var{Term} and
+collects a  result in @var{Accumulator}
+
+@item mapnodes(+@var{Pred}, +@var{TermIn}, ?@var{TermOut}) 
+@findex mapnodes/3
+@snindex mapnodes/3
+@cnindex mapnodes/3
+      Creates @var{TermOut} by applying the predicate @var{Pred}
+      to all sub-terms of @var{TermIn} (depth-first and left-to-right order)
+
+@item checknodes(+@var{Pred}, +@var{Term}) 
+@findex checknodes/3
+@snindex checknodes/3
+@cnindex checknodes/3
+      Succeeds if the predicate @var{Pred} succeeds on all sub-terms of
+      @var{Term} (depth-first and left-to-right order)
+
+@item sumnodes(+@var{Pred}, +@var{Term}, ?@var{AccIn}, ?@var{AccOut})
+@findex sumnodes/4
+@snindex sumnodes/4
+@cnindex sumnodes/4
+      Calls the predicate @var{Pred} on all sub-terms of @var{Term} and
+collect a result in @var{Accumulator} (depth-first and left-to-right
+order)
+
+@item include(+@var{Pred}, +@var{ListIn}, ?@var{ListOut})
+@findex include/3
+@snindex include/3
+@cnindex include/3
+      Same as @code{selectlist/3}.
+
+@item exclude(+@var{Goal}, +@var{List1}, ?@var{List2})
+@findex exclude/3
+@snindex exclude/3
+@cnindex exclude/3
+Filter elements for which @var{Goal} fails. True if @var{List2} contains
+      those elements @var{Xi} of @var{List1} for which @code{call(Goal, Xi)} fails.
+
+@item partition(+@var{Pred},  +@var{List1}, ?@var{Included}, ?@var{Excluded})
+@findex partition/4
+@snindex partition/4
+@cnindex partition/4
+Filter elements of @var{List} according to @var{Pred}. True if
+@var{Included} contains all elements for which @code{call(Pred, X)}
+succeeds and @var{Excluded} contains the remaining elements.
+
+@item partition(+@var{Pred},  +@var{List1}, ?@var{Lesser}, ?@var{Equal}, ?@var{Greater})
+@findex partition/5
+@snindex partition/5
+@cnindex partition/5
+Filter list according to @var{Pred} in three sets. For each element
+@var{Xi} of @var{List}, its destination is determined by
+@code{call(Pred, Xi, Place)}, where @var{Place} must be unified to one
+of @code{<}, @code{=} or @code{>}. @code{Pred} must be deterministic.
+
+@end table
+
+Examples:
+
+@example
+%given
+plus(X,Y,Z) :- Z is X + Y.
+plus_if_pos(X,Y,Z) :- Y > 0, Z is X + Y.
+vars(X, Y, [X|Y]) :- var(X), !.
+vars(_, Y, Y).
+trans(TermIn, TermOut) :-
+  (compound(TermIn) ; atom(TermIn)),
+  TermIn =.. [p|Args],
+  TermOut =..[q|Args],
+  !.
+trans(X,X).
+
+%success
+
+maplist(plus(1), [1,2,3,4], [2,3,4,5]).
+checklist(var, [X,Y,Z]).
+selectlist(<(0), [-1,0,1], [1]).
+convlist(plus_if_pos(1), [-1,0,1], [2]).
+sumlist(plus, [1,2,3,4], 1, 11).
+mapargs(number_atom,s(1,2,3), s('1','2','3')).
+sumargs(vars, s(1,X,2,Y), [], [Y,X]).
+mapnodes(trans, p(a,p(b,a),c), q(a,q(b,a),c)).
+checknodes(\==(T), p(X,p(Y,X),Z)).
+sumnodes(vars, [c(X), p(X,Y), q(Y)], [], [Y,Y,X,X]).
+% another one
+maplist(mapargs(number_atom),[c(1),s(1,2,3)],[c('1'),s('1','2','3')]).
+@end example
+
+@node matrix, MATLAB, MapList, Library
 @section Matrix Library
 @cindex Matrix Library
 
@@ -9084,8 +9510,18 @@ matrices are multi-dimensional and compact. In contrast to static
 arrays. these arrays are allocated in the stack. Matrices are available
 by loading the library @code{library(matrix)}.
 
+Accessing the matlab dynamic libraries can be complicated. In Linux
+machines, to use this interface, you may have to set the environment
+variable @t{LD_LIBRARY_PATH}. Next, follows an example using bash in a
+64-bit Linux PC:
+@example
+export LD_LIBRARY_PATH=''$MATLAB_HOME"/sys/os/glnxa64:''$MATLAB_HOME"/bin/glnxa64:''$LD_LIBRARY_PATH"
+@end example
+where @code{MATLAB_HOME} is the directory where matlab is installed
+at. Please replace @code{ax64} for @code{x86} on a 32-bit PC.
+
 Notice that the functionality in this library is only partial. Please
-contact the YAP maintainers if you need for extra functionality.
+contact the YAP maintainers if you require extra functionality.
 
 @table @code
 
@@ -10309,7 +10745,7 @@ associated with @var{Val}.
 list @var{L}.
 @end table
 
-@node RegExp, Splay Trees, Red-Black Trees, Library
+@node RegExp, shlib, Red-Black Trees, Library
 @section Regular Expressions
 @cindex regular expressions
 
@@ -10440,7 +10876,136 @@ sub-expression.  Thus the @code{"b"} has already been claimed before the
 
 @end table
 
-@node Splay Trees, String I/O, RegExp, Library
+@node shlib, Splay Trees, RegExp, Library
+@section SWI-Prolog's shlib library
+
+@cindex SWI-Compatible foreign file loading
+This section discusses the functionality of the (autoload)
+@code{library(shlib)}, providing an interface to manage shared
+libraries.
+
+One of the files provides a global function @code{install_mylib()} that
+initialises the module using calls to @code{PL_register_foreign()}. Here is a
+simple example file @code{mylib.c}, which creates a Windows MessageBox:
+
+@example
+#include <windows.h>
+#include <SWI-Prolog.h>
+
+static foreign_t
+pl_say_hello(term_t to)
+@{ char *a;
+
+  if ( PL_get_atom_chars(to, &a) )
+  @{ MessageBox(NULL, a, "DLL test", MB_OK|MB_TASKMODAL);
+
+    PL_succeed;
+  @}
+
+  PL_fail;
+@}
+
+install_t
+install_mylib()
+@{ PL_register_foreign("say_hello", 1, pl_say_hello, 0);
+@}
+@end example
+
+Now write a file mylib.pl:
+
+@example
+:- module(mylib, [ say_hello/1 ]).
+:- use_foreign_library(foreign(mylib)).
+@end example
+
+The file mylib.pl can be loaded as a normal Prolog file and provides the predicate defined in C.
+
+@table @code
+@item [det]load_foreign_library(:@var{FileSpec})
+@item [det]load_foreign_library(:@var{FileSpec}, +@var{Entry}:atom)
+@findex load_foreign_library/1
+@snindex load_foreign_library/1
+@cnindex load_foreign_library/1
+@findex load_foreign_library/2
+@snindex load_foreign_library/2
+@cnindex load_foreign_library/2
+    Load a shared object or DLL. After loading the @var{Entry} function is
+    called without arguments. The default entry function is composed
+    from @code{install_}, followed by the file base-name. E.g., the
+    load-call below calls the function @code{install_mylib()}. If the platform
+    prefixes extern functions with @code{_}, this prefix is added before
+    calling.
+
+@example
+          ...
+          load_foreign_library(foreign(mylib)),
+          ...
+@end example
+
+    @var{FileSpec} is a specification for
+    @code{absolute_file_name/3}. If searching the file fails, the plain
+    name is passed to the OS to try the default method of the OS for
+    locating foreign objects. The default definition of
+    @code{file_search_path/2} searches <prolog home>/lib/Yap.
+
+    See also
+        @code{use_foreign_library/1,2} are intended for use in
+        directives. 
+
+@item [det]use_foreign_library(+@var{FileSpec})
+@item [det]use_foreign_library(+@var{FileSpec}, +@var{Entry}:atom)
+@findex use_foreign_library/1
+@snindex use_foreign_library/1
+@cnindex use_foreign_library/1
+@findex use_foreign_library/2
+@snindex use_foreign_library/2
+@cnindex use_foreign_library/2
+    Load and install a foreign library as load_foreign_library/1,2 and
+    register the installation using @code{initialization/2} with the option
+    now. This is similar to using:
+
+@example
+    :- initialization(load_foreign_library(foreign(mylib))).
+@end example
+
+    but using the @code{initialization/1} wrapper causes the library to
+    be loaded after loading of the file in which it appears is
+    completed, while @code{use_foreign_library/1} loads the library
+    immediately. I.e. the difference is only relevant if the remainder
+    of the file uses functionality of the @code{C}-library. 
+
+@item [det]unload_foreign_library(+@var{FileSpec})
+@item [det]unload_foreign_library(+@var{FileSpec}, +@var{Exit}:atom) 
+@findex unload_foreign_library/1
+@snindex unload_foreign_library/1
+@cnindex unload_foreign_library/1
+@findex unload_foreign_library/2
+@snindex unload_foreign_library/2
+@cnindex unload_foreign_library/2
+
+Unload a shared
+object or DLL. After calling the @var{Exit} function, the shared object is
+removed from the process. The default exit function is composed from
+@code{uninstall_}, followed by the file base-name.
+
+@item current_foreign_library(?@var{File}, ?@var{Public}) 
+@findex current_foreign_library/2
+@snindex current_foreign_library/2
+@cnindex current_foreign_library/2
+
+Query currently
+loaded shared libraries.  
+
+@c @item reload_foreign_libraries 
+@c @findex reload_foreign_libraries/0
+@c @snindex reload_foreign_libraries/0
+@c @cnindex reload_foreign_libraries/0
+@c Reload all foreign
+@c libraries loaded (after restore of a state created using
+@c @code{qsave_program/2}).
+@end table
+
+@node Splay Trees, String I/O, shlib, Library
 @section Splay Trees
 @cindex splay trees
 
@@ -10595,6 +11160,15 @@ Convert the atom @var{Number} to the difference list of character codes
 @cnindex atom_to_term/3
 Use @var{Atom} as input to @code{read_term/2} using the option @code{variable_names} and return the read term in @var{Term} and the variable bindings in @var{Bindings}. @var{Bindings} is a list of @code{Name = Var} couples, thus providing access to the actual variable names. See also @code{read_term/2}. If Atom has no valid syntax, a syntax_error exception is raised.
 
+@item term_to_atom(?@var{Term}, ?@var{Atom})
+@findex term_to_atom/2
+@syindex term_to_atom/2
+@cnindex term_to_atom/2
+True if @var{Atom} describes a term that unifies with @var{Term}. When
+@var{Atom} is instantiated @var{Atom} is converted and then unified with
+@var{Term}. If @var{Atom} has no valid syntax, a syntax_error exception
+is raised. Otherwise @var{Term} is ``written'' on @var{Atom} using
+@code{write_term/2} with the option quoted(true).
 
 @item read_from_chars(+@var{Chars}, -@var{Term})
 @findex read_from_chars/2
@@ -11014,12 +11588,6 @@ efficiency. They are available through the
 @code{use_module(library(terms))} command.
 
 @table @code
-
-@item acyclic_term(?@var{Term})
-@findex cyclic_term/1
-@syindex cyclic_term/1
-@cnindex cyclic_term/1
-Succeed if the argument @var{Term} is an acyclic term.
 
 @item cyclic_term(?@var{Term})
 @findex cyclic_term/1
@@ -11937,7 +12505,7 @@ The path @var{Path} is a path starting at vertex @var{Vertex} in graph
 
 @end table
 
-@node UnDGraphs, LAM , DGraphs, Library
+@node UnDGraphs, Lambda , DGraphs, Library
 @section Undirected Graphs
 @cindex undirected graphs
 
@@ -12033,7 +12601,83 @@ directed graph @var{DGraph}.
 
 @end table
 
-@node LAM, , UnDGraphs, Library
+@node Lambda, LAM, UnDGraphs, Library
+@section Lambda Expressions
+@cindex Lambda Expressions
+
+
+This library, designed and implemented by Ulrich Neumerkel, provides
+lambda expressions to simplify higher order programming based on @code{call/N}.
+
+Lambda expressions are represented by ordinary Prolog terms.  There are
+two kinds of lambda expressions:
+
+@example
+    Free+\X1^X2^ ..^XN^Goal
+
+         \X1^X2^ ..^XN^Goal
+@end example
+
+The second is a shorthand for@code{ t+\X1^X2^..^XN^Goal}, where @code{Xi} are the parameters.
+
+@var{Goal} is a goal or continuation (Syntax note: @var{Operators} within @var{Goal}
+require parentheses due to the low precedence of the @code{^} operator).
+
+Free contains variables that are valid outside the scope of the lambda
+expression. They are thus free variables within.
+
+All other variables of @var{Goal} are considered local variables. They must
+not appear outside the lambda expression. This restriction is
+currently not checked. Violations may lead to unexpected bindings.
+
+In the following example the parentheses around @code{X>3} are necessary.
+
+@example
+?- use_module(library(lambda)).
+?- use_module(library(apply)).
+
+?- maplist(\X^(X>3),[4,5,9]).
+true.
+@end example
+
+In the following @var{X} is a variable that is shared by both instances
+of the lambda expression. The second query illustrates the cooperation
+of continuations and lambdas. The lambda expression is in this case a
+continuation expecting a further argument.
+
+@example
+?- Xs = [A,B], maplist(X+\Y^dif(X,Y), Xs).
+Xs = [A, B],
+dif(X, A),
+dif(X, B).
+
+?- Xs = [A,B], maplist(X+\dif(X), Xs).
+Xs = [A, B],
+dif(X, A),
+dif(X, B).
+
+@end example
+
+The following queries are all equivalent. To see this, use
+the fact @code{f(x,y)}.
+
+@example
+?- call(f,A1,A2).
+?- call(\X^f(X),A1,A2).
+?- call(\X^Y^f(X,Y), A1,A2).
+?- call(\X^(X+\Y^f(X,Y)), A1,A2).
+?- call(call(f, A1),A2).
+?- call(f(A1),A2).
+?- f(A1,A2).
+A1 = x,
+A2 = y.
+@end example
+
+Further discussions
+at @url{http://www.complang.tuwien.ac.at/ulrich/Prolog-inedit/ISO-Hiord}.
+
+
+@node LAM, , Lambda, Library
 @section LAM
 @cindex lam
 
@@ -14582,6 +15226,7 @@ The rest of this appendix describes exhaustively how to interface C to YAP.
 * Manipulating Strings:: From character arrays to Lists of codes and back
 * Memory Allocation:: Stealing Memory From YAP
 * Controlling Streams:: Control How YAP sees Streams
+* Utility Functions:: From character arrays to Lists of codes and back
 * Calling YAP From C:: From C to YAP to C to YAP 
 * Module Manipulation in C:: Create and Test Modules from within C
 * Writing C:: Writing Predicates in C
@@ -14951,7 +15596,7 @@ The routine releases a buffer allocated from the code area. The system
 may crash if @code{buf} is not a valid pointer to a buffer in the code
 area.
 
-@node Controlling Streams, Calling YAP From C, Memory Allocation, C-Interface
+@node Controlling Streams, Utility Functions, Memory Allocation, C-Interface
 @section Controlling YAP Streams from @code{C}
 
 @findex YAP_StreamToFileNo (C-Interface function)
@@ -15003,7 +15648,71 @@ The available flags are @code{YAP_INPUT_STREAM},
 stream is supposed to be at position 0. The argument @var{name} gives
 the name by which YAP should know the new stream.
 
-@node Calling YAP From C, Module Manipulation in C, Controlling Streams, C-Interface
+@node Utility Functions, Calling YAP From C, Controlling Streams, C-Interface
+@section Utility Functions in @code{C}
+
+
+The C-Interface  provides the C-application with a a number of utility
+functions that are useful.
+
+
+@findex YAP_Record (C-Interface function)
+The first provides a way to insert a term into the data-base
+@example
+      void      *YAP_Record(YAP_Term @var{t})
+@end example
+@noindent
+This function returns a pointer to a copy of the term in the database
+(or to @t{NULL} if the operation fails.
+
+@findex YAP_Recorded (C-Interface function)
+The next functions provides a way to recover the term from the data-base:
+@example
+      YAP_Term      YAP_Recorded(void *@var{handle})
+@end example
+@noindent
+Notice that the semantics are the same as for @code{recorded/3}: this
+function creates a new copy of the term in the stack, with fresh
+variables. The function returns @t{0L} if it cannot create a new term.
+
+@findex YAP_Erase (C-Interface function)
+Last, the next function allows one to recover space:
+@example
+      int      YAP_Erase(void *@var{handle})
+@end example
+@noindent
+Notice that any accesses using @var{handle} after this operation may
+lead to a crash.
+
+The following functions are often required to compare terms.
+
+@findex YAP_ExactlyEqual (C-Interface function)
+The first function succeeds if two terms are actually the same term, as
+@code{==/2}:
+@example
+      int      YAP_ExactlyEqual(YAP_Term t1, YAP_Term t2)
+@end example
+@noindent
+
+The second function succeeds if two terms are variant terms, and returns
+0 otherwise, as
+@code{=@=/2}:
+@example
+      int      YAP_Variant(YAP_Term t1, YAP_Term t2)
+@end example
+@noindent
+
+The second function computes a hash function for a term, as in
+@code{term_hash/4}.
+@example
+     YAP_Int    YAP_TermHash(YAP_Term t, YAP_Int range, YAP_Int depth, int  ignore_variables));
+@end example
+@noindent
+The first three arguments follow @code{term_has/4}. The last argument
+indicates what to do if we find a variable: if @code{0} fail, otherwise
+ignore the variable. 
+
+@node Calling YAP From C, Module Manipulation in C, Utility Functions, C-Interface
 @section From @code{C} back to Prolog
 
 @findex YAP_RunGoal (C-Interface function)
@@ -15050,25 +15759,25 @@ YAP that the slot @var{sl} is not needed and can be given back to the
 system. The slot functions are as follows:
 
 @table @code
-@item long int YAP_NewSlots(int @var{NumberOfSlots})
+@item YAP_Int YAP_NewSlots(int @var{NumberOfSlots})
 @findex YAP_NewSlots (C-Interface function)
 Allocate @var{NumberOfSlots} from the stack and return an handle to the
 last one. The other handle can be obtained by decrementing the handle.
 
-@item long int YAP_CurrentSlot(void)
+@item YAP_Int YAP_CurrentSlot(void)
 @findex YAP_CurrentSlot (C-Interface function)
 Return a handle to the system's default slot.
 
-@item long YAP_InitSlot(YAP_Term @var{t})
+@item YAP_Int YAP_InitSlot(YAP_Term @var{t})
 @findex YAP_InitSlot (C-Interface function)
 Create a new slot, initialise it with @var{t}, and return a handle to
 this slot, that also becomes the current slot.
 
-@item YAP_Term *YAP_AddressFromSlot(long int @var{slot})
+@item YAP_Term *YAP_AddressFromSlot(YAP_Int @var{slot})
 @findex YAP_AddressFromSlot (C-Interface function)
 Return the address of slot @var{slot}: please use with care.
 
-@item void YAP_PutInSlot(long int @var{slot}, YAP_Term @var{t})
+@item void YAP_PutInSlot(YAP_Int @var{slot}, YAP_Term @var{t})
 @findex YAP_PutInSlot (C-Interface function)
 Set the contents of slot @var{slot} to @var{t}.
 
@@ -15076,6 +15785,15 @@ Set the contents of slot @var{slot} to @var{t}.
 @findex YAP_RecoverSlots (C-Interface function)
 Recover the space for @var{HowMany} slots: these will include the
 current default slot. Fails if no such slots exist.
+
+@item YAP_Int YAP_ArgsToSlots(int @var{HowMany})
+@findex YAP_ArgsToSlots (C-Interface function)
+Store the current first  @var{HowMany} arguments in new slots.
+
+@item void YAP_SlotsToArgs(int @var{HowMany}, YAP_Int @var{slot})
+@findex YAP_SlotsToArgs (C-Interface function)
+Set the first @var{HowMany} arguments to the @var{HowMany} slots
+starting at @var{slot}.
 @end table
 
 The following functions complement @var{YAP_RunGoal}:
@@ -15153,7 +15871,7 @@ runall(YAP_Term g)
     YAP_dogoalinfo goalInfo;
     YAP_Term *goalArgs = YAP_ArraysOfTerm(g);
     YAP_Functor *goalFunctor = YAP_FunctorOfTerm(g);
-    YAP_PredEntryPtr goalPred = YAP_FunctorToGoal(goalFunctor);
+    YAP_PredEntryPtr goalPred = YAP_FunctorToPred(goalFunctor);
     
     result = YAP_EnterGoal( goalPred, goalArgs, &goalInfo );
     while (result)
@@ -15398,10 +16116,52 @@ YAP will search for @var{ObjectFiles} in the current directory first. If
 it cannot find them it will search for the files using the environment
 variable @code{YAPLIBDIR}, if defined, or in the default library.
 
-In a.out systems YAP by default only reserves a fixed amount of memory
-for object code (64 Kbytes in the current version). Should this size
-prove inadequate the flag @code{-c n} can be passed to YAP (in the
-command line invoking YAP) to force the allocation of @code{n} Kbytes.
+YAP also supports the SWI-Prolog interface to loading foreign code:
+
+@table @code
+@item open_shared_object(+@var{File}, -@var{Handle})
+@findex open_shared_object/2
+@snindex open_shared_object/2
+@cnindex open_shared_object/2
+    File is the name of a shared object file (called dynamic load
+    library in MS-Windows). This file is attached to the current process
+    and @var{Handle} is unified with a handle to the library. Equivalent to
+    @code{open_shared_object(File, [], Handle)}. See also
+    load_foreign_library/[1,2].
+
+    On errors, an exception @code{shared_object}(@var{Action},
+    @var{Message}) is raised. @var{Message} is the return value from
+    dlerror().
+
+@item open_shared_object(+@var{File}, -@var{Handle}, +@var{Options})
+@findex open_shared_object/3
+@snindex open_shared_object/3
+@cnindex open_shared_object/3
+    As @code{open_shared_object/2}, but allows for additional flags to
+    be passed. @var{Options} is a list of atoms. @code{now} implies the
+    symbols are 
+    resolved immediately rather than lazily (default). @code{global} implies
+    symbols of the loaded object are visible while loading other shared
+    objects (by default they are local). Note that these flags may not
+    be supported by your operating system. Check the documentation of
+    @code{dlopen()} or equivalent on your operating system. Unsupported
+    flags  are silently ignored. 
+
+@item close_shared_object(+@var{Handle})
+@findex close_shared_object/1
+@snindex close_shared_object/1
+@cnindex close_shared_object/1
+    Detach the shared object identified by @var{Handle}. 
+
+@item call_shared_object_function(+@var{Handle}, +@var{Function})
+@findex call_shared_object_function/2
+@snindex call_shared_object_function/2
+@cnindex call_shared_object_function/2
+    Call the named function in the loaded shared library. The function
+    is called without arguments and the return-value is
+    ignored. In SWI-Prolog, normally this function installs foreign
+    language predicates using calls to @code{PL_register_foreign()}.
+@end table
 
 @node Save&Rest, YAP4 Notes, Loading Objects, C-Interface
 @section Saving and Restoring

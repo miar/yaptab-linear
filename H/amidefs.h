@@ -478,6 +478,11 @@ typedef struct yami {
       CELL next;
     } ollll;
     struct {
+      Int		  i;
+      struct pred_entry  *p;
+      CELL next;
+    } ip;
+    struct {
       struct yami        *l;
       struct pred_entry  *p;
       CELL next;
@@ -646,6 +651,16 @@ typedef struct yami {
       struct pred_entry  *p0;
       CELL next;
     } Osblp;
+    struct {
+#ifdef YAPOR
+      unsigned int        or_arg;
+#endif
+      COUNT               s;
+      CELL               *bmap;
+      struct pred_entry  *p;
+      Int		  i;
+      CELL next;
+    } Osbpi;
     struct {
 #ifdef YAPOR
       unsigned int        or_arg;
@@ -1046,7 +1061,7 @@ extern YAP_ULONG_LONG Yap_2opcount[_std_top + 1][_std_top + 1];
   Make this into an even number so that the system will know
   it should ignore the depth limit
 */   
-#define RESET_DEPTH() DEPTH = MkIntTerm(MAX_ABS_INT-1)
+#define RESET_DEPTH() MkIntTerm(MAX_ABS_INT-1)
 #else
 
 #endif

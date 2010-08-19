@@ -61,7 +61,9 @@ form colour(Left, Key, Value, Right), where _colour_  is one of =red= or
 @author Vitor Santos Costa, Jan Wielemaker
 */
 
-:- meta_predicate rb_map(+,:,-), rb_partial_map(+,+,:,-), rb_apply(+,+,:,-).
+:- meta_predicate rb_map(+,2,-),
+	rb_partial_map(+,+,2,-),
+	rb_apply(+,+,2,-).
 
 /*
 :- use_module(library(type_check)).
@@ -356,10 +358,11 @@ lookupall(<, K, V, Tree) :-
 
 % We don't use parent nodes, so we may have to fix the root.
 
-%%	rb_insert(+T0, +Key, ?Value, -TN)
+%%	rb_insert(+T0, +Key, ?Value, -TN) is det.
 %
 %	Add an element with key Key and Value  to the tree T0 creating a
-%	new red-black tree TN. Duplicated elements are not allowed.
+%	new red-black tree TN. If Key  is   a  key in T0, the associated
+%	value is replaced by Value.  See also rb_insert_new/4.
 
 rb_insert(t(Nil,Tree0),Key,Val,t(Nil,Tree)) :-
 	insert(Tree0,Key,Val,Nil,Tree).
@@ -421,10 +424,10 @@ insert2(black(L,K0,V0,R), K, V, Nil, NT, Flag) :-
 
 % We don't use parent nodes, so we may have to fix the root.
 
-%%	rb_insert_new(+T0, +Key, ?Value, -TN)
+%%	rb_insert_new(+T0, +Key, ?Value, -TN) is semidet.
 %
 %	Add a new element with key Key and Value  to the tree T0 creating a
-%	new red-black tree TN. Duplicated elements are not allowed.
+%	new red-black tree TN.   Fails if Key is a key in T0.
 
 rb_insert_new(t(Nil,Tree0),Key,Val,t(Nil,Tree)) :-
 	insert_new(Tree0,Key,Val,Nil,Tree).
@@ -773,8 +776,7 @@ visit(black(L,K,V,R),L0,Lf) :-
 	visit(L,[K-V|L1],Lf),
 	visit(R,L0,L1).
 
-:- meta_predicate rb_map(?,:,?). % this is not strictly required
-:- meta_predicate map(?,:,?,?).  % this is required.
+:- meta_predicate map(?,2,?,?).  % this is required.
 
 %%	rb_map(+T, :Goal) is semidet.
 %
@@ -794,8 +796,8 @@ map(black(L,K,V,R),Goal,black(NL,K,NV,NR),Nil) :-
 	map(L,Goal,NL,Nil),
 	map(R,Goal,NR,Nil).
 
-:- meta_predicate rb_map(?,:). % this is not strictly required
-:- meta_predicate map(?,:).  % this is required.
+:- meta_predicate rb_map(?,1). % this is not strictly required
+:- meta_predicate map(?,1).  % this is required.
 
 %%	rb_map(+T, :G, -TN) is semidet.
 %

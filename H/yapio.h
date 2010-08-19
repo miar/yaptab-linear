@@ -165,7 +165,7 @@ extern YP_FILE yp_iob[YP_MAX_FILES];
 
 typedef YP_FILE *YP_File;
 
-enum TokenKinds {
+typedef enum TokenKinds {
   Name_tok,
   Number_tok,
   Var_tok,
@@ -174,16 +174,16 @@ enum TokenKinds {
   Ponctuation_tok,
   Error_tok,
   eot_tok
-};
+} tkinds;
 
 typedef	 struct	TOKEN {
-  unsigned char Tok;
+  enum TokenKinds Tok;
   Term TokInfo;
   int	TokPos;
   struct TOKEN *TokNext;
 } TokEntry;
 
-#define	Ord(X) ((int) (X))
+#define	Ord(X) ((enum TokenKinds) (X))
 
 #define	NextToken GNextToken()
 
@@ -248,6 +248,7 @@ typedef struct AliasDescS {
 
 /************ SWI compatible support for different encodings ************/
 
+#ifndef SIO_NL_POSIX
 typedef enum {
   ENC_OCTET      = 0,
   ENC_ISO_LATIN1 = 1,
@@ -257,21 +258,24 @@ typedef enum {
   ENC_UNICODE_BE = 16,
   ENC_UNICODE_LE = 32
 } encoding_t;
+#endif
 
 #define MAX_ISO_LATIN1 255
 
 /****************** character definition table **************************/
+
 #define NUMBER_OF_CHARS 256
 extern char *Yap_chtype;
 
-EXTERN inline int STD_PROTO(chtype,(int));
+EXTERN inline int STD_PROTO(chtype,(Int));
+int STD_PROTO(Yap_wide_chtype,(Int));
 
 EXTERN inline int
-chtype(int ch)
+chtype(Int ch)
 {
-  if (ch < 256)
+  if (ch < NUMBER_OF_CHARS)
     return Yap_chtype[ch];
-  return SL;
+  return Yap_wide_chtype(ch);
 }
 
 
@@ -299,7 +303,7 @@ void  STD_PROTO(Yap_UnLockStream,(int));
 #define Yap_LockStream(X)
 #define Yap_UnLockStream(X)
 #endif
-int   STD_PROTO(Yap_GetStreamFd,(int));
+Int   STD_PROTO(Yap_GetStreamFd,(int));
 void  STD_PROTO(Yap_CloseStreams,(int));
 void  STD_PROTO(Yap_FlushStreams,(void));
 void  STD_PROTO(Yap_CloseStream,(int));
@@ -307,7 +311,7 @@ int   STD_PROTO(Yap_PlGetchar,(void));
 int   STD_PROTO(Yap_PlGetWchar,(void));
 int   STD_PROTO(Yap_PlFGetchar,(void));
 int   STD_PROTO(Yap_GetCharForSIGINT,(void));
-int   STD_PROTO(Yap_StreamToFileNo,(Term));
+Int   STD_PROTO(Yap_StreamToFileNo,(Term));
 Term  STD_PROTO(Yap_OpenStream,(FILE *,char *,Term,int));
 Term  STD_PROTO(Yap_StringToTerm,(char *,Term *));
 Term  STD_PROTO(Yap_TermToString,(Term,char *,unsigned int,int));
@@ -317,11 +321,6 @@ int   STD_PROTO(Yap_GetFreeStreamDForReading,(void));
 Term	STD_PROTO(Yap_WStringToList,(wchar_t *));
 Term	STD_PROTO(Yap_WStringToListOfAtoms,(wchar_t *));
 Atom	STD_PROTO(Yap_LookupWideAtom,(wchar_t *));
-
-extern int
-  Yap_c_input_stream,
-  Yap_c_output_stream,
-  Yap_c_error_stream;
 
 #define YAP_INPUT_STREAM	0x01
 #define YAP_OUTPUT_STREAM	0x02

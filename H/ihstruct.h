@@ -1,4 +1,8 @@
 
+  /* This file, ihstruct.h, was generated automatically by "yap -L misc/buildheap"
+     please do not update, update misc/HEAPFIELDS instead */
+
+
 
 
 
@@ -86,6 +90,7 @@
   Yap_heap_regs->charsio_module = MkAtomTerm(AtomCharsio);
   Yap_heap_regs->terms_module = MkAtomTerm(AtomTerms);
   Yap_heap_regs->system_module = MkAtomTerm(AtomSystem);
+  Yap_heap_regs->operating_system_module = MkAtomTerm(AtomOperatingSystemSupport);
   Yap_heap_regs->readutil_module = MkAtomTerm(AtomReadutil);
   Yap_heap_regs->hacks_module = MkAtomTerm(AtomYapHacks);
   Yap_heap_regs->arg_module = MkAtomTerm(AtomArg);
@@ -291,3 +296,7 @@
   Yap_heap_regs->foreign_code_base = NULL;
   Yap_heap_regs->foreign_code_top = NULL;
   Yap_heap_regs->foreign_code_max = NULL;
+
+  InitSWIAtoms();
+
+

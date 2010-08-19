@@ -398,7 +398,8 @@ copy_complex_term(register CELL *pt0, register CELL *pt0_end, int share, int cop
 	  default:
 	    {
 	      /* big int */
-	      UInt sz = ArenaSz(d0), i;
+	      UInt sz = (sizeof(MP_INT)+3*CellSize+
+			 ((MP_INT *)(ap2+2))->_mp_alloc*sizeof(mp_limb_t))/CellSize, i;
 
 	      if (H > ASP - (MIN_ARENA_SIZE+sz)) {
 		goto overflow;
@@ -1708,6 +1709,8 @@ DelHeapRoot(CELL *pt, UInt sz)
   sz--;
   tk = pt[2*sz];
   tv = pt[2*sz+1];
+  pt[2*sz] = TermNil;
+  pt[2*sz+1] = TermNil;
   while (TRUE) {
     if (sz < 2*indx+3 || Yap_compare_terms(pt[4*indx+2],pt[4*indx+4]) < 0) {
       if (sz < 2*indx+2 || Yap_compare_terms(tk, pt[4*indx+2]) < 0) {
@@ -1785,9 +1788,12 @@ p_nb_heap_add_to_heap(void)
   if (arena == 0L)
     return FALSE;
   mingrow = garena_overflow_size(ArenaPt(arena));
-  key = CopyTermToArena(ARG2, arena, FALSE, TRUE, 3, qd+HEAP_ARENA, mingrow);
+  ARG2 = CopyTermToArena(ARG2, arena, FALSE, TRUE, 3, qd+HEAP_ARENA, mingrow);
+  qd = GetHeap(ARG1,"add_to_heap");
   arena = qd[HEAP_ARENA];
   to = CopyTermToArena(ARG3, arena, FALSE, TRUE, 3, qd+HEAP_ARENA, mingrow);
+  /* protect key in ARG2 in case there is an overflow while copying to */
+  key = ARG2;
   if (key == 0 || to == 0L)
     return FALSE;
   qd = GetHeap(ARG1,"add_to_heap");
@@ -1942,7 +1948,7 @@ p_nb_beam(void)
 static Int
 p_nb_beam_close(void)
 {
-  p_nb_heap_close();
+  return p_nb_heap_close();
 }
 
 

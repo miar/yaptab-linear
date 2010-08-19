@@ -1,3 +1,7 @@
+
+  /* This file, tatoms.h, was generated automatically by "yap -L misc/buildatoms"
+     please do not update, update misc/ATOMS instead */
+
   Atom Atom3Dots_;
 #define Atom3Dots Yap_heap_regs->Atom3Dots_
   Atom AtomAbol_;
@@ -90,6 +94,8 @@
 #define AtomColomn Yap_heap_regs->AtomColomn_
   Atom AtomCodeSpace_;
 #define AtomCodeSpace Yap_heap_regs->AtomCodeSpace_
+  Atom AtomCodes_;
+#define AtomCodes Yap_heap_regs->AtomCodes_
   Atom AtomComma_;
 #define AtomComma Yap_heap_regs->AtomComma_
   Atom AtomCompound_;
@@ -172,6 +178,8 @@
 #define AtomEvaluable Yap_heap_regs->AtomEvaluable_
   Atom AtomEvaluationError_;
 #define AtomEvaluationError Yap_heap_regs->AtomEvaluationError_
+  Atom AtomExecute_;
+#define AtomExecute Yap_heap_regs->AtomExecute_
   Atom AtomExecAnswers_;
 #define AtomExecAnswers Yap_heap_regs->AtomExecAnswers_
   Atom AtomExecuteInMod_;
@@ -180,6 +188,8 @@
 #define AtomExecuteWithin Yap_heap_regs->AtomExecuteWithin_
   Atom AtomExecuteWoMod_;
 #define AtomExecuteWoMod Yap_heap_regs->AtomExecuteWoMod_
+  Atom AtomExist_;
+#define AtomExist Yap_heap_regs->AtomExist_
   Atom AtomExistenceError_;
 #define AtomExistenceError Yap_heap_regs->AtomExistenceError_
   Atom AtomExpectedNumber_;
@@ -230,8 +240,10 @@
 #define AtomGetwork Yap_heap_regs->AtomGetwork_
   Atom AtomGetworkSeq_;
 #define AtomGetworkSeq Yap_heap_regs->AtomGetworkSeq_
-  Atom AtomGlobal_;
-#define AtomGlobal Yap_heap_regs->AtomGlobal_
+  Atom AtomGlobalSp_;
+#define AtomGlobalSp Yap_heap_regs->AtomGlobalSp_
+  Atom AtomGlobalTrie_;
+#define AtomGlobalTrie Yap_heap_regs->AtomGlobalTrie_
   Atom AtomGoalExpansion_;
 #define AtomGoalExpansion Yap_heap_regs->AtomGoalExpansion_
   Atom AtomHERE_;
@@ -288,8 +300,10 @@
 #define AtomLoadAnswers Yap_heap_regs->AtomLoadAnswers_
   Atom AtomLocal_;
 #define AtomLocal Yap_heap_regs->AtomLocal_
-  Atom AtomLocalA_;
-#define AtomLocalA Yap_heap_regs->AtomLocalA_
+  Atom AtomLocalSp_;
+#define AtomLocalSp Yap_heap_regs->AtomLocalSp_
+  Atom AtomLocalTrie_;
+#define AtomLocalTrie Yap_heap_regs->AtomLocalTrie_
   Atom AtomMaxArity_;
 #define AtomMaxArity Yap_heap_regs->AtomMaxArity_
   Atom AtomMaxFiles_;
@@ -332,6 +346,8 @@
 #define AtomNew Yap_heap_regs->AtomNew_
   Atom AtomNoMemory_;
 #define AtomNoMemory Yap_heap_regs->AtomNoMemory_
+  Atom AtomNone_;
+#define AtomNone Yap_heap_regs->AtomNone_
   Atom AtomNonEmptyList_;
 #define AtomNonEmptyList Yap_heap_regs->AtomNonEmptyList_
   Atom AtomNot_;
@@ -358,6 +374,8 @@
 #define AtomOpen Yap_heap_regs->AtomOpen_
   Atom AtomOperatingSystemError_;
 #define AtomOperatingSystemError Yap_heap_regs->AtomOperatingSystemError_
+  Atom AtomOperatingSystemSupport_;
+#define AtomOperatingSystemSupport Yap_heap_regs->AtomOperatingSystemSupport_
   Atom AtomOperator_;
 #define AtomOperator Yap_heap_regs->AtomOperator_
   Atom AtomOperatorPriority_;
@@ -440,6 +458,8 @@
 #define AtomReposition Yap_heap_regs->AtomReposition_
   Atom AtomRepresentationError_;
 #define AtomRepresentationError Yap_heap_regs->AtomRepresentationError_
+  Atom AtomRDiv_;
+#define AtomRDiv Yap_heap_regs->AtomRDiv_
   Atom AtomResize_;
 #define AtomResize Yap_heap_regs->AtomResize_
   Atom AtomResourceError_;
@@ -638,6 +658,8 @@
 #define FunctorCleanCall Yap_heap_regs->FunctorCleanCall_
   Functor FunctorClist_;
 #define FunctorClist Yap_heap_regs->FunctorClist_
+  Functor FunctorCodes_;
+#define FunctorCodes Yap_heap_regs->FunctorCodes_
   Functor FunctorComma_;
 #define FunctorComma Yap_heap_regs->FunctorComma_
   Functor FunctorContext2_;
@@ -766,6 +788,8 @@
 #define FunctorQuery Yap_heap_regs->FunctorQuery_
   Functor FunctorRecordedWithKey_;
 #define FunctorRecordedWithKey Yap_heap_regs->FunctorRecordedWithKey_
+  Functor FunctorRDiv_;
+#define FunctorRDiv Yap_heap_regs->FunctorRDiv_
   Functor FunctorRedoFreeze_;
 #define FunctorRedoFreeze Yap_heap_regs->FunctorRedoFreeze_
   Functor FunctorRepresentationError_;

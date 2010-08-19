@@ -1,13 +1,15 @@
-/**********************************************************************
-                                                               
-                       The OPTYap Prolog system                
-  OPTYap extends the Yap Prolog system to support or-parallel tabling
-                                                               
-  Copyright:   R. Rocha and NCC - University of Porto, Portugal
-  File:        or.cut.c
-  version:     $Id: or.cut.c,v 1.3 2008-03-25 16:45:53 vsc Exp $   
-                                                                     
-**********************************************************************/
+/************************************************************************
+**                                                                     **
+**                   The YapTab/YapOr/OPTYap systems                   **
+**                                                                     **
+** YapTab extends the Yap Prolog engine to support sequential tabling  **
+** YapOr extends the Yap Prolog engine to support or-parallelism       **
+** OPTYap extends the Yap Prolog engine to support or-parallel tabling **
+**                                                                     **
+**                                                                     **
+**      Yap Prolog was developed at University of Porto, Portugal      **
+**                                                                     **
+************************************************************************/
 
 /* ------------------ **
 **      Includes      **
@@ -16,7 +18,7 @@
 #include "Yap.h"
 #ifdef YAPOR
 #include "Yatom.h"
-#include "Heap.h"
+#include "YapHeap.h"
 #include "or.macros.h"
 #ifdef TABLING
 #include "tab.macros.h"
@@ -39,7 +41,7 @@ void prune_shared_branch(choiceptr prune_cp) {
 #endif /* TABLING_INNER_CUTS */
 
   leftmost_or_fr = CUT_leftmost_or_frame();
-  leftmost_cp = OrFr_node(leftmost_or_fr);
+  leftmost_cp = GetOrFr_node(leftmost_or_fr);
   qg_solutions = NULL;
 #ifdef TABLING_INNER_CUTS
   tg_solutions = NULL;
@@ -99,17 +101,14 @@ void prune_shared_branch(choiceptr prune_cp) {
       }
 #endif /* TABLING_INNER_CUTS */
       SCH_update_local_or_tops();
-    } while (LOCAL_top_cp != prune_cp);
+    } while (Get_LOCAL_top_cp() != prune_cp);
 
-#ifdef YAPOR_ERRORS
-    if (LOCAL_prune_request && EQUAL_OR_YOUNGER_CP(LOCAL_prune_request, LOCAL_top_cp))
-      YAPOR_ERROR_MESSAGE("EQUAL_OR_YOUNGER_CP(LOCAL_prune_request, LOCAL_top_cp) (prune_shared_branch)");
-#endif /* YAPOR_ERRORS */
+    YAPOR_ERROR_CHECKING(prune_shared_branch, Get_LOCAL_prune_request() && EQUAL_OR_YOUNGER_CP(Get_LOCAL_prune_request(), Get_LOCAL_top_cp()));
     /* store answers not pruned */
     if (qg_solutions)
       CUT_join_answers_in_an_unique_frame(qg_solutions);
     LOCK_OR_FRAME(leftmost_or_fr);
-    if (LOCAL_prune_request) {
+    if (Get_LOCAL_prune_request()) {
       UNLOCK_OR_FRAME(leftmost_or_fr);
       if (qg_solutions)
         CUT_free_solution_frame(qg_solutions);
@@ -151,10 +150,10 @@ void prune_shared_branch(choiceptr prune_cp) {
     UNLOCK_OR_FRAME(leftmost_or_fr);
 
     /* move up to leftmost_cp */
-    while (LOCAL_top_cp != leftmost_cp) {
+    while (Get_LOCAL_top_cp() != leftmost_cp) {
       ltt = BRANCH_LTT(worker_id, OrFr_depth(LOCAL_top_or_fr));
       LOCK_OR_FRAME(LOCAL_top_or_fr);
-      if (OrFr_pend_prune_cp(LOCAL_top_or_fr))
+      if (Get_OrFr_pend_prune_cp(LOCAL_top_or_fr))
         prune_more = 0;
       aux_qg_solutions = OrFr_qg_solutions(LOCAL_top_or_fr);
 #ifdef TABLING_INNER_CUTS
@@ -191,15 +190,12 @@ void prune_shared_branch(choiceptr prune_cp) {
       SCH_update_local_or_tops();
     }
 
-#ifdef YAPOR_ERRORS
-    if (LOCAL_prune_request && EQUAL_OR_YOUNGER_CP(LOCAL_prune_request, LOCAL_top_cp))
-      YAPOR_ERROR_MESSAGE("EQUAL_OR_YOUNGER_CP(LOCAL_prune_request, LOCAL_top_cp) (prune_shared_branch)");
-#endif /* YAPOR_ERRORS */
+    YAPOR_ERROR_CHECKING(prune_shared_branch, Get_LOCAL_prune_request() && EQUAL_OR_YOUNGER_CP(Get_LOCAL_prune_request(), Get_LOCAL_top_cp()));
     /* store answers not pruned */
     if (qg_solutions)
       CUT_join_answers_in_an_unique_frame(qg_solutions);
     LOCK_OR_FRAME(leftmost_or_fr);
-    if (LOCAL_prune_request) {
+    if (Get_LOCAL_prune_request()) {
       UNLOCK_OR_FRAME(leftmost_or_fr);
       if (qg_solutions)
         CUT_free_solution_frame(qg_solutions);
@@ -214,10 +210,10 @@ void prune_shared_branch(choiceptr prune_cp) {
       if (tg_solutions)
         tg_solutions = CUT_store_tg_answers(leftmost_or_fr, tg_solutions, ltt);
 #endif /* TABLING_INNER_CUTS */
-      if (OrFr_pend_prune_cp(leftmost_or_fr))
+      if (Get_OrFr_pend_prune_cp(leftmost_or_fr))
         prune_more = 0;
       OrFr_alternative(leftmost_or_fr) = NULL;
-      OrFr_pend_prune_cp(leftmost_or_fr) = prune_cp;
+      Set_OrFr_pend_prune_cp(leftmost_or_fr, prune_cp);
       OrFr_pend_prune_ltt(leftmost_or_fr) = ltt;
       UNLOCK_OR_FRAME(leftmost_or_fr);
 #ifdef TABLING_INNER_CUTS
@@ -256,7 +252,7 @@ void prune_shared_branch(choiceptr prune_cp) {
 end_prune_more:
   CUT_reset_prune_request();
 #ifdef TABLING
-  LOCAL_top_cp_on_stack = LOCAL_top_cp;
+  Set_LOCAL_top_cp_on_stack(Get_LOCAL_top_cp());
 #endif /* TABLING */
 
   return;

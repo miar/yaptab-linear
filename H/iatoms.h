@@ -1,3 +1,7 @@
+
+  /* This file, iatoms.h, was generated automatically by "yap -L misc/buildatoms"
+     please do not update, update misc/ATOMS instead */
+
   Atom3Dots = Yap_LookupAtom("...");
   AtomAbol = Yap_FullLookupAtom("$abol");
   AtomAccess = Yap_LookupAtom("access");
@@ -44,6 +48,7 @@
   AtomCleanCall = Yap_FullLookupAtom("$clean_call");
   AtomColomn = Yap_LookupAtom(":");
   AtomCodeSpace = Yap_LookupAtom("code_space");
+  AtomCodes = Yap_LookupAtom("codes");
   AtomComma = Yap_LookupAtom(",");
   AtomCompound = Yap_LookupAtom("compound");
   AtomConsistencyError = Yap_LookupAtom("consistency_error");
@@ -85,10 +90,12 @@
   AtomError = Yap_LookupAtom("error");
   AtomEvaluable = Yap_LookupAtom("evaluable");
   AtomEvaluationError = Yap_LookupAtom("evaluation_error");
+  AtomExecute = Yap_LookupAtom("execute");
   AtomExecAnswers = Yap_LookupAtom("exec_answers");
   AtomExecuteInMod = Yap_FullLookupAtom("$execute_in_mod");
   AtomExecuteWithin = Yap_FullLookupAtom("$execute_within");
   AtomExecuteWoMod = Yap_FullLookupAtom("$execute_wo_mod");
+  AtomExist = Yap_LookupAtom("exist");
   AtomExistenceError = Yap_LookupAtom("existence_error");
   AtomExpectedNumber = Yap_LookupAtom("expected_number_syntax");
   AtomExtendFileSearchPath = Yap_FullLookupAtom("$extend_file_search_path");
@@ -114,7 +121,8 @@
   AtomGeneratePredInfo = Yap_FullLookupAtom("$generate_pred_info");
   AtomGetwork = Yap_FullLookupAtom("$getwork");
   AtomGetworkSeq = Yap_FullLookupAtom("$getwork_seq");
-  AtomGlobal = Yap_LookupAtom("global_sp");
+  AtomGlobalSp = Yap_LookupAtom("global_sp");
+  AtomGlobalTrie = Yap_LookupAtom("global_trie");
   AtomGoalExpansion = Yap_LookupAtom("goal_expansion");
   AtomHERE = Yap_LookupAtom("\n   <====HERE====>  \n");
   AtomHandleThrow = Yap_FullLookupAtom("$handle_throw");
@@ -142,8 +150,9 @@
   AtomList = Yap_LookupAtom("list");
   AtomLive = Yap_FullLookupAtom("$live");
   AtomLoadAnswers = Yap_LookupAtom("load_answers");
-  AtomLocal = Yap_LookupAtom("local_sp");
-  AtomLocalA = Yap_LookupAtom("local");
+  AtomLocal = Yap_LookupAtom("local");
+  AtomLocalSp = Yap_LookupAtom("local_sp");
+  AtomLocalTrie = Yap_LookupAtom("local_trie");
   AtomMaxArity = Yap_LookupAtom("max_arity");
   AtomMaxFiles = Yap_LookupAtom("max_files");
   AtomMegaClause = Yap_FullLookupAtom("$mega_clause");
@@ -165,6 +174,7 @@
   AtomNbTerm = Yap_LookupAtom("nb_term");
   AtomNew = Yap_LookupAtom("new");
   AtomNoMemory = Yap_LookupAtom("no_memory");
+  AtomNone = Yap_LookupAtom("none");
   AtomNonEmptyList = Yap_LookupAtom("non_empty_list");
   AtomNot = Yap_LookupAtom("\\+");
   AtomNotImplemented = Yap_LookupAtom("not_implemented");
@@ -178,6 +188,7 @@
   AtomOnline = Yap_LookupAtom("online");
   AtomOpen = Yap_LookupAtom("open");
   AtomOperatingSystemError = Yap_LookupAtom("operating_system_error");
+  AtomOperatingSystemSupport = Yap_LookupAtom("operating_system_support");
   AtomOperator = Yap_LookupAtom("operator");
   AtomOperatorPriority = Yap_LookupAtom("operator_priority");
   AtomOperatorSpecifier = Yap_LookupAtom("operator_specifier");
@@ -219,6 +230,7 @@
   AtomRepeatSpace = Yap_LookupAtom("repeat ");
   AtomReposition = Yap_LookupAtom("reposition");
   AtomRepresentationError = Yap_LookupAtom("representation_error");
+  AtomRDiv = Yap_LookupAtom("rdiv");
   AtomResize = Yap_LookupAtom("resize");
   AtomResourceError = Yap_LookupAtom("resource_error");
   AtomRestoreRegs = Yap_FullLookupAtom("$restore_regs");
@@ -240,7 +252,7 @@
   AtomSigPending = Yap_FullLookupAtom("$sig_pending");
   AtomSigPipe = Yap_LookupAtom("sig_pipe");
   AtomSigStackDump = Yap_LookupAtom("sig_stack_dump");
-  AtomSigStatistics = Yap_LookupAtom("sig_statistic");
+  AtomSigStatistics = Yap_LookupAtom("sig_statistics");
   AtomSigTrace = Yap_LookupAtom("sig_trace");
   AtomSigUsr1 = Yap_LookupAtom("sig_usr1");
   AtomSigUsr2 = Yap_LookupAtom("sig_usr2");
@@ -318,6 +330,7 @@
   FunctorChangeModule = Yap_MkFunctor(AtomChangeModule,1);
   FunctorCleanCall = Yap_MkFunctor(AtomCleanCall,2);
   FunctorClist = Yap_MkFunctor(AtomWhen,4);
+  FunctorCodes = Yap_MkFunctor(AtomCodes,2);
   FunctorComma = Yap_MkFunctor(AtomComma,2);
   FunctorContext2 = Yap_MkFunctor(AtomContext,2);
   FunctorConsistencyError = Yap_MkFunctor(AtomConsistencyError,1);
@@ -382,6 +395,7 @@
   FunctorPrologConstraint = Yap_MkFunctor(AtomProlog,2);
   FunctorQuery = Yap_MkFunctor(AtomQuery,1);
   FunctorRecordedWithKey = Yap_MkFunctor(AtomRecordedWithKey,6);
+  FunctorRDiv = Yap_MkFunctor(AtomRDiv,2);
   FunctorRedoFreeze = Yap_MkFunctor(AtomRedoFreeze,3);
   FunctorRepresentationError = Yap_MkFunctor(AtomRepresentationError,1);
   FunctorResourceError = Yap_MkFunctor(AtomResourceError,1);

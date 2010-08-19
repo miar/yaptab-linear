@@ -14,7 +14,7 @@
 *************************************************************************/
 
 #include "config.h"
-#if defined(ENV_COPY) || defined(TABLING)
+#if defined(ENV_COPY) || defined(TABLING) || defined(THREADS)
 #include "opt.config.h"
 #endif /* YAPOR || TABLING */
 
@@ -40,7 +40,7 @@
 #error Do not define multiple or-parallel models
 #endif /* (ENV_COPY && (ACOW || SBA)) || (ACOW && SBA) */
 
-#if defined(ENV_COPY) || defined(ACOW) || defined(SBA)
+#if defined(ENV_COPY) || defined(ACOW) || defined(SBA) || defined(THREADS)
 #define YAPOR 1
 #endif /* ENV_COPY || ACOW || SBA */
 
@@ -90,7 +90,7 @@
 #undef  USE_THREADED_CODE
 #endif
 #define inline __inline
-#define YAP_VERSION "Yap-6.0.4"
+#define YAP_VERSION "YAP-6.0.7"
 
 #define BIN_DIR "c:\\Yap\\bin"
 #define LIB_DIR "c:\\Yap\\lib\\Yap"
@@ -158,9 +158,15 @@
 /*   */ typedef int Int;
 /*   */ typedef unsigned int UInt;
 
+#define Int_FORMAT "%d"
+#define UInt_FORMAT "%u"
+
 #elif SIZEOF_LONG_INT==4
 /*   */ typedef long int Int;
 /*   */ typedef unsigned long int UInt;
+
+#define Int_FORMAT "%ld"
+#define UInt_FORMAT "%lu"
 
 #else
 #	error Yap require integer types of the same size as a pointer
@@ -180,13 +186,22 @@
 /*   */ typedef int Int;
 /*   */ typedef unsigned int UInt;
 
+#define Int_FORMAT "%d"
+#define UInt_FORMAT "%u"
+
 #elif SIZEOF_LONG_INT==8
 /*   */ typedef long int Int;
 /*   */ typedef unsigned long int UInt;
 
+#define Int_FORMAT "%ld"
+#define UInt_FORMAT "%lu"
+
 #   elif SIZEOF_LONG_LONG_INT==8
 /*   */ typedef long long int Int;
 /*   */ typedef unsigned long long int UInt;
+
+#define Int_FORMAT "%I64d"
+#define UInt_FORMAT "%I64u"
 
 #   else
 #	error Yap requires integer types of the same size as a pointer
@@ -261,7 +276,7 @@ extern char Yap_Option[20];
 #endif
 #endif /* !IN_SECOND_QUADRANT */
 
-/* #define RANDOMIZE_START_ADDRESS 1*/
+/* #define RANDOMIZE_START_ADDRESS 1 */
 
 #ifdef USE_SYSTEM_MALLOC
 #define HEAP_INIT_BASE  0L
@@ -287,6 +302,12 @@ extern char Yap_Option[20];
 #ifndef ALIGN_LONGS
 #define ALIGN_LONGS 1
 #endif
+
+#define K1   ((CELL)1024)
+#define K16  ((CELL)(1024*64))
+#define K64  ((CELL)(1024*64))
+#define M1   ((CELL)(1024*1024))
+#define M2   ((CELL)(2048*1024))
 
 /*  basic data types  */
 
@@ -336,22 +357,22 @@ typedef CELL Term;
 #define _XOPEN_SOURCE 600
 #endif
 
-#include <pthread_locks.h>
+#include <locks_pthread.h>
 typedef pthread_mutex_t lockvar;
 typedef pthread_rwlock_t rwlock_t;
 
-#elif defined(i386) || defined(__x86_64__)
+#elif defined(i386)
 typedef volatile int lockvar;
-#include <x86_locks.h>
+#include <locks_x86.h>
 #elif defined(sparc) || defined(__sparc)
 typedef volatile int lockvar;
-#include <sparc_locks.h>
+#include <locks_sparc.h>
 #elif defined(mips)
 typedef volatile int lockvar;
-#include <mips_locks.h>
+#include <locks_mips.h>
 #elif defined(__alpha)
 typedef volatile int lockvar;
-#include <alpha_locks.h>
+#include <locks_alpha.h>
 #else
 
 #ifndef _XOPEN_SOURCE
@@ -360,7 +381,7 @@ typedef volatile int lockvar;
 
 typedef pthread_mutex_t lockvar;
 typedef pthread_rwlock_t rwlock_t;
-#include <pthread_locks.h>
+#include <locks_pthread.h>
 #endif
 
 /********************** use an auxiliary function for ranges ************/
@@ -397,10 +418,10 @@ typedef pthread_rwlock_t rwlock_t;
 
 #if defined(YAPOR) ||defined(THREADS)
 #ifdef mips
-#include <mips_locks_funcs.h>
+#include <locks_mips_funcs.h>
 #endif
 #ifdef __alpha
-#include <alpha_locks_funcs.h>
+#include <locks_alpha_funcs.h>
 #endif
 #ifdef YAPOR
 #define MAX_AGENTS MAX_WORKERS
@@ -662,7 +683,7 @@ typedef enum
 	if you place things in the lower addresses (power to the libc people).
 */
 
-#if (defined(_AIX) || (defined(__APPLE__) && !defined(__LP64__)) || defined(_WIN32) || defined(sparc) || defined(__sparc) || defined(mips) || defined(__FreeBSD__) || defined(_POWER) || defined(__POWERPC__) || defined(__linux__) || defined(IN_SECOND_QUADRANT) || defined(__CYGWIN__))
+#if (defined(_AIX) || (defined(__APPLE__) && !defined(__LP64__)) || defined(_WIN32) || defined(sparc) || defined(__sparc) || defined(mips) || defined(__FreeBSD__) || defined(_POWER) || defined(__POWERPC__) || defined(__linux__) || defined(IN_SECOND_QUADRANT) || defined(__CYGWIN__)) || defined(__NetBSD__)
 #define USE_LOW32_TAGS 1
 #endif
 
@@ -752,7 +773,6 @@ typedef struct thread_globs
 
 extern struct thread_globs Yap_thread_gl[MAX_THREADS];
 
-
 #define    Yap_LocalBase  Yap_thread_gl[worker_id].local_base
 #define    Yap_GlobalBase Yap_thread_gl[worker_id].global_base
 #define    Yap_TrailBase  Yap_thread_gl[worker_id].trail_base
@@ -763,6 +783,10 @@ extern struct thread_globs Yap_thread_gl[MAX_THREADS];
 #define    Yap_Error_Size   Yap_thread_gl[worker_id].error_size
 #define    Yap_ErrorSay    Yap_thread_gl[worker_id].error_say
 #define    Yap_RestartEnv    Yap_thread_gl[worker_id].restart_env
+
+/* This is the guy who actually started the system, and who has the correct registers */
+extern pthread_t Yap_master_thread;
+
 #else
 extern ADDR Yap_HeapBase,
   Yap_LocalBase, Yap_GlobalBase, Yap_TrailBase, Yap_TrailTop;
@@ -1033,7 +1057,7 @@ IntegerOfTerm (Term t)
 /*************** unification routines ***********************************/
 
 #ifdef SBA
-#include "sbaamiops.h"
+#include "or.sbaamiops.h"
 #else
 #include "amiops.h"
 #endif
@@ -1270,7 +1294,7 @@ extern char emacs_tmp[], emacs_tmp2[];
 #endif /* YAPOR || TABLING */
 
 #ifdef SBA
-#include "sbaunify.h"
+#include "or.sbaunify.h"
 #endif
 
 /********* execution mode ***********************/
@@ -1284,4 +1308,27 @@ typedef enum
     COMPILE_ALL          /* compile all predicates */
   } yap_exec_mode;
 
+/********* slots ***********************/
+
+
+static inline void
+Yap_StartSlots(void) {
+  *--ASP = MkIntegerTerm(CurSlot);
+  *--ASP = MkIntTerm(0);
+  CurSlot = LCL0-ASP;
+}
+
+static inline void
+Yap_CloseSlots(void) {
+  Int old_slots;
+  old_slots = IntOfTerm(ASP[0]);
+  ASP += (old_slots+1);
+  CurSlot = IntegerOfTerm(*ASP);
+  ASP++;
+}
+
+static inline Int
+Yap_CurrentSlot(void) {
+  return IntOfTerm(ASP[0]);
+}
 

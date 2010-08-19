@@ -1,4 +1,8 @@
 
+  /* This file, dhstruct.h, was generated automatically by "yap -L misc/buildheap"
+     please do not update, update misc/HEAPFIELDS instead */
+
+
 
 
 
@@ -86,6 +90,7 @@
 #define CHARSIO_MODULE Yap_heap_regs->charsio_module
 #define TERMS_MODULE Yap_heap_regs->terms_module
 #define SYSTEM_MODULE Yap_heap_regs->system_module
+#define OPERATING_SYSTEM_MODULE Yap_heap_regs->operating_system_module
 #define READUTIL_MODULE Yap_heap_regs->readutil_module
 #define HACKS_MODULE Yap_heap_regs->hacks_module
 #define ARG_MODULE Yap_heap_regs->arg_module
@@ -291,3 +296,7 @@
 #define ForeignCodeBase Yap_heap_regs->foreign_code_base
 #define ForeignCodeTop Yap_heap_regs->foreign_code_top
 #define ForeignCodeMax Yap_heap_regs->foreign_code_max
+
+#define SWI_Atoms Yap_heap_regs->swi_atoms
+#define SWI_Functors Yap_heap_regs->swi_functors
+#define SWI_ReverseHash Yap_heap_regs->swi_reverse_hash

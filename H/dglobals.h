@@ -1,4 +1,6 @@
 
+  /* This file, dglobals.h, was generated automatically by "yap -L misc/buildheap"
+     please do not update, update misc/GLOBALS instead */
 
 
 
@@ -17,6 +19,12 @@
 
 
 
+
+
+
+#define Yap_c_input_stream WL->c_input_stream
+#define Yap_c_output_stream WL->c_output_stream
+#define Yap_c_error_stream WL->c_error_stream
 
 #define OldASP WL->rinfo.old_ASP
 #define OldLCL0 WL->rinfo.old_LCL0
@@ -131,6 +139,21 @@
 #define GlobalVariables WL->global_variables
 #define Yap_AllowRestart WL->allow_restart
 
+#define Yap_CMemFirstBlock WL->cmem_first_block
+#define Yap_CMemFirstBlockSz WL->cmem_first_block_sz
+
+#define Yap_LabelFirstArray WL->label_first_array
+#define Yap_LabelFirstArraySz WL->label_first_array_sz
+
+#define putc_curp WL->putc_curp_
+#define putc_cur_buf WL->putc_cur_buf_
+#define putc_cur_lim WL->putc_cur_lim_
+#define putc_cur_flags WL->putc_cur_flags_
+#define SWI_buffers WL->SWI_buffers_
+#define SWI_buffers_sz WL->SWI_buffers_sz_
+#define SWI_buf_index WL->SWI_buf_index_
+#define execution WL->_execution
+
 #if (defined(YAPOR) || defined(TABLING)) && defined(THREADS)
 #define WORKER WL->worker
 #endif
@@ -157,6 +180,13 @@
 
 #define BGL Yap_global->bgl
 #endif
+#define FSWIStream Yap_global->f_swi_stream
+#define SWIGetc Yap_global->swi_getc
+#define SWIPutc Yap_global->swi_putc
+#define SWIWideGetc Yap_global->swi_wgetc
+#define SWIWidePutc Yap_global->swi_wputc
+#define SWIClose Yap_global->swi_close
+#define SWIFlush Yap_global->swi_flush
 
 #define Yap_AllowLocalExpansion Yap_global->allow_local_expansion
 #define Yap_AllowGlobalExpansion Yap_global->allow_global_expansion
@@ -181,4 +211,9 @@
 #define GLOBAL Yap_global->global
 #define REMOTE Yap_global->remote
 #endif
+
+#define Yap_Initialised Yap_global->initialised
+#define Yap_InitialisedFromPL Yap_global->initialised_from_pl
+#define Yap_PL_Argc Yap_global->pl_argc
+#define Yap_PL_Argv Yap_global->pl_argv
 

@@ -141,7 +141,7 @@ system_message(trace_command(C)) -->
 system_message(trace_help) -->
 	[ '   Please enter a valid debugger command (h for help).'  ].
 system_message(version(Version)) -->
-	[ 'YAP version ~a' - [Version] ].
+	[ '~a' - [Version] ].
 system_message(myddas_version(Version)) -->
 	[ 'MYDDAS version ~a' - [Version] ].
 system_message(yes) -->
@@ -463,7 +463,7 @@ prolog:print_message_lines(S, P-Opts, Lines) :- !,
 	atom_concat('~N', P, Prefix),
 	format(S, Prefix, Opts),
 	print_message_line(S, Lines, Rest),
-	prolog:print_message_lines(S, P, Rest).
+	prolog:print_message_lines(S, P-Opts, Rest).
 prolog:print_message_lines(S, P, Lines) :-
 	atom_concat('~N', P, Prefix),
 	format(S, Prefix, []),

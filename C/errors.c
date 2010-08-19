@@ -67,7 +67,7 @@ legal_env (CELL *ep)
     return (FALSE);
   ps = *((CELL *) (Addr (cp) - CellSize));
   pe = (PredEntry *) (ps - sizeof (OPREG) - sizeof (Prop));
-  LOCK(pe->PELock);
+  PELOCK(70,pe);
   if (!ONHEAP (pe) || Unsigned (pe) & 3 || pe->KindOfPE & 0xff00) {
     UNLOCK(pe->PELock);
     return (FALSE);
@@ -100,7 +100,7 @@ DumpActiveGoals (void)
       pe = EnvPreg((yamop *)cp);
       if (!ONHEAP (pe) || Unsigned (pe) & (sizeof(CELL)-1))
 	break;
-      LOCK(pe->PELock);
+      PELOCK(71,pe);
       if (pe->KindOfPE & 0xff00) {
 	UNLOCK(pe->PELock);
 	break;
@@ -142,7 +142,7 @@ DumpActiveGoals (void)
       if (!ONLOCAL (b_ptr) || b_ptr->cp_b == NULL)
 	break;
       pe = Yap_PredForChoicePt(b_ptr);
-      LOCK(pe->PELock);
+      PELOCK(72,pe);
       {
 	Functor f;
 	Term mod = PROLOG_MODULE;
@@ -455,6 +455,7 @@ Yap_Error(yap_error_number type, Term where, char *format,...)
     where = TermNil;
     Yap_PrologMode &= ~AbortMode;
     Yap_PrologMode |= InErrorMode;
+    P = FAILCODE;
   } else {
     if (IsVarTerm(where)) {
       /* we must be careful someone gave us a copy to a local variable */
@@ -1818,7 +1819,15 @@ Yap_Error(yap_error_number type, Term where, char *format,...)
     nt[1] = MkAtomTerm(Yap_LookupAtom(tmpbuf));
     break;
   default:
-    nt[1] = MkPairTerm(MkAtomTerm(Yap_LookupAtom(tmpbuf)), Yap_all_calls());
+    {
+      Term stack_dump;
+
+      if ((stack_dump = Yap_all_calls()) == 0L) {
+	stack_dump = TermNil;
+	Yap_Error_Size = 0L;
+      }
+      nt[1] = MkPairTerm(MkAtomTerm(Yap_LookupAtom(tmpbuf)), stack_dump);
+    }
   }
   if (serious) {
     /* disable active signals at this point */
@@ -1837,11 +1846,24 @@ Yap_Error(yap_error_number type, Term where, char *format,...)
       siglongjmp(Yap_RestartEnv,1);      
     }
     UNLOCK(SignalLock);
-    if (type == PURE_ABORT)
-      Yap_JumpToEnv(MkAtomTerm(AtomDAbort));
-    else
-      Yap_JumpToEnv(Yap_MkApplTerm(fun, 2, nt));
-    P = (yamop *)FAILCODE;
+    /* wait if we we are in user code,
+       it's up to her to decide */
+
+    if (Yap_PrologMode & UserCCallMode) {
+      if (EX) {
+	if (!(EX = Yap_StoreTermInDB(Yap_MkApplTerm(fun, 2, nt), 0))) {
+	  /* fat chance */
+	  siglongjmp(Yap_RestartEnv,1);
+	}
+      }
+    } else {
+      if (type == PURE_ABORT) {
+	Yap_JumpToEnv(MkAtomTerm(AtomDAbort));
+	CreepFlag = LCL0-ASP;
+      } else
+	Yap_JumpToEnv(Yap_MkApplTerm(fun, 2, nt));
+      P = (yamop *)FAILCODE;
+    }
   } else {
     Yap_PrologMode &= ~InErrorMode;
   }

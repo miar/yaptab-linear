@@ -216,15 +216,15 @@ extern X_API YAP_Bool PROTO(YAP_Unify,(YAP_Term, YAP_Term));
 extern X_API void PROTO(YAP_UserCPredicate,(CONST char *, YAP_Bool (*)(void), unsigned int));
 
 /*  void UserCPredicateWithArgs(const char *name, int *fn(), unsigned int arity) */
-extern X_API void PROTO(YAP_UserCPredicateWithArgs,(CONST char *, YAP_Bool (*)(void), unsigned long int, unsigned long int));
+extern X_API void PROTO(YAP_UserCPredicateWithArgs,(CONST char *, YAP_Bool (*)(void), YAP_Arity, YAP_Term));
 
 /*  void UserBackCPredicate(const char *name, int *init(), int *cont(), int
     arity, int extra) */
-extern X_API void PROTO(YAP_UserBackCPredicate,(CONST char *, YAP_Bool (*)(void), YAP_Bool (*)(void), unsigned long int, unsigned int));
+extern X_API void PROTO(YAP_UserBackCPredicate,(CONST char *, YAP_Bool (*)(void), YAP_Bool (*)(void), YAP_Arity, unsigned int));
 
 /*  void UserBackCPredicate(char *name, int *init(), int *cont(), int *cut(), int
     arity, int extra) */
-extern X_API void PROTO(YAP_UserBackCutCPredicate,(char *, YAP_Bool (*)(void), YAP_Bool (*)(void), YAP_Bool (*)(void), unsigned long int, unsigned int));
+extern X_API void PROTO(YAP_UserBackCutCPredicate,(char *, YAP_Bool (*)(void), YAP_Bool (*)(void), YAP_Bool (*)(void), YAP_Arity, unsigned int));
 
 /*  void CallProlog(YAP_Term t) */
 extern X_API YAP_Bool PROTO(YAP_CallProlog,(YAP_Term t));
@@ -406,25 +406,31 @@ extern X_API void PROTO(YAP_FlushAllStreams,(void));
 extern X_API YAP_Term PROTO(YAP_OpenStream,(void *, CONST char *, YAP_Term, int));
 
 /*  YAP_Term  *YAP_NewSlots()  */
-extern X_API long PROTO(YAP_NewSlots,(int));
+extern X_API YAP_Int PROTO(YAP_NewSlots,(int));
 
-/*  long  YAP_CurrentSlot()  */
-extern X_API long PROTO(YAP_CurrentSlot,(void));
+/*  YAP_Int  YAP_CurrentSlot()  */
+extern X_API YAP_Int PROTO(YAP_CurrentSlot,(void));
 
 /*  YAP_Term  *YAP_InitSlot()  */
-extern X_API long PROTO(YAP_InitSlot,(YAP_Term));
+extern X_API YAP_Int PROTO(YAP_InitSlot,(YAP_Term));
 
 /*  YAP_Term  YAP_GetFromSlots(t)  */
-extern X_API YAP_Term PROTO(YAP_GetFromSlot,(long int));
+extern X_API YAP_Term PROTO(YAP_GetFromSlot,(YAP_Int));
 
 /*  YAP_Term  YAP_AddressFromSlots(t)  */
-extern X_API YAP_Term *PROTO(YAP_AddressFromSlot,(long int));
+extern X_API YAP_Term *PROTO(YAP_AddressFromSlot,(YAP_Int));
 
 /*  YAP_Term  YAP_PutInSlots(t)  */
-extern X_API void PROTO(YAP_PutInSlot,(long int, YAP_Term));
+extern X_API void PROTO(YAP_PutInSlot,(YAP_Int, YAP_Term));
 
 /*  void  YAP_RecoverSlots()  */
 extern X_API int PROTO(YAP_RecoverSlots,(int));
+
+/*  void  YAP_RecoverSlots()  */
+extern X_API YAP_Int PROTO(YAP_ArgsToSlots,(int));
+
+/*  void  YAP_RecoverSlots()  */
+extern X_API void PROTO(YAP_SlotsToArgs,(int, YAP_Int));
 
 /*  void  YAP_Throw()  */
 extern X_API void PROTO(YAP_Throw,(YAP_Term));
@@ -441,10 +447,10 @@ extern X_API int  PROTO(YAP_Halt,(int));
 extern X_API YAP_Term  *PROTO(YAP_TopOfLocalStack,(void));
 
 /*  int  YAP_Predicate()  */
-extern X_API void  *PROTO(YAP_Predicate,(YAP_Atom,unsigned long int,YAP_Term));
+extern X_API void  *PROTO(YAP_Predicate,(YAP_Atom,YAP_Arity,YAP_Term));
 
 /*  int  YAP_Predicate()  */
-extern X_API void  PROTO(YAP_PredicateInfo,(void *,YAP_Atom *,unsigned long int*,YAP_Module*));
+extern X_API void  PROTO(YAP_PredicateInfo,(void *,YAP_Atom *,YAP_Arity*,YAP_Module*));
 
 /*  int  YAP_CurrentModule()  */
 extern X_API YAP_Module  PROTO(YAP_CurrentModule,(void));
@@ -468,11 +474,11 @@ extern X_API YAP_agc_hook  PROTO(YAP_AGCRegisterHook,(YAP_agc_hook));
 extern X_API char *  PROTO(YAP_cwd,(void));
 
 /* thread stuff */
-extern X_API int  PROTO(YAP_ThreadSelf,(void));
-extern X_API YAP_CELL PROTO(YAP_ThreadCreateEngine,(YAP_thread_attr *));
-extern X_API int  PROTO(YAP_ThreadAttachEngine,(int));
-extern X_API int  PROTO(YAP_ThreadDetachEngine,(int));
-extern X_API int  PROTO(YAP_ThreadDestroyEngine,(int));
+extern X_API int PROTO(YAP_ThreadSelf,(void));
+extern X_API int PROTO(YAP_ThreadCreateEngine,(YAP_thread_attr *));
+extern X_API int PROTO(YAP_ThreadAttachEngine,(int));
+extern X_API int PROTO(YAP_ThreadDetachEngine,(int));
+extern X_API int PROTO(YAP_ThreadDestroyEngine,(int));
 
 /* blob stuff */
 extern X_API YAP_Term PROTO(YAP_MkBlobTerm,(unsigned int));
@@ -493,6 +499,16 @@ extern X_API YAP_Term	PROTO(YAP_AttsOfVar,(YAP_Term));
 /*  stream info */
 extern X_API void      *PROTO(YAP_FileDescriptorFromStream,(YAP_Term));
 extern X_API int        PROTO(YAP_FileNoFromStream,(YAP_Term));
+
+/*  store and recover terms */
+extern X_API void      *PROTO(YAP_Record,(YAP_Term));
+extern X_API YAP_Term   PROTO(YAP_Recorded,(void *));
+extern X_API int        PROTO(YAP_Erase,(void *));
+
+/*  term utilities */
+extern X_API int        PROTO(YAP_Variant,(YAP_Term,YAP_Term));
+extern X_API int        PROTO(YAP_ExactlyEqual,(YAP_Term,YAP_Term));
+extern X_API YAP_Int    PROTO(YAP_TermHash,(YAP_Term, YAP_Int, YAP_Int, int));
 
 #define YAP_InitCPred(N,A,F)  YAP_UserCPredicate(N,F,A)
 

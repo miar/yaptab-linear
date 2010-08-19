@@ -63,7 +63,7 @@ allocate_new_tid(void)
   } else {
     new_worker_id = -1;
   }
-       UNLOCK(ThreadHandlesLock);
+  UNLOCK(ThreadHandlesLock);
   return new_worker_id;  
 }
 
@@ -81,6 +81,9 @@ store_specs(int new_worker_id, UInt ssize, UInt tsize, UInt sysize, Term *tpgoal
   FOREIGN_ThreadHandle(new_worker_id).ssize = ssize;
   FOREIGN_ThreadHandle(new_worker_id).tsize = tsize;
   FOREIGN_ThreadHandle(new_worker_id).sysize = sysize;
+  FOREIGN_WL(new_worker_id)->c_input_stream = Yap_c_input_stream;
+  FOREIGN_WL(new_worker_id)->c_output_stream = Yap_c_output_stream;
+  FOREIGN_WL(new_worker_id)->c_error_stream = Yap_c_error_stream;
   pm = (ssize + tsize)*1024;
   if (!(FOREIGN_ThreadHandle(new_worker_id).stack_address = malloc(pm))) {
     return FALSE;
@@ -111,6 +114,8 @@ kill_thread_engine (int wid, int always_die)
   Prop p0 = AbsPredProp(FOREIGN_ThreadHandle(wid).local_preds);
   GlobalEntry *gl = GlobalVariables;
 
+  FOREIGN_ThreadHandle(wid).local_preds = NIL;
+  GlobalVariables = NULL;
   /* kill all thread local preds */
   while(p0) {
     PredEntry *ap = RepPredProp(p0);
@@ -152,14 +157,16 @@ thread_die(int wid, int always_die)
 }
 
 static void
-setup_engine(int myworker_id)
+setup_engine(int myworker_id, int init_thread)
 {
   REGSTORE *standard_regs;
   
   standard_regs = (REGSTORE *)calloc(1,sizeof(REGSTORE));
   /* create the YAAM descriptor */
   FOREIGN_ThreadHandle(myworker_id).default_yaam_regs = standard_regs;
-  pthread_setspecific(Yap_yaamregs_key, (void *)standard_regs);
+  if (init_thread) {
+    pthread_setspecific(Yap_yaamregs_key, (void *)FOREIGN_ThreadHandle(myworker_id).default_yaam_regs);
+  }
   worker_id = myworker_id;
   Yap_InitExStacks(FOREIGN_ThreadHandle(myworker_id).tsize, FOREIGN_ThreadHandle(myworker_id).ssize);
   CurrentModule = FOREIGN_ThreadHandle(myworker_id).cmod;
@@ -178,8 +185,7 @@ setup_engine(int myworker_id)
 static void
 start_thread(int myworker_id)
 {
-  setup_engine(myworker_id);
-  worker_id = myworker_id;
+  setup_engine(myworker_id, TRUE);
 }
 
 static void *
@@ -262,6 +268,7 @@ p_create_thread(void)
   /* make sure we can proceed */
   if (!init_thread_engine(new_worker_id, ssize, tsize, sysize, &ARG1, &ARG5, &ARG6))
     return FALSE;
+  FOREIGN_ThreadHandle(new_worker_id).pthread_handle = 0L;
   FOREIGN_ThreadHandle(new_worker_id).id = new_worker_id;
   FOREIGN_ThreadHandle(new_worker_id).ref_count = 1;
   if ((FOREIGN_ThreadHandle(new_worker_id).ret = pthread_create(&FOREIGN_ThreadHandle(new_worker_id).pthread_handle, NULL, thread_run, (void *)(&(FOREIGN_ThreadHandle(new_worker_id).id)))) == 0) {
@@ -365,33 +372,60 @@ Yap_thread_self(void)
 CELL
 Yap_thread_create_engine(thread_attr *ops)
 {
-  Term t = TermNil;
+  thread_attr opsv;
   int new_id = allocate_new_tid();
+  Term t = TermNil;
+
+  /* 
+     ok, this creates a problem, because we are initializing an engine from some "empty" thread. 
+     We need first to foool the thread into believing it is the main thread
+  */
   if (new_id == -1) {
     /* YAP ERROR */
-    return FALSE;
+    return -1;
+  }
+  if (ops == NULL) {
+    ops = &opsv;
+    ops->tsize = DefHeapSpace;
+    ops->ssize = DefStackSpace;
+    ops->sysize = 0;
+    ops->egoal = t;
+  }
+  if (pthread_self() != Yap_master_thread) {
+    /* we are worker_id 0 for now, lock master thread so that no one messes with us */ 
+    pthread_setspecific(Yap_yaamregs_key, (const void *)&Yap_standard_regs);
+    pthread_mutex_lock(&(FOREIGN_ThreadHandle(0).tlock));
   }
   if (!init_thread_engine(new_id, ops->ssize, ops->tsize, ops->sysize, &t, &t, &(ops->egoal)))
-    return FALSE;
+    return -1;
+  FOREIGN_ThreadHandle(new_id).pthread_handle = 0L;
   FOREIGN_ThreadHandle(new_id).id = new_id;
-  FOREIGN_ThreadHandle(new_id).pthread_handle = pthread_self();
   FOREIGN_ThreadHandle(new_id).ref_count = 0;
-  setup_engine(new_id);
-  return TRUE;
+  setup_engine(new_id, FALSE);
+  if (pthread_self() != Yap_master_thread) {
+    pthread_setspecific(Yap_yaamregs_key, NULL);
+    pthread_mutex_unlock(&(FOREIGN_ThreadHandle(0).tlock));
+  }
+  return new_id;
 }
 
 Int
 Yap_thread_attach_engine(int wid)
 {
-  DEBUG_TLOCK_ACCESS(7, wid);
-  pthread_mutex_lock(&(FOREIGN_ThreadHandle(wid).tlock));
+  /* 
+     already locked
+     pthread_mutex_lock(&(FOREIGN_ThreadHandle(wid).tlock));
+  */
   if (FOREIGN_ThreadHandle(wid).ref_count ) {
     DEBUG_TLOCK_ACCESS(8, wid);
+    FOREIGN_ThreadHandle(wid).ref_count++;
+    FOREIGN_ThreadHandle(wid).pthread_handle = pthread_self();
     pthread_mutex_unlock(&(FOREIGN_ThreadHandle(wid).tlock));
-    return FALSE;
+    return TRUE;
   }
   FOREIGN_ThreadHandle(wid).pthread_handle = pthread_self();
   FOREIGN_ThreadHandle(wid).ref_count++;
+  pthread_setspecific(Yap_yaamregs_key, (const void *)FOREIGN_ThreadHandle(wid).default_yaam_regs);
   worker_id = wid;
   DEBUG_TLOCK_ACCESS(9, wid);
   pthread_mutex_unlock(&(FOREIGN_ThreadHandle(wid).tlock));
@@ -403,7 +437,9 @@ Yap_thread_detach_engine(int wid)
 {
   DEBUG_TLOCK_ACCESS(10, wid);
   pthread_mutex_lock(&(FOREIGN_ThreadHandle(wid).tlock));
+  FOREIGN_ThreadHandle(wid).pthread_handle = 0;
   FOREIGN_ThreadHandle(wid).ref_count--;
+  pthread_setspecific(Yap_yaamregs_key, NULL);
   DEBUG_TLOCK_ACCESS(11, wid);
   pthread_mutex_unlock(&(FOREIGN_ThreadHandle(wid).tlock));
   return TRUE;
@@ -412,6 +448,8 @@ Yap_thread_detach_engine(int wid)
 Int
 Yap_thread_destroy_engine(int wid)
 {
+  DEBUG_TLOCK_ACCESS(10, wid);
+  pthread_mutex_lock(&(FOREIGN_ThreadHandle(wid).tlock));
   if (FOREIGN_ThreadHandle(wid).ref_count == 0) {
     kill_thread_engine(wid, TRUE);
     return TRUE;

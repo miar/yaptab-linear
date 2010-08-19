@@ -31,6 +31,7 @@ int     STD_PROTO(Yap_HasOp,(Atom));
 struct operator_entry *STD_PROTO(Yap_GetOpPropForAModuleHavingALock,(AtomEntry *, Term));
 Atom	STD_PROTO(Yap_LookupAtom,(char *));
 Atom	STD_PROTO(Yap_LookupMaybeWideAtom,(wchar_t *));
+Atom	STD_PROTO(Yap_LookupMaybeWideAtomWithLength,(wchar_t *, size_t));
 Atom	STD_PROTO(Yap_FullLookupAtom,(char *));
 void	STD_PROTO(Yap_LookupAtomWithAddress,(char *,AtomEntry *));
 Prop	STD_PROTO(Yap_NewPredPropByFunctor,(struct FunctorEntryStruct *, Term));
@@ -58,15 +59,13 @@ Term	STD_PROTO(Yap_NWideStringToDiffListOfAtoms,(wchar_t *, Term, size_t));
 int     STD_PROTO(Yap_AtomIncreaseHold,(Atom));
 int     STD_PROTO(Yap_AtomDecreaseHold,(Atom));
 
-#define Yap_StartSlots() (*--ASP = MkIntTerm(0))
-#define Yap_CurrentSlot() IntOfTerm(ASP[0])
-long    STD_PROTO(Yap_InitSlot,(Term));
-long    STD_PROTO(Yap_NewSlots,(int));
-Term    STD_PROTO(Yap_GetFromSlot,(long));
+Int	STD_PROTO(Yap_InitSlot,(Term));
+Int     STD_PROTO(Yap_NewSlots,(int));
+Term    STD_PROTO(Yap_GetFromSlot,(Int));
 int     STD_PROTO(Yap_RecoverSlots,(int));
-Term    STD_PROTO(Yap_GetPtrFromSlot,(long));
-Term   *STD_PROTO(Yap_AddressFromSlot,(long));
-void    STD_PROTO(Yap_PutInSlot,(long, Term));
+Term    STD_PROTO(Yap_GetPtrFromSlot,(Int));
+Term   *STD_PROTO(Yap_AddressFromSlot,(Int));
+void    STD_PROTO(Yap_PutInSlot,(Int, Term));
 
 
 #ifdef SFUNC
@@ -116,8 +115,9 @@ void   STD_PROTO(Yap_InitAttVarPreds,(void));
 void   STD_PROTO(Yap_InitBBPreds,(void));
 
 /* bignum.c */
-Term   STD_PROTO(Yap_MkULLIntTerm,(YAP_ULONG_LONG));
-void   STD_PROTO(Yap_InitBigNums,(void));
+Term   STD_PROTO(Yap_MkULLIntTerm, (YAP_ULONG_LONG));
+Term   STD_PROTO(Yap_RatTermToApplTerm, (Term));
+void   STD_PROTO(Yap_InitBigNums, (void));
 
 /* c_interface.c */
 Int    STD_PROTO(YAP_Execute,(struct pred_entry *, CPredicate));
@@ -146,7 +146,7 @@ int	STD_PROTO(Yap_compare_terms,(Term,Term));
 void	STD_PROTO(Yap_InitCmpPreds,(void));
 
 /* compiler.c */
-yamop  *STD_PROTO(Yap_cclause,(Term, int, Term, Term));
+yamop  *STD_PROTO(Yap_cclause,(Term, Int, Term, Term));
 
 /* computils.c */
 
@@ -247,7 +247,8 @@ int	STD_PROTO(Yap_OpDec,(int,char *,Atom,Term));
 void    STD_PROTO(Yap_CloseScratchPad,(void));
 
 /* inlines.c */
-void         STD_PROTO(Yap_InitInlines,(void));
+void    STD_PROTO(Yap_InitInlines,(void));
+int      STD_PROTO(Yap_eq,(Term, Term));
 
 /* iopreds.c */
 void	STD_PROTO(Yap_InitPlIO,(void));
@@ -295,6 +296,7 @@ void    STD_PROTO(Yap_InitMPE,(void));
 Term	STD_PROTO(Yap_MkApplTerm,(Functor,unsigned int,Term *));
 Term	STD_PROTO(Yap_MkNewApplTerm,(Functor,unsigned int));
 Term	STD_PROTO(Yap_MkNewPairTerm,(void));
+Term	STD_PROTO(Yap_Globalise,(Term));
 
 
 /* parser.c */
@@ -328,6 +330,7 @@ Int	STD_PROTO(Yap_walltime,(void));
 int	STD_PROTO(Yap_dir_separator,(int));
 int	STD_PROTO(Yap_volume_header,(char *));
 void	STD_PROTO(Yap_InitSysPath,(void));
+int	STD_PROTO(Yap_signal_index,(const char *));
 #ifdef MAC
 void	STD_PROTO(Yap_SetTextFile,(char *));
 #endif
@@ -343,6 +346,7 @@ int	STD_PROTO(Yap_ProcessSIGINT,(void));
 double  STD_PROTO(Yap_random, (void));
 #ifdef _WIN32
 char	*STD_PROTO(Yap_RegistryGetString,(char *));
+void	STD_PROTO(Yap_WinError,(char *));
 #endif
 
 /* threads.c */
@@ -369,12 +373,15 @@ void	STD_PROTO(Yap_InitUserBacks,(void));
 
 /* utilpreds.c */
 Term	STD_PROTO(Yap_CopyTerm,(Term));
+int	STD_PROTO(Yap_Variant,(Term, Term));
+int	STD_PROTO(Yap_ExportTerm,(Term, char *, size_t));
+Term	STD_PROTO(Yap_ImportTerm,(char *));
 int	STD_PROTO(Yap_IsListTerm,(Term));
 Term	STD_PROTO(Yap_CopyTermNoShare,(Term));
 int	STD_PROTO(Yap_SizeGroundTerm,(Term, int));
 int	STD_PROTO(Yap_IsGroundTerm,(Term));
 void	STD_PROTO(Yap_InitUtilCPreds,(void));
-
+Int     STD_PROTO(Yap_TermHash,(Term, Int, Int, int));
 /* yap.c */
 
 /* MYDDAS */
@@ -453,6 +460,7 @@ void    STD_PROTO(Yap_InitMYDDAS_TopLevelPreds,(void));
 
 /* yap2swi.c */
 void	STD_PROTO(Yap_swi_install,(void));
+void    STD_PROTO(Yap_InitSWIHash,(void));
 
 /* ypsocks.c */
 void	STD_PROTO(Yap_InitSockets,(void));

@@ -48,6 +48,9 @@
 #if HAVE_STRING_H
 #include <string.h>
 #endif
+#if HAVE_WCTYPE_H
+#include <wctype.h>
+#endif
 
 /* You just can't trust some machines */
 #define my_isxdigit(C,SU,SL)	(chtype(C) == NU || (C >= 'A' &&	\
@@ -119,7 +122,23 @@ EF,
 #endif
 };
 
+
 char *Yap_chtype = chtype0+1;
+
+int
+Yap_wide_chtype(Int ch) {
+#if HAVE_WCTYPE_H
+  if (iswalnum(ch)) {
+    if (iswlower(ch)) return LC;
+    if (iswdigit(ch)) return NU;
+    return UC;
+  }
+  if (iswpunct(ch)) return SY;
+#endif
+  return BS;
+}
+
+
 
 /* in case there is an overflow */
 typedef struct scanner_extra_alloc {
@@ -144,7 +163,7 @@ AllocScannerMemory(unsigned int size)
     ScannerExtraBlocks = ptr;
     return (char *)(ptr+1);
   } else if (Yap_TrailTop <= AuxSpScan+size) {
-    UInt alloc_size = sizeof(CELL) * 16 * 1024L;
+    UInt alloc_size = sizeof(CELL) * K16;
  
     if (size > alloc_size)
       alloc_size = size;
@@ -242,9 +261,13 @@ read_quoted_char(int *scan_nextp, int inp_stream, int (*QuotedNxtch)(int))
   ch = QuotedNxtch(inp_stream);
   switch (ch) {
   case 10:
-    ch = QuotedNxtch(inp_stream);
-    if (ch == '\\') goto restart;
-    return ch;
+    do {
+      ch = QuotedNxtch(inp_stream);
+      if (ch == '\\') goto restart;
+      if (chtype(ch) != BS || ch == 10) {
+	return ch;
+      }
+    } while (TRUE);
   case 'a':
     return '\a';
   case 'b':
@@ -548,17 +571,15 @@ get_num(int *chp, int *chbuffp, int inp_stream, int (*Nxtch) (int), int (*Quoted
     }
     *chp = ch;
   }
-  else if ((ch == 'o') && base == 0) {
+  else if ((ch == 'o' || ch == 'O') && base == 0) {
     might_be_float = FALSE;
     base = 8;
-    if (--max_size == 0) {
-      Yap_ErrorMessage = "Number Too Long";
-      return (TermNil);
-    }
-    *sp++ = ch;
-    *chp = Nxtch(inp_stream);
-  }
-  else {
+    ch = Nxtch(inp_stream);
+  } else if ((ch == 'b' || ch == 'B') && base == 0) {
+    might_be_float = FALSE;
+    base = 2;
+    ch = Nxtch(inp_stream);
+  } else {
     val = base;
     base = 10;
   }
@@ -666,6 +687,10 @@ get_num(int *chp, int *chbuffp, int inp_stream, int (*Nxtch) (int), int (*Quoted
     *chp = ch;
     if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
       return read_int_overflow(s+2,16,val,sign);
+    else if (s[0] == '0' && (s[1] == 'o' || s[1] == 'O'))
+      return read_int_overflow(s+2,8,val,sign);
+    else if (s[0] == '0' && (s[1] == 'b' || s[1] == 'B'))
+      return read_int_overflow(s+2,2,val,sign);
     if (s[1] == '\'')
       return read_int_overflow(s+2,base,val,sign);
     if (s[2] == '\'')
@@ -735,6 +760,17 @@ ch_to_wide(char *base, char *charp)
   return nb+n;
 }
 
+#define  add_ch_to_buff(ch) \
+  if (wcharp) { *wcharp++ = (ch); charp = (char *)wcharp; }	\
+  else { \
+    if (ch > MAX_ISO_LATIN1 && !wcharp) { \
+      /* does not fit in ISO-LATIN */		\
+      wcharp = ch_to_wide(TokImage, charp);	\
+      if (!wcharp) goto huge_var_error;		\
+      *wcharp++ = (ch); charp = (char *)wcharp; \
+    } else *charp++ = ch;			\
+  }
+
 TokEntry *
 Yap_tokenizer(int inp_stream, Term *tposp)
 {
@@ -755,7 +791,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
   ScannerExtraBlocks = NULL;
   l = NULL;
   p = NULL;			/* Just to make lint happy */
-  LOCK(Stream[inp_stream].streamlock);
   ch = Nxtch(inp_stream);
   while (chtype(ch) == BS) {
     ch = Nxtch(inp_stream);
@@ -777,7 +812,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
       if (p)
 	p->Tok = Ord(kind = eot_tok);
       /* serious error now */
-      UNLOCK(Stream[inp_stream].streamlock);
       return l;
     }
     if (!l)
@@ -818,8 +852,9 @@ Yap_tokenizer(int inp_stream, Term *tposp)
     scan_name:
       TokImage = ((AtomEntry *) ( Yap_PreAllocCodeSpace()))->StrOfAE;
       charp = TokImage;
+      wcharp = NULL;
       isvar = (chtype(och) != LC);
-      *charp++ = och;
+      add_ch_to_buff(och);
       for (; chtype(ch) <= NU; ch = Nxtch(inp_stream)) {
 	if (charp == (char *)AuxSp-1024) {
 	huge_var_error:
@@ -830,29 +865,32 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	  if (p)
 	    p->Tok = Ord(kind = eot_tok);
 	  /* serious error now */
-	  UNLOCK(Stream[inp_stream].streamlock);
 	  return l;
 	}
-	*charp++ = ch;
+	add_ch_to_buff(ch);
       }
       while (ch == '\'' && isvar && yap_flags[VARS_CAN_HAVE_QUOTE_FLAG]) {
 	if (charp == (char *)AuxSp-1024) {
 	  goto huge_var_error;
 	}
-	*charp++ = ch;
+	add_ch_to_buff(ch);
 	ch = Nxtch(inp_stream);
       }
-      *charp++ = '\0';
+      add_ch_to_buff('\0');
       if (!isvar) {
+	Atom ae;
 	/* don't do this in iso */
-	Atom ae = Yap_LookupAtom(TokImage);
+	if (wcharp) {
+	  ae = Yap_LookupWideAtom((wchar_t *)TokImage);
+	} else {
+	  ae = Yap_LookupAtom(TokImage);
+	}
 	if (ae == NIL) {
 	  Yap_Error_TYPE = OUT_OF_HEAP_ERROR;	  
 	  Yap_ErrorMessage = "Code Space Overflow";
 	  if (p)
 	    t->Tok = Ord(kind = eot_tok);
 	  /* serious error now */
-	  UNLOCK(Stream[inp_stream].streamlock);
 	  return l;
 	}
 	t->TokInfo = Unsigned(ae);
@@ -875,7 +913,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 
 	cherr = 0;
 	if (!(ptr = AllocScannerMemory(4096))) {
-	  UNLOCK(Stream[inp_stream].streamlock);
 	  Yap_ErrorMessage = "Trail Overflow";
 	  Yap_Error_TYPE = OUT_OF_TRAIL_ERROR;	            
 	  if (p)
@@ -884,7 +921,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	  return l;
 	}
 	if (ASP-H < 1024) {
-	  UNLOCK(Stream[inp_stream].streamlock);
 	  Yap_ErrorMessage = "Stack Overflow";
 	  Yap_Error_TYPE = OUT_OF_STACK_ERROR;	            
 	  Yap_Error_Size = 0L;	            
@@ -894,7 +930,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	  return l;
 	}
 	if ((t->TokInfo = get_num(&cha,&cherr,inp_stream,Nxtch,QuotedNxtch,ptr,4096,1)) == 0L) {
-	  UNLOCK(Stream[inp_stream].streamlock);
 	  if (p)
 	    p->Tok = Ord(kind = eot_tok);
 	  /* serious error now */
@@ -908,7 +943,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	  t->TokPos = GetCurInpPos(inp_stream);
 	  e = (TokEntry *) AllocScannerMemory(sizeof(TokEntry));
 	  if (e == NULL) {
-	    UNLOCK(Stream[inp_stream].streamlock);
 	    Yap_ErrorMessage = "Trail Overflow";
 	    Yap_Error_TYPE = OUT_OF_TRAIL_ERROR;	            
 	    if (p)
@@ -938,7 +972,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	      t->TokPos = GetCurInpPos(inp_stream);
 	      e2 = (TokEntry *) AllocScannerMemory(sizeof(TokEntry));
 	      if (e2 == NULL) {
-		UNLOCK(Stream[inp_stream].streamlock);
 		Yap_ErrorMessage = "Trail Overflow";
 		Yap_Error_TYPE = OUT_OF_TRAIL_ERROR;	            
 		if (p)
@@ -970,7 +1003,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	      t->TokPos = GetCurInpPos(inp_stream);
 	      e2 = (TokEntry *) AllocScannerMemory(sizeof(TokEntry));
 	      if (e2 == NULL) {
-		UNLOCK(Stream[inp_stream].streamlock);
 		Yap_ErrorMessage = "Trail Overflow";
 		Yap_Error_TYPE = OUT_OF_TRAIL_ERROR;	            
 		t->Tok = Ord(kind = eot_tok);
@@ -1003,18 +1035,10 @@ Yap_tokenizer(int inp_stream, Term *tposp)
       wcharp = NULL;
 
       while (TRUE) {
-	if (wcharp && wcharp + 1024 > (wchar_t *)AuxSp) {
+	if (charp + 1024 > (char *)AuxSp) {
 	  Yap_Error_TYPE = OUT_OF_AUXSPACE_ERROR;	  
 	  Yap_ErrorMessage = "Heap Overflow While Scanning: please increase code space (-h)";
 	  break;
-	} else if (charp + 1024 > (char *)AuxSp) {
-	  Yap_Error_TYPE = OUT_OF_AUXSPACE_ERROR;	  
-	  Yap_ErrorMessage = "Heap Overflow While Scanning: please increase code space (-h)";
-	  break;
-	}
-	if (!wcharp && ch > MAX_ISO_LATIN1){
-	  /* does not fit in ISO-LATIN */
-	  wcharp = ch_to_wide(TokImage, charp);
 	}
 	if (ch == 10  &&  yap_flags[CHARACTER_ESCAPE_FLAG] == ISO_CHARACTER_ESCAPES) {
 	  /* in ISO a new line terminates a string */
@@ -1025,25 +1049,12 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	  ch = QuotedNxtch(inp_stream);
 	  if (ch != quote)
 	    break;
-	  if (wcharp) 
-	    *wcharp++ = ch;
-	  else
-	    *charp++ = ch;
+	  add_ch_to_buff(ch);
 	  ch = QuotedNxtch(inp_stream);
 	} else if (ch == '\\' && yap_flags[CHARACTER_ESCAPE_FLAG] != CPROLOG_CHARACTER_ESCAPES) {
 	  int scan_next = TRUE;
-	  if (wcharp) 
-	    *wcharp++ = read_quoted_char(&scan_next, inp_stream, QuotedNxtch);
-	  else {
-	    wchar_t next = read_quoted_char(&scan_next, inp_stream, QuotedNxtch);
-	    if (next > MAX_ISO_LATIN1){
-	      /* does not fit in ISO-LATIN */
-	      wcharp = ch_to_wide(TokImage, charp);
-	      *wcharp++ = next;
-	    } else {
-	      *charp++ = next;
-	    }
-	  }
+	  ch = read_quoted_char(&scan_next, inp_stream, QuotedNxtch);
+	  add_ch_to_buff(ch);
 	  if (scan_next) {
 	    ch = QuotedNxtch(inp_stream);
 	  }
@@ -1052,15 +1063,11 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	  t->Tok = Ord(kind = eot_tok);
 	  break;
 	} else {
-	  if (wcharp) 
-	    *wcharp++ = ch;
-	  else
-	    *charp++ = ch;
+	  add_ch_to_buff(ch);
 	  ch = QuotedNxtch(inp_stream);
 	}
 	++len;
 	if (charp > (char *)AuxSp - 1024) {
-	  UNLOCK(Stream[inp_stream].streamlock);
 	  /* Not enough space to read in the string. */
 	  Yap_Error_TYPE = OUT_OF_AUXSPACE_ERROR;	  
 	  Yap_ErrorMessage = "not enough space to read in string or quoted atom";
@@ -1082,7 +1089,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	  mp = AllocScannerMemory(len + 1);
 	}
 	if (mp == NULL) {
-	  UNLOCK(Stream[inp_stream].streamlock);
 	  Yap_ErrorMessage = "not enough heap space to read in string or quoted atom";
 	  Yap_ReleasePreAllocCodeSpace((CODEADDR)TokImage);
 	  t->Tok = Ord(kind = eot_tok);
@@ -1104,15 +1110,14 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	  t->TokInfo = Unsigned(Yap_LookupWideAtom((wchar_t *)TokImage));
 	} else {
 	  t->TokInfo = Unsigned(Yap_LookupAtom(TokImage));
-	  if (t->TokInfo == (CELL)NIL) {
-	    Yap_Error_TYPE = OUT_OF_HEAP_ERROR;	  
-	    Yap_ErrorMessage = "Code Space Overflow";
-	    if (p)
-	      t->Tok = Ord(kind = eot_tok);
-	    /* serious error now */
-	    UNLOCK(Stream[inp_stream].streamlock);
-	    return l;
-	  }
+	}
+	if (!(t->TokInfo)) {
+	  Yap_Error_TYPE = OUT_OF_HEAP_ERROR;	  
+	  Yap_ErrorMessage = "Code Space Overflow";
+	  if (p)
+	    t->Tok = Ord(kind = eot_tok);
+	  /* serious error now */
+	  return l;
 	}
 	Yap_ReleasePreAllocCodeSpace((CODEADDR)TokImage);
 	t->Tok = Ord(kind = Name_tok);
@@ -1164,7 +1169,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
 	  if (p)
 	    t->Tok = Ord(kind = eot_tok);
 	  /* serious error now */
-	  UNLOCK(Stream[inp_stream].streamlock);
 	  return l;
 	}
 	Yap_ReleasePreAllocCodeSpace((CODEADDR)TokImage);
@@ -1235,7 +1239,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
       /* insert an error token to inform the system of what happened */
       TokEntry *e = (TokEntry *) AllocScannerMemory(sizeof(TokEntry));
       if (e == NULL) {
-	UNLOCK(Stream[inp_stream].streamlock);
 	Yap_ErrorMessage = "Trail Overflow";
 	Yap_Error_TYPE = OUT_OF_TRAIL_ERROR;	            
 	p->Tok = Ord(kind = eot_tok);
@@ -1251,7 +1254,6 @@ Yap_tokenizer(int inp_stream, Term *tposp)
       p = e;
     }
   } while (kind != eot_tok);
-  UNLOCK(Stream[inp_stream].streamlock);
   return (l);
 }
 

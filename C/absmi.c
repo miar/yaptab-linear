@@ -844,7 +844,7 @@ Yap_absmi(int inp)
 	cut_b = LCL0-(CELL *)(ASP[E_CB]);
 	saveregs();
 	if(!Yap_growtrail (0, FALSE)) {
-	  Yap_Error(OUT_OF_TRAIL_ERROR,TermNil,"YAP failed to reserve %ld bytes in growtrail",sizeof(CELL) * 16 * 1024L);
+	  Yap_Error(OUT_OF_TRAIL_ERROR,TermNil,"YAP failed to reserve %ld bytes in growtrail",sizeof(CELL) * K16);
 	  setregs();
 	  FAIL();
 	}
@@ -1103,7 +1103,7 @@ Yap_absmi(int inp)
 	/* HEY, leave indexing block alone!! */
 	/* check if we are the ones using this code */
 #if defined(YAPOR) || defined(THREADS)
-	LOCK(ap->PELock);
+	PELOCK(1, ap);
 	PP = ap;
 	DEC_CLREF_COUNT(cl);
 	/* clear the entry from the trail */
@@ -1404,7 +1404,7 @@ Yap_absmi(int inp)
 	/* HEY, leave indexing block alone!! */
 	/* check if we are the ones using this code */
 #if defined(YAPOR) || defined(THREADS)
-	LOCK(ap->PELock);
+	PELOCK(2, ap);
 	PP = ap;
 	DEC_CLREF_COUNT(cl);
 	/* clear the entry from the trail */
@@ -1501,7 +1501,7 @@ Yap_absmi(int inp)
 	GONext();
       }
       PP = PREG->u.p.p;
-      LOCK(PP->PELock);
+      PELOCK(3, PP);
 #endif
       PREG = NEXTOP(PREG, p);
       GONext();
@@ -1511,7 +1511,7 @@ Yap_absmi(int inp)
       /* lock logical updates predicate.  */
       Op(unlock_lu, e);
 #if defined(YAPOR) || defined(THREADS)
-      UNLOCK(PP->PELock);
+      UNLOCKPE(1,PP);
       PP = NULL;
 #endif
       PREG = NEXTOP(PREG, e);
@@ -1532,7 +1532,7 @@ Yap_absmi(int inp)
 	/* always add an extra reference */
 	INC_CLREF_COUNT(cl);
 	TRAIL_CLREF(cl);
-	UNLOCK(ap->PELock);
+	UNLOCKPE(2,ap);
 	PP = NULL;
       }
 #else
@@ -1554,13 +1554,17 @@ Yap_absmi(int inp)
 	LogUpdClause *cl = ClauseCodeToLogUpdClause(PREG);
 	Term t;
 
-	ASP = YREG+E_CB;
+	if (YREG > (CELL *) PROTECT_FROZEN_B(B)) {
+	  ASP = (CELL *) PROTECT_FROZEN_B(B);
+	} else {
+	  ASP = YREG+E_CB;
+	}
 	saveregs();
 	while ((t = Yap_FetchTermFromDB(cl->ClSource)) == 0L) {
 	  if (Yap_Error_TYPE == OUT_OF_ATTVARS_ERROR) {
 	    Yap_Error_TYPE = YAP_NO_ERROR;
 	    if (!Yap_growglobal(NULL)) {
-	      UNLOCK(PP->PELock);
+	      UNLOCKPE(3,PP);
 #if defined(YAPOR) || defined(THREADS)
 	      PP = NULL;
 #endif
@@ -1570,7 +1574,7 @@ Yap_absmi(int inp)
 	  } else {
 	    Yap_Error_TYPE = YAP_NO_ERROR;
 	    if (!Yap_gc(3, ENV, CP)) {
-	      UNLOCK(PP->PELock);
+	      UNLOCKPE(4,PP);
 #if defined(YAPOR) || defined(THREADS)
 	      PP = NULL;
 #endif
@@ -1581,7 +1585,7 @@ Yap_absmi(int inp)
 	}
 	if (!Yap_IUnify(ARG2, t)) {
 	  setregs();
-	  UNLOCK(PP->PELock);
+	  UNLOCKPE(5,PP);
 #if defined(YAPOR) || defined(THREADS)
 	  PP = NULL;
 #endif
@@ -1589,7 +1593,7 @@ Yap_absmi(int inp)
 	}
 	if (!Yap_IUnify(ARG3, MkDBRefTerm((DBRef)cl))) {
 	  setregs();
-	  UNLOCK(PP->PELock);
+	  UNLOCKPE(6,PP);
 #if defined(YAPOR) || defined(THREADS)
 	  PP = NULL;
 #endif
@@ -1601,7 +1605,7 @@ Yap_absmi(int inp)
 	/* always add an extra reference */
 	INC_CLREF_COUNT(cl);
 	TRAIL_CLREF(cl);
-	UNLOCK(PP->PELock);
+	UNLOCKPE(7,PP);
 	PP = NULL;
 #else
 	if (!(cl->ClFlags & InUseMask)) {
@@ -1631,7 +1635,7 @@ Yap_absmi(int inp)
 	saveregs();
 	if (!Yap_IUnify(ARG2, cl->ClSource->Entry)) {
 	  setregs();
-	  UNLOCK(PP->PELock);
+	  UNLOCKPE(8,PP);
 #if defined(YAPOR) || defined(THREADS)
 	  PP = NULL;
 #endif
@@ -1639,7 +1643,7 @@ Yap_absmi(int inp)
 	}
 	if (!Yap_IUnify(ARG3, MkDBRefTerm((DBRef)cl))) {
 	  setregs();
-	  UNLOCK(PP->PELock);
+	  UNLOCKPE(9,PP);
 #if defined(YAPOR) || defined(THREADS)
 	  PP = NULL;
 #endif
@@ -1653,7 +1657,7 @@ Yap_absmi(int inp)
 	/* always add an extra reference */
 	INC_CLREF_COUNT(cl);
 	TRAIL_CLREF(cl);
-	UNLOCK(PP->PELock);
+	UNLOCKPE(10,PP);
 	PP = NULL;
 #else
 	if (!(cl->ClFlags & InUseMask)) {
@@ -1676,14 +1680,45 @@ Yap_absmi(int inp)
 
 
 /*****************************************************************
+*        check for enough room			                 *
+*****************************************************************/
+
+      /* ensure_space                   */
+      BOp(ensure_space, Osbpi);
+      {
+	Int sz =  PREG->u.Osbpi.i;   
+	PREG = NEXTOP(PREG,Osbpi);
+	if (Unsigned(H) + sz > Unsigned(YREG)-CreepFlag) {
+	  YENV[E_CP] = (CELL) CPREG;
+	  YENV[E_E] = (CELL) ENV;
+#ifdef DEPTH_LIMIT
+	  YENV[E_DEPTH] = DEPTH;
+#endif	/* DEPTH_LIMIT */
+	  ASP = YREG+E_CB;
+	  if (ASP > (CELL *)PROTECT_FROZEN_B(B))
+	    ASP = (CELL *)PROTECT_FROZEN_B(B);
+	  saveregs();
+	  if (!Yap_gcl(sz, 0, YENV, PREG)) {
+	    Yap_Error(OUT_OF_STACK_ERROR,TermNil,Yap_ErrorMessage);
+	    setregs();
+	    FAIL();
+	  } else {
+	    setregs();
+	  }
+	} 
+      }
+      JMPNext();
+      ENDBOp();
+
+/*****************************************************************
 *        try and retry of dynamic predicates                     *
 *****************************************************************/
 
       /* spy_or_trymark                   */
       BOp(spy_or_trymark, Otapl);
-      LOCK(((PredEntry *)(PREG->u.Otapl.p))->PELock);
+      PELOCK(5, ((PredEntry *)(PREG->u.Otapl.p)));
       PREG = (yamop *)(&(((PredEntry *)(PREG->u.Otapl.p))->OpcodeOfPred));
-      UNLOCK(((PredEntry *)(PREG->u.Otapl.p))->PELock);
+      UNLOCKPE(11,(PredEntry *)(PREG->u.Otapl.p));
       goto dospy;
       ENDBOp();
 
@@ -1696,7 +1731,7 @@ Yap_absmi(int inp)
       CUT_wait_leftmost();
 #endif /* YAPOR */
       if (PREG->u.Otapl.p->PredFlags & LogUpdatePredFlag) {
-	LOCK(PREG->u.Otapl.p->PELock);
+	PELOCK(6,PREG->u.Otapl.p);
 	PP = PREG->u.Otapl.p;
       }
       if (PREG->u.Otapl.p->CodeOfPred != PREG) {
@@ -1705,7 +1740,7 @@ Yap_absmi(int inp)
 	   anything yet */
 	PP = NULL;
 	PREG = PREG->u.Otapl.p->CodeOfPred;
-	UNLOCK(PREG->u.Otapl.p->PELock);
+	UNLOCKPE(12,PREG->u.Otapl.p);
 	/* for profiler */
 	save_pc();
 	JMPNext();
@@ -1719,7 +1754,7 @@ Yap_absmi(int inp)
       */
       LOCK(DynamicLock(PREG));
       /* one can now mess around with the predicate */
-      UNLOCK(((PredEntry *)(PREG->u.Otapl.p))->PELock);
+      UNLOCKPE(13,((PredEntry *)(PREG->u.Otapl.p)));
       BEGD(d1);
       d1 = PREG->u.Otapl.s;
       store_args(d1);
@@ -1779,7 +1814,7 @@ Yap_absmi(int inp)
       CUT_wait_leftmost();
 #endif /* YAPOR */
       /* need to make the DB stable until I get the new clause */
-      LOCK(PREG->u.Otapl.p->PELock);
+      PELOCK(7,PREG->u.Otapl.p);
       CACHE_Y(B);
       PREG = PREG->u.Otapl.d;
       LOCK(DynamicLock(PREG));
@@ -1903,34 +1938,36 @@ Yap_absmi(int inp)
 	      case _table_answer_resolution:
 		low_level_trace(retry_table_consumer, CONS_CP(B)->cp_pred_entry, NULL);
 		break;
-	      case _trie_trust_null:
-	      case _trie_retry_null:
-	      case _trie_trust_null_in_new_pair:
-	      case _trie_retry_null_in_new_pair:
-	      case _trie_trust_var:
-	      case _trie_retry_var:
-	      case _trie_trust_var_in_new_pair:
-	      case _trie_retry_var_in_new_pair:
-	      case _trie_trust_val:
-	      case _trie_retry_val:
-	      case _trie_trust_val_in_new_pair:
-	      case _trie_retry_val_in_new_pair:
-	      case _trie_trust_atom:
-	      case _trie_retry_atom:
-	      case _trie_trust_atom_in_new_pair:
-	      case _trie_retry_atom_in_new_pair:
-	      case _trie_trust_pair:
-	      case _trie_retry_pair:
-	      case _trie_trust_struct:
-	      case _trie_retry_struct:
-	      case _trie_trust_struct_in_new_pair:
-	      case _trie_retry_struct_in_new_pair:
-	      case _trie_trust_extension:
-	      case _trie_retry_extension:
-	      case _trie_trust_float:
-	      case _trie_retry_float:
-	      case _trie_trust_long:
-	      case _trie_retry_long:
+              case _trie_trust_var:
+              case _trie_retry_var:
+              case _trie_trust_var_in_pair:
+              case _trie_retry_var_in_pair:
+              case _trie_trust_val:
+              case _trie_retry_val:
+              case _trie_trust_val_in_pair:
+              case _trie_retry_val_in_pair:
+              case _trie_trust_atom:
+              case _trie_retry_atom:
+              case _trie_trust_atom_in_pair:
+              case _trie_retry_atom_in_pair:
+              case _trie_trust_null:
+              case _trie_retry_null:
+              case _trie_trust_null_in_pair:
+              case _trie_retry_null_in_pair:
+              case _trie_trust_pair:
+              case _trie_retry_pair:
+              case _trie_trust_appl:
+              case _trie_retry_appl:
+              case _trie_trust_appl_in_pair:
+              case _trie_retry_appl_in_pair:
+              case _trie_trust_extension:
+              case _trie_retry_extension:
+              case _trie_trust_double:
+              case _trie_retry_double:
+              case _trie_trust_longint:
+              case _trie_retry_longint:
+              case _trie_trust_gterm:
+              case _trie_retry_gterm:
 		low_level_trace(retry_table_loader, UndefCode, NULL);
 		break;
 #endif /* TABLING */
@@ -2048,7 +2085,7 @@ Yap_absmi(int inp)
 	      goto failloop;
 	    } else
 #endif /* FROZEN_STACKS */
-	      if (IsAttVar(pt1))
+	      if (IN_BETWEEN(H0,pt1,H) && IsAttVar(pt1))
 		goto failloop;		       	    
 	    flags = *pt1;
 #if defined(YAPOR) || defined(THREADS)
@@ -2072,7 +2109,7 @@ Yap_absmi(int inp)
 		  int erase;
 		  PredEntry *ap = cl->ClPred;
 
-		  LOCK(ap->PELock);
+		  PELOCK(8,ap);
 		  DEC_CLREF_COUNT(cl);
 		  erase = (cl->ClFlags & ErasedMask) && !(cl->ClRefCount);
 		  if (erase) {
@@ -2096,7 +2133,7 @@ Yap_absmi(int inp)
 		  int erase;
 		  PredEntry *ap = cl->ClPred;
 
-		  LOCK(ap->PELock);
+		  PELOCK(9,ap);
 		  DEC_CLREF_COUNT(cl);
 		  erase = (cl->ClFlags & ErasedMask) && !(cl->ClRefCount);
 		  if (erase) {
@@ -2672,6 +2709,8 @@ Yap_absmi(int inp)
 	if (SREG <= ASP) {
 	  ASP = SREG-EnvSizeInCells;
 	}
+	if (ASP > (CELL *)PROTECT_FROZEN_B(B))
+	  ASP = (CELL *)PROTECT_FROZEN_B(B);
 	if (ActiveSignals & YAP_CDOVF_SIGNAL) {
 	  goto noheapleft;
 	}
@@ -4197,7 +4236,7 @@ Yap_absmi(int inp)
 	{
 	  FAIL();
 	}
-      if (mpz_cmp(Yap_BigIntOfTerm(d0),Yap_BigIntOfTerm(PREG->u.xc.c)))
+      if (Yap_gmp_tcmp_big_big(d0,PREG->u.xc.c))
 	FAIL();
       PREG = NEXTOP(PREG, xc);      
       ENDP(pt0);
@@ -6286,7 +6325,7 @@ Yap_absmi(int inp)
 	FAIL();
       }
       ENDD(d1);
-      if (mpz_cmp(Yap_BigIntOfTerm(d0),Yap_BigIntOfTerm(PREG->u.oc.c)))
+      if (Yap_gmp_tcmp_big_big(d0,PREG->u.oc.c))
 	FAIL();
       PREG = NEXTOP(PREG, oc);
       ENDP(pt0);
@@ -6295,7 +6334,7 @@ Yap_absmi(int inp)
       derefa_body(d0, pt0, ubigint_unk, ubigint_nonvar);
       BEGD(d1);
       d1 = PREG->u.oc.c;
-      PREG = NEXTOP(PREG, oi);
+      PREG = NEXTOP(PREG, oc);
       BIND_GLOBAL(pt0, d1, bind_ubigint);
 #ifdef COROUTINING
       DO_TRAIL(pt0, d1);
@@ -6331,7 +6370,7 @@ Yap_absmi(int inp)
 	FAIL();
       }
       ENDD(d0);
-      if (mpz_cmp(Yap_BigIntOfTerm(d0),Yap_BigIntOfTerm(PREG->u.oc.c)))
+      if (Yap_gmp_tcmp_big_big(d0,PREG->u.oc.c))
 	FAIL();
       PREG = NEXTOP(PREG, oc);
       ENDP(pt0);
@@ -6372,8 +6411,8 @@ Yap_absmi(int inp)
 
       derefa_body(d0, pt0, udbterm_unk, udbterm_nonvar);
       BEGD(d1);
-      d1 = AbsAppl(PREG->u.oi.i);
-      PREG = NEXTOP(PREG, oi);
+      d1 = PREG->u.oc.c;
+      PREG = NEXTOP(PREG, oc);
       BIND_GLOBAL(pt0, d1, bind_udbterm);
 #ifdef COROUTINING
       DO_TRAIL(pt0, d1);
@@ -7517,7 +7556,7 @@ Yap_absmi(int inp)
       ENDCACHE_Y_AS_ENV();
 #ifdef LOW_LEVEL_TRACER
 	if (Yap_do_low_level_trace) {
-	  low_level_trace(enter_pred,PREG->u.Osbpp.p0,XREGS+1);
+	  low_level_trace(enter_pred,PREG->u.Osbpp.p,XREGS+1);
 	}
 #endif	/* LOW_LEVEL_TRACE */
 #ifdef FROZEN_STACKS
@@ -7538,29 +7577,38 @@ Yap_absmi(int inp)
       }
       /* for slots to work */
 #endif /* FROZEN_STACKS */
-      Yap_StartSlots();
-      Yap_PrologMode = UserCCallMode;
       {
-	PredEntry *p = PREG->u.Osbpp.p;
-#ifdef LOW_LEVEL_TRACER
-	if (Yap_do_low_level_trace)
-	  low_level_trace(enter_pred,p,XREGS+1);
-#endif	/* LOW_LEVEL_TRACE */
-	PREG = NEXTOP(PREG, Osbpp);
-	saveregs();
-	save_machine_regs();
+	/* make sure that we can still have access to our old PREG after calling user defined goals and backtracking or failing */
+	yamop *savedP;
 
-	SREG = (CELL *) YAP_Execute(p, p->cs.f_code);
-	EX = 0L;
+	Yap_StartSlots();
+	Yap_PrologMode = UserCCallMode;
+	{
+	  PredEntry *p = PREG->u.Osbpp.p;
+
+	  PREG = NEXTOP(PREG, Osbpp);
+	  savedP = PREG;
+	  saveregs();
+	  save_machine_regs();
+
+	  SREG = (CELL *) YAP_Execute(p, p->cs.f_code);
+	}
+	Yap_CloseSlots();
+	setregs();
+	Yap_PrologMode = UserMode;
+	restore_machine_regs();
+	PREG = savedP;
       }
-
-      restore_machine_regs();
-      setregs();
-      Yap_PrologMode = UserMode;
+      if (EX) {
+	struct DB_TERM *exp = EX;
+	EX = NULL;
+	Yap_JumpToEnv(Yap_PopTermFromDB(exp));
+      }
       if (!SREG) {
 	FAIL();
       }
       /* in case we call Execute */
+      YENV = ENV;
       YREG = ENV;
       JMPNext();
       ENDBOp();
@@ -7726,6 +7774,7 @@ Yap_absmi(int inp)
       restore_machine_regs();
       setregs();
       Yap_PrologMode = UserMode;
+      Yap_CloseSlots();
       if (!SREG) {
 	FAIL();
       }
@@ -7758,7 +7807,11 @@ Yap_absmi(int inp)
       ENDCACHE_Y();
 
       Yap_PrologMode = UserCCallMode;
-      ASP = YREG;
+      if (YREG > (CELL *) PROTECT_FROZEN_B(B)) {
+	ASP = (CELL *) PROTECT_FROZEN_B(B);
+      } else {
+	ASP = YREG;
+      }
       /* for slots to work */
       Yap_StartSlots();
       saveregs();
@@ -7768,6 +7821,7 @@ Yap_absmi(int inp)
       restore_machine_regs();
       setregs();
       Yap_PrologMode = UserMode;
+      Yap_CloseSlots();
       if (!SREG) {
 #ifdef CUT_C
 	/* Removes the cut functions from the stack
@@ -7811,7 +7865,7 @@ Yap_absmi(int inp)
 #if defined(YAPOR) || defined(THREADS)
       {
 	PredEntry *ap = PredFromDefCode(PREG);
- 	LOCK(ap->PELock);
+ 	PELOCK(10,ap);
 	PP = ap;
 	if (!ap->cs.p_code.NOfClauses) {
 	  FAIL();
@@ -7850,10 +7904,13 @@ Yap_absmi(int inp)
 	we must take extra care here
       */
 	if (!PP) {
-	  LOCK(ap->PELock);
+	  PELOCK(11,ap);
 	}
 	if (ap->OpcodeOfPred != INDEX_OPCODE) {
 	  /* someone was here before we were */
+	  if (!PP) {
+	    UNLOCKPE(11,ap);
+	  }
 	  PREG = ap->CodeOfPred;
 	  /* for profiler */
 	  save_pc();
@@ -7876,7 +7933,7 @@ Yap_absmi(int inp)
 #if defined(YAPOR) || defined(THREADS)
 	if (!PP)
 #endif
-	  UNLOCK(ap->PELock);
+	  UNLOCKPE(14,ap);
 
       }
       JMPNext();
@@ -7907,12 +7964,13 @@ Yap_absmi(int inp)
 	}
 #if defined(YAPOR) || defined(THREADS)
 	if (!PP) {
-	  LOCK(pe->PELock);
+	  PELOCK(12,pe);
 	}
 	if (!same_lu_block(PREG_ADDR, PREG)) {
 	  PREG = *PREG_ADDR;
-	  if (!PP)
-	    UNLOCK(pe->PELock);
+	  if (!PP) {
+	    UNLOCKPE(15,pe);
+	  }
 	  JMPNext();
 	}
 #endif
@@ -7928,9 +7986,10 @@ Yap_absmi(int inp)
 #endif /* SHADOW_S */
  	PREG = pt0;
 #if defined(YAPOR) || defined(THREADS)
-	if (!PP)
+	if (!PP) {
+	  UNLOCKPE(12,pe);
+	}
 #endif
-	  UNLOCK(pe->PELock);
 	JMPNext();
       }
       ENDBOp();
@@ -7947,12 +8006,12 @@ Yap_absmi(int inp)
 	}
 #if defined(YAPOR) || defined(THREADS)
 	if (PP == NULL) {
-	  LOCK(pe->PELock);
+	  PELOCK(13,pe);
 	}
 	if (!same_lu_block(PREG_ADDR, PREG)) {
 	  PREG = *PREG_ADDR;
 	  if (!PP) {
-	    UNLOCK(pe->PELock);	    
+	    UNLOCKPE(16,pe);	    
 	  }
 	  JMPNext();
 	}
@@ -7961,11 +8020,11 @@ Yap_absmi(int inp)
 	pt0 = Yap_ExpandIndex(pe, 0);
 	/* restart index */
 	setregs();
-	UNLOCK(pe->PELock);
+	UNLOCKPE(17,pe);
  	PREG = pt0;
 #if defined(YAPOR) || defined(THREADS)
 	if (!PP) {
-	  UNLOCK(pe->PELock);
+	  UNLOCKPE(18,pe);
 	}
 #endif
 	JMPNext();
@@ -7983,11 +8042,11 @@ Yap_absmi(int inp)
 #if defined(YAPOR) || defined(THREADS)
 	  PP = NULL;
 #endif
-	  UNLOCK(pe->PELock);
+	  UNLOCKPE(19,pe);
 	  FAIL();
 	}
 	d0 = pe->ArityOfPE;
-	UNLOCK(pe->PELock);
+	UNLOCKPE(19,pe);
 	if (d0 == 0) {
 	  H[1] = MkAtomTerm((Atom)(pe->FunctorOfPred));
 	}
@@ -8046,7 +8105,7 @@ Yap_absmi(int inp)
       {
 	PredEntry *pe = PredFromDefCode(PREG);
 	BEGD(d0);
- 	LOCK(pe->PELock);
+ 	PELOCK(14,pe);
 	if (!(pe->PredFlags & IndexedPredFlag) &&
 	      pe->cs.p_code.NOfClauses > 1) {
 	  /* update ASP before calling IPred */
@@ -8066,7 +8125,7 @@ Yap_absmi(int inp)
 	  UNLOCK(pe->StatisticsForPred.lock);
 	  ReductionsCounter--;
 	  if (ReductionsCounter == 0 && ReductionsCounterOn) {
-	    UNLOCK(pe->PELock);
+	    UNLOCKPE(20,pe);
 	    saveregs();
 	    Yap_Error(CALL_COUNTER_UNDERFLOW,TermNil,"");
 	    setregs();
@@ -8074,7 +8133,7 @@ Yap_absmi(int inp)
 	  } 
 	  PredEntriesCounter--;
 	  if (PredEntriesCounter == 0 && PredEntriesCounterOn) {
-	    UNLOCK(pe->PELock);
+	    UNLOCKPE(21,pe);
 	    saveregs();
 	    Yap_Error(PRED_ENTRY_COUNTER_UNDERFLOW,TermNil,"");
 	    setregs();
@@ -8083,7 +8142,7 @@ Yap_absmi(int inp)
 	  if ((pe->PredFlags & (CountPredFlag|ProfiledPredFlag|SpiedPredFlag)) == 
 	    CountPredFlag) {
 	    PREG = pe->cs.p_code.TrueCodeOfPred;
-	    UNLOCK(pe->PELock);
+	    UNLOCKPE(22,pe);
 	    JMPNext();
 	  }
 	}
@@ -8094,16 +8153,16 @@ Yap_absmi(int inp)
 	  UNLOCK(pe->StatisticsForPred.lock);
 	  if (!(pe->PredFlags & SpiedPredFlag)) {
 	    PREG = pe->cs.p_code.TrueCodeOfPred;
-	    UNLOCK(pe->PELock);
+	    UNLOCKPE(23,pe);
 	    JMPNext();
 	  }
 	}
 	if (!DebugOn) {
 	  PREG = pe->cs.p_code.TrueCodeOfPred;
-	  UNLOCK(pe->PELock);
+	  UNLOCKPE(24,pe);
 	  JMPNext();
 	}
-	UNLOCK(pe->PELock);
+	UNLOCKPE(25,pe);
 	
 	d0 = pe->ArityOfPE;
 	/* save S for ModuleName */
@@ -8444,7 +8503,7 @@ Yap_absmi(int inp)
 #if defined(YAPOR) || defined(THREADS)
 	if (!PP) {
 	  PP = PREG->u.OtaLl.d->ClPred;
-	  LOCK(PP->PELock);
+	  PELOCK(15,PP);
 	}
 #endif
 	timestamp = IntegerOfTerm(((CELL *)(B_YREG+1))[PREG->u.OtaLl.s]);
@@ -8483,7 +8542,7 @@ Yap_absmi(int inp)
 	/* fprintf(stderr,"- %p/%p %d %d %p\n",PREG,ap,timestamp,ap->TimeStampOfPred,PREG->u.OtILl.d->ClCode);*/
 #if defined(YAPOR) || defined(THREADS)
 	if (!PP) {
-	  LOCK(ap->PELock);
+	  PELOCK(16,ap);
 	  PP = ap;
 	}
 #endif
@@ -8575,7 +8634,7 @@ Yap_absmi(int inp)
 	ENDCACHE_Y();
 #if defined(YAPOR) || defined(THREADS)
 	if (PREG == FAILCODE) {
-	  UNLOCK(PP->PELock);
+	  UNLOCKPE(26,PP);
 	  PP = NULL;
 	}
 #endif
@@ -9024,17 +9083,13 @@ Yap_absmi(int inp)
       
       Op(index_blob, e);
       PREG = NEXTOP(PREG, e);
-#if SIZEOF_DOUBLE == 2*SIZEOF_LONG_INT
-      I_R = MkIntTerm(SREG[0]^SREG[1]);
-#else
-      I_R = MkIntTerm(SREG[0]);
-#endif
+      I_R = Yap_DoubleP_key(SREG);
       GONext();
       ENDOp();
       
       Op(index_long, e);
       PREG = NEXTOP(PREG, e);
-      I_R = MkIntTerm(SREG[0] & (MAX_ABS_INT-1));
+      I_R = Yap_IntP_key(SREG);
       GONext();
       ENDOp();
       
@@ -12008,7 +12063,7 @@ Yap_absmi(int inp)
 	      PREG = PREG->u.l.l;
 	      GONext();
 	    }
-	    if (mpz_cmp(Yap_BigIntOfTerm(d0), Yap_BigIntOfTerm(d1)) == 0) {
+	    if (Yap_gmp_tcmp_big_big(d0,d1) == 0) {
 	      PREG = NEXTOP(PREG, l);
 	      GONext();
 	    }
@@ -12161,9 +12216,12 @@ Yap_absmi(int inp)
 	ENDP(pt0);
       }
       else {
-	saveregs();
-	Yap_Error(TYPE_ERROR_COMPOUND, d1, "arg 2 of arg/3");
-	setregs();
+	/*
+	  don't complain here for SWI Prolog compatibility 
+	  saveregs();
+	  Yap_Error(TYPE_ERROR_COMPOUND, d1, "arg 2 of arg/3");
+	  setregs();
+	*/
 	FAIL();
       }
 
@@ -12249,9 +12307,12 @@ Yap_absmi(int inp)
 	ENDP(pt0);
       }
       else {
-	saveregs();
-	Yap_Error(TYPE_ERROR_COMPOUND, d1, "arg 2 of arg/3");
-	setregs();
+	/*
+	  keep SWI Prolog compatibility, just fail on trying to obtain an argument of a compound term.
+	  saveregs();
+	  Yap_Error(TYPE_ERROR_COMPOUND, d1, "arg 2 of arg/3");
+	  setregs();
+	*/
 	FAIL();
       }
 
@@ -12356,9 +12417,12 @@ Yap_absmi(int inp)
 	ENDP(pt0);
       }
       else {
-	saveregs();
-	Yap_Error(TYPE_ERROR_COMPOUND, d1, "arg 2 of arg/3");
-	setregs();
+	/*
+	  don't complain here for SWI Prolog compatibility 
+	  saveregs();
+	  Yap_Error(TYPE_ERROR_COMPOUND, d1, "arg 2 of arg/3");
+	  setregs();
+	*/
 	FAIL();
       }
 
@@ -12459,9 +12523,12 @@ Yap_absmi(int inp)
 	ENDP(pt0);
       }
       else {
-	saveregs();
-	Yap_Error(TYPE_ERROR_COMPOUND, d1, "arg 2 of arg/3");
-	setregs();
+	/*
+	  don't complain here for SWI Prolog compatibility 
+	  saveregs();
+	  Yap_Error(TYPE_ERROR_COMPOUND, d1, "arg 2 of arg/3");
+	  setregs();
+	*/
 	FAIL();
       }
 
@@ -13796,6 +13863,8 @@ Yap_absmi(int inp)
 	PP = PredMetaCall;
 	SREG = (CELL *) pen;
 	ASP = ENV_YREG;
+	if (ASP > (CELL *)PROTECT_FROZEN_B(B))
+	  ASP = (CELL *)PROTECT_FROZEN_B(B);
 	/* setup GB */
 	WRITEBACK_Y_AS_ENV();
 	YREG[E_CB] = (CELL) B;
@@ -13993,6 +14062,8 @@ Yap_absmi(int inp)
 	PP = PredMetaCall;
 	SREG = (CELL *) pen;
 	ASP = ENV_YREG;
+	if (ASP > (CELL *)PROTECT_FROZEN_B(B))
+	  ASP = (CELL *)PROTECT_FROZEN_B(B);
 	/* setup GB */
 	WRITEBACK_Y_AS_ENV();
 	YREG[E_CB] = (CELL) B;
@@ -14289,7 +14360,7 @@ Yap_absmi(int inp)
 #endif
 	  saveregs_and_ycache();
 	  if(!Yap_growtrail (0, FALSE)) {
-	    Yap_Error(OUT_OF_TRAIL_ERROR,TermNil,"YAP failed to reserve %ld bytes in growtrail",sizeof(CELL) * 16 * 1024L);
+	    Yap_Error(OUT_OF_TRAIL_ERROR,TermNil,"YAP failed to reserve %ld bytes in growtrail",sizeof(CELL) * K16);
 	    setregs_and_ycache();
 	    FAIL();
 	  }

@@ -14,11 +14,12 @@ BINDIR = $(EROOTDIR)/bin
 #
 # where YAP should look for libraries
 #
-LIBDIR=@libdir@/Yap
+LIBDIR=@libdir@
+YAPLIBDIR=@libdir@/Yap
 #
 #
 CC=@CC@
-CFLAGS= @CFLAGS@ $(YAP_EXTRAS) $(DEFS) -I$(srcdir) -I../.. -I$(srcdir)/../../include
+CFLAGS= @SHLIB_CFLAGS@ $(YAP_EXTRAS) $(DEFS) -I$(srcdir) -I../.. -I$(srcdir)/../../include
 #
 #
 # You shouldn't need to change what follows.
@@ -29,31 +30,30 @@ INSTALL_PROGRAM=@INSTALL_PROGRAM@
 SHELL=/bin/sh
 RANLIB=@RANLIB@
 srcdir=@srcdir@
-SHLIB_CFLAGS=@SHLIB_CFLAGS@
-SHLIB_SUFFIX=@SHLIB_SUFFIX@
+SO=@SO@
 #4.1VPATH=@srcdir@:@srcdir@/OPTYap
 CWD=$(PWD)
 #
 
-OBJS=random.o
-SOBJS=random@SHLIB_SUFFIX@
+OBJS=yap_random.o
+SOBJS=yap_random.@SO@
 
 #in some systems we just create a single object, in others we need to
 # create a libray
 
 all: $(SOBJS) 
 
-random.o: $(srcdir)/random.c
-	$(CC) -c $(CFLAGS) $(SHLIB_CFLAGS) $(srcdir)/random.c -o random.o
+yap_random.o: $(srcdir)/yap_random.c
+	$(CC) -c $(CFLAGS) $(srcdir)/yap_random.c -o yap_random.o
 
-@DO_SECOND_LD@%@SHLIB_SUFFIX@: %.o
-@DO_SECOND_LD@	@SHLIB_LD@ -o $@ $<
+@DO_SECOND_LD@%.@SO@: %.o
+@DO_SECOND_LD@	@SHLIB_LD@ -o $@ $< @EXTRA_LIBS_FOR_DLLS@
 
-@DO_SECOND_LD@random@SHLIB_SUFFIX@: random.o
-@DO_SECOND_LD@	@SHLIB_LD@ -o random@SHLIB_SUFFIX@ random.o
+@DO_SECOND_LD@yap_random.@SO@: yap_random.o
+@DO_SECOND_LD@	@SHLIB_LD@ -o yap_random.@SO@ yap_random.o @EXTRA_LIBS_FOR_DLLS@
 
 install: all
-	$(INSTALL_PROGRAM) $(SOBJS) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROGRAM) $(SOBJS) $(DESTDIR)$(YAPLIBDIR)
 
 clean:
 	rm -f *.o *~ $(OBJS) $(SOBJS) *.BAK

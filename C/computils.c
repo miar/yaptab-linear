@@ -82,16 +82,72 @@ char            Yap_Option[20];
 YP_FILE *Yap_logfile;
 #endif
 
+typedef struct mem_blk {
+  union {
+    struct mem_blk *next;
+    double fill;
+  } u;
+  char contents[1];
+} MemBlk;
+
+#define CMEM_BLK_SIZE (4*4096)
+#define FIRST_CMEM_BLK_SIZE (16*4096)
+
 static char *
-AllocCMem (int size, struct intermediates *cip)
+AllocCMem (UInt size, struct intermediates *cip)
 {
+#if SIZEOF_INT_P==8
+  size = (size + 7) & ((UInt)-8);
+#else
+  size = (size + 3) & ((UInt)0xfffffffc);
+#endif
+#if USE_SYSTEM_MALLOC
+  if (!cip->blks || cip->blk_cur+size > cip->blk_top) {
+    UInt blksz;
+    struct mem_blk *p;
+
+    if (size > CMEM_BLK_SIZE)
+      blksz = size+sizeof(struct mem_blk);
+    else
+      blksz = CMEM_BLK_SIZE;
+    if (!cip->blks) {
+      if (Yap_CMemFirstBlock) {
+	p = Yap_CMemFirstBlock;
+	blksz = Yap_CMemFirstBlockSz;
+	p->u.next = NULL;
+      } else {
+	if (blksz < FIRST_CMEM_BLK_SIZE)
+	  blksz = FIRST_CMEM_BLK_SIZE;
+	p = (struct mem_blk *)Yap_AllocCodeSpace(blksz);
+	if (!p) {
+	  Yap_Error_Size = size;
+	  save_machine_regs();
+	  longjmp(cip->CompilerBotch, OUT_OF_HEAP_BOTCH);
+	}
+	Yap_CMemFirstBlock = p;
+	Yap_CMemFirstBlockSz = blksz;
+      }
+    } else {
+      p = (struct mem_blk *)Yap_AllocCodeSpace(blksz);
+      if (!p) {
+	Yap_Error_Size = size;
+	save_machine_regs();
+	longjmp(cip->CompilerBotch, OUT_OF_HEAP_BOTCH);
+      }
+    }
+    p->u.next = cip->blks;
+    cip->blks = p;
+    cip->blk_cur = p->contents;
+    cip->blk_top = (char *)p+blksz;
+  }
+  {
+    char *out = cip->blk_cur;
+    cip->blk_cur += size;
+    return out;
+  }
+#else
   char *p;
   p = cip->freep;
-#if SIZEOF_INT_P==8
-  size = (size + 7) & 0xfffffffffffffff8L;
-#else
-  size = (size + 3) & 0xfffffffcL;
-#endif
   cip->freep += size;
   if (ASP <= CellPtr (cip->freep) + 256) {
     Yap_Error_Size = 256+((char *)cip->freep - (char *)H);
@@ -99,12 +155,33 @@ AllocCMem (int size, struct intermediates *cip)
     longjmp(cip->CompilerBotch, OUT_OF_STACK_BOTCH);
   }
   return (p);
+#endif
+}
+
+void
+Yap_ReleaseCMem (struct intermediates *cip)
+{
+#if USE_SYSTEM_MALLOC
+  struct mem_blk *p = cip->blks;
+  while (p) {
+    struct mem_blk *nextp = p->u.next;
+    if (p != Yap_CMemFirstBlock)
+      Yap_FreeCodeSpace((ADDR)p);
+    p = nextp;
+  }
+  cip->blks = NULL;
+  if (cip->label_offset &&
+      cip->label_offset != Yap_LabelFirstArray) {
+    Yap_FreeCodeSpace((ADDR)cip->label_offset);
+  }
+#endif
+  cip->label_offset = NULL;
 }
 
 char *
-Yap_AllocCMem (int size, struct intermediates *cip)
+Yap_AllocCMem (UInt size, struct intermediates *cip)
 {
-  return(AllocCMem(size, cip));
+  return AllocCMem(size, cip);
 }
 
 static int
@@ -637,6 +714,7 @@ static char *opformat[] =
   "unify_last_dbterm\t%w",
   "unify_last_longint\t%w",
   "unify_last_bigint\t%l",
+  "ensure_space",
   "native_code",
   "function_to_var\t%v,%B",
   "function_to_val\t%v,%B",

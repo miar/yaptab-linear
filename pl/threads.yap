@@ -16,12 +16,14 @@
 *************************************************************************/
 
 :- meta_predicate
-	thread_create(:,-,:),
-	thread_create(:,-),
-	thread_create(:),
-	thread_at_exit(:),
-	thread_signal(+,:),
-	with_mutex(+,:),
+	thread_initialization(0),
+	thread_at_exit(0),
+	thread_create(0, -, :),
+	thread_create(0, -),
+	thread_create(0),
+	thread_signal(+, 0),
+	with_mutex(+, 0),
+	thread_signal(+,0),
 	volatile(:).
 
 volatile(P) :- var(P),
@@ -37,7 +39,6 @@ volatile(P) :-
 
 '$do_volatile'(P,M) :- dynamic(M:P).
 
-
 :- initialization('$init_thread0').
 
 '$init_thread0' :-
@@ -49,7 +50,7 @@ volatile(P) :-
 	recorda('$thread_defaults', [0, 0, 0, false, true], _),
 	'$create_thread_mq'(0),
 	'$new_mutex'(Id),
-	assert('$with_mutex_mutex'(Id)).
+	assert_static(prolog:'$with_mutex_mutex'(Id)).
 
 '$top_thread_goal'(G, Detached) :-
 	'$thread_self'(Id),
@@ -501,6 +502,9 @@ mutex_unlock_all :-
 	'$unlock_mutex'(Id),
 	'$mutex_unlock_all'(Id).
 
+with_mutex(M, G) :-
+	'$no_threads', !,
+	call(G).
 with_mutex(M, G) :-
 	var(M), !,
 	'$do_error'(instantiation_error,with_mutex(M, G)).

@@ -509,6 +509,7 @@ a_cle(op_numbers opcode, yamop *code_p, int pass_no, struct intermediates *cip)
   return code_p;
 }
 
+
 inline static yamop *
 a_e(op_numbers opcode, yamop *code_p, int pass_no)
 {
@@ -1093,6 +1094,23 @@ a_blob(CELL rnd1, op_numbers opcode, int *clause_has_blobsp, yamop *code_p, int 
   GONEXT(c);
   return code_p;
 }
+
+static yamop *
+a_ensure_space(op_numbers opcode, yamop *code_p, int pass_no, struct intermediates *cip, clause_info *clinfo) 
+{
+  if (cip->cpc->rnd1 > 4096) {
+    if (pass_no) {
+      code_p->opc = emit_op(opcode);
+      code_p->u.Osbpi.i = sizeof(CELL) * cip->cpc->rnd1;
+      code_p->u.Osbpi.p = clinfo->CurrentPred;
+      code_p->u.Osbpi.bmap = NULL;
+      code_p->u.Osbpi.s = emit_count(-Signed(RealEnvSize));
+    }
+    GONEXT(Osbpi);
+  }
+  return code_p;
+}
+
 
 inline static yamop *
 a_wdbt(CELL rnd1, op_numbers opcode, int *clause_has_dbtermp, yamop *code_p, int pass_no, struct intermediates *cip)
@@ -3069,7 +3087,7 @@ do_pass(int pass_no, yamop **entry_codep, int assembling, int *clause_has_blobsp
       }
       code_p = cl_u->sc.ClCode;
     }
-    IPredArity = cip->cpc->rnd2;	/* number of args */
+    IPredArity = cip->CurrentPred->ArityOfPE;	/* number of args */
     *entry_codep = code_p;
     if (tabled) {
 #if TABLING
@@ -3516,18 +3534,23 @@ do_pass(int pass_no, yamop **entry_codep, int assembling, int *clause_has_blobsp
 	code_p = a_il((CELL)*entry_codep, _Ystop, code_p, pass_no, cip);
       }
       if (!pass_no) {
+#if !USE_SYSTEM_MALLOC
 	if (CellPtr(cip->label_offset+cip->cpc->rnd1) > ASP-256) {
 	  Yap_Error_Size = 256+((char *)(cip->label_offset+cip->cpc->rnd1) - (char *)H);
 	  save_machine_regs();
 	  longjmp(cip->CompilerBotch, 3);	  
 	}
-	
 	if ( (char *)(cip->label_offset+cip->cpc->rnd1) >= cip->freep)
 	  cip->freep = (char *)(cip->label_offset+(cip->cpc->rnd1+1));
+#endif
+
 	cip->label_offset[cip->cpc->rnd1] = (CELL) code_p;
       }
       /* reset dealloc_found in case there was a branch */
       clinfo.dealloc_found = FALSE;
+      break;
+    case ensure_space_op:
+      code_p = a_ensure_space(_ensure_space, code_p, pass_no, cip, &clinfo);
       break;
     case pop_op:
       if (cip->cpc->rnd1 == 1)
@@ -3767,7 +3790,7 @@ fetch_clause_space(Term* tp, UInt size, struct intermediates *cip, UInt *osizep)
     case OUT_OF_TRAIL_ERROR:
       /* don't just return NULL */
       ARG1 = *tp;
-      if (!Yap_growtrail(64 * 1024L, FALSE)) {
+      if (!Yap_growtrail(K64, FALSE)) {
 	return NULL;
       }
       Yap_Error_TYPE = YAP_NO_ERROR;
@@ -3817,9 +3840,10 @@ init_dbterms_list(yamop *code_p, PredEntry *ap)
   return new;
 }
 
+#define DEFAULT_NLABELS 4096
 
 yamop *
-Yap_assemble(int mode, Term t, PredEntry *ap, int is_fact, struct intermediates *cip)
+Yap_assemble(int mode, Term t, PredEntry *ap, int is_fact, struct intermediates *cip, UInt max_label)
 {
   /*
    * the assembly proccess is done in two passes: 1 - a first pass
@@ -3832,7 +3856,29 @@ Yap_assemble(int mode, Term t, PredEntry *ap, int is_fact, struct intermediates 
   int clause_has_blobs = FALSE;
   int clause_has_dbterm = FALSE;
 
+#if USE_SYSTEM_MALLOC
+  if (!cip->label_offset) {
+    if (!Yap_LabelFirstArray && max_label <= DEFAULT_NLABELS) { 
+      Yap_LabelFirstArray = (Int *)Yap_AllocCodeSpace(sizeof(Int)*DEFAULT_NLABELS);
+      Yap_LabelFirstArraySz = DEFAULT_NLABELS;
+      if (!Yap_LabelFirstArray) {
+	save_machine_regs();
+	longjmp(cip->CompilerBotch, OUT_OF_HEAP_BOTCH);
+      }
+    }
+    if (Yap_LabelFirstArray && max_label <= Yap_LabelFirstArraySz) { 
+      cip->label_offset = Yap_LabelFirstArray;
+    } else {
+      cip->label_offset = (Int *)Yap_AllocCodeSpace(sizeof(Int)*max_label);
+      if (!cip->label_offset) {
+	save_machine_regs();
+	longjmp(cip->CompilerBotch, OUT_OF_HEAP_BOTCH);
+      }
+    }
+  }
+#else
   cip->label_offset = (Int *)cip->freep;
+#endif
   cip->code_addr = NULL;
   code_p = do_pass(0, &entry_code, mode, &clause_has_blobs, &clause_has_dbterm, cip, size);
   if (clause_has_dbterm) {

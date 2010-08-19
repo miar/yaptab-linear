@@ -273,6 +273,9 @@ static char     SccsId[] = "%W% %G%";
 #include "YapHeap.h"
 #include "eval.h"
 #include "yapio.h"
+#ifdef TABLING
+#include "tab.macros.h"
+#endif /* TABLING */
 #include <stdio.h>
 #if HAVE_STRING_H
 #include <string.h>
@@ -604,7 +607,7 @@ FindAtom(codeToFind, arity)
 	pp = RepPredProp(pp->NextOfPE);
       if (pp != NIL) {
 	CODEADDR *out;
-	LOCK(pp->PELock);
+	PELOCK(90,pp);
 	out = &(pp->CodeOfPred)
 	*arityp = pp->ArityOfPE;
 	UNLOCK(pp->PELock);
@@ -629,7 +632,7 @@ FindAtom(codeToFind, arity)
 	pp = RepPredProp(pp->NextOfPE);
       if (pp != NIL) {
 	CODEADDR *out;
-	LOCK(pp->PELock);
+	PELOCK(91,pp);
 	out = &(pp->CodeOfPred)
 	*arityp = pp->ArityOfPE;
 	UNLOCK(pp->PELock);
@@ -849,7 +852,6 @@ p_char_code(void)
       Yap_Error(INSTANTIATION_ERROR,t0,"char_code/2");
       return(FALSE);
     } else if (!IsIntegerTerm(t1)) {
-      fprintf(stderr,"hello\n"),
       Yap_Error(TYPE_ERROR_INTEGER,t1,"char_code/2");
       return(FALSE);
     } else {
@@ -915,7 +917,7 @@ ch_to_wide(char *base, char *charp)
     return NULL;
   }
   for (i=n; i > 0; i--) {
-    nb[i-1] = base[i-1];
+    nb[i-1] = (unsigned char)base[i-1];
   }
   return nb+n;
 }
@@ -945,11 +947,7 @@ p_name(void)
       String = Yap_PreAllocCodeSpace();
       if (String + 1024 > (char *)AuxSp) 
 	goto expand_auxsp;
-#if SHORT_INTS
-      sprintf(String, "%ld", IntOfTerm(AtomNameT));
-#else
-      sprintf(String, "%d", IntOfTerm(AtomNameT));
-#endif
+      sprintf(String, Int_FORMAT, IntOfTerm(AtomNameT));
     } else if (IsFloatTerm(AtomNameT)) {
       String = Yap_PreAllocCodeSpace();
       if (String + 1024 > (char *)AuxSp) 
@@ -961,17 +959,12 @@ p_name(void)
       if (String + 1024 > (char *)AuxSp) 
 	goto expand_auxsp;
 
-#if SHORT_INTS
-      sprintf(String, "%ld", LongIntOfTerm(AtomNameT));
-#else
-      sprintf(String, "%d", LongIntOfTerm(AtomNameT));
-#endif
+      sprintf(String, Int_FORMAT, LongIntOfTerm(AtomNameT));
 #if USE_GMP
     } else if (IsBigIntTerm(AtomNameT)) {
       String = Yap_PreAllocCodeSpace();
-      if (String + 1024 > (char *)AuxSp) 
+      if (!Yap_gmp_to_string(AtomNameT, String, ((char *)AuxSp-String)-1024, 10 ))
 	goto expand_auxsp;
-      mpz_get_str(String, 10, Yap_BigIntOfTerm(AtomNameT));
 #endif
     } else {
       Yap_Error(TYPE_ERROR_ATOMIC,AtomNameT,"name/2");
@@ -1502,9 +1495,9 @@ p_atomic_concat(void)
 	char *cptr = (char *)wcptr;
 
 #if HAVE_SNPRINTF
-	sz = snprintf(cptr, (wtop-wcptr)-1024,"%ld", (long int)IntegerOfTerm(thead));
+	sz = snprintf(cptr, (wtop-wcptr)-1024,Int_FORMAT, IntegerOfTerm(thead));
 #else
-	sz = sprintf(cptr,"%ld", (long int)IntegerOfTerm(thead));
+	sz = sprintf(cptr,Int_FORMAT, IntegerOfTerm(thead));
 #endif
 	for (i=sz; i>0; i--) {
 	  wcptr[i-1] = cptr[i-1];
@@ -1525,19 +1518,18 @@ p_atomic_concat(void)
 	wcptr += sz;
 #if USE_GMP
       } else if (IsBigIntTerm(thead)) {
-	MP_INT *n = Yap_BigIntOfTerm(thead);
-	int sz, i;
+	size_t sz, i;
 	char *tmp = (char *)wcptr;
 
-	if ((sz = mpz_sizeinbase (n, 10)) > (wtop-wcptr)-1024) {
+	sz = Yap_gmp_to_size(thead, 10);
+	if (!Yap_gmp_to_string(thead, tmp, (wtop-wcptr)-1024, 10 )) {
 	  Yap_ReleasePreAllocCodeSpace((ADDR)cpt0);
 	  if (!Yap_growheap(FALSE, sz+1024, NULL)) {
-	    Yap_Error(OUT_OF_HEAP_ERROR, TermNil, Yap_ErrorMessage);
+	    Yap_Error(OUT_OF_AUXSPACE_ERROR, TermNil, Yap_ErrorMessage);
 	    return(FALSE);
 	  }
 	  goto restart;
 	}
-	mpz_get_str(tmp, 10, n);
 	for (i=sz; i>0; i--) {
 	  wcptr[i-1] = tmp[i-1];
 	}
@@ -1605,9 +1597,9 @@ p_atomic_concat(void)
 	cptr += sz;
       } else if (IsIntegerTerm(thead)) {
 #if HAVE_SNPRINTF
-	snprintf(cptr, (top-cptr)-1024,"%ld", (long int)IntegerOfTerm(thead));
+	snprintf(cptr, (top-cptr)-1024,Int_FORMAT, IntegerOfTerm(thead));
 #else
-	sprintf(cptr,"%ld", (long int)IntegerOfTerm(thead));
+	sprintf(cptr, Int_FORMAT, IntegerOfTerm(thead));
 #endif
 	while (*cptr && cptr < top-1024) cptr++;
       } else if (IsFloatTerm(thead)) {
@@ -1619,18 +1611,15 @@ p_atomic_concat(void)
 	while (*cptr && cptr < top-1024) cptr++;
 #if USE_GMP
       } else if (IsBigIntTerm(thead)) {
-	MP_INT *n = Yap_BigIntOfTerm(thead);
-	int sz;
-
-	if ((sz = mpz_sizeinbase (n, 10)) > (top-cptr)-1024) {
+	if (!Yap_gmp_to_string(thead, cptr, (top-cptr)-1024, 10 )) {
+	  size_t sz = Yap_gmp_to_size(thead, 10);
 	  Yap_ReleasePreAllocCodeSpace((ADDR)cpt0);
 	  if (!Yap_growheap(FALSE, sz+1024, NULL)) {
-	    Yap_Error(OUT_OF_HEAP_ERROR, TermNil, Yap_ErrorMessage);
+	    Yap_Error(OUT_OF_AUXSPACE_ERROR, TermNil, Yap_ErrorMessage);
 	    return(FALSE);
 	  }
 	  goto restart;
 	}
-	mpz_get_str(cptr, 10, n);
 	while (*cptr) cptr++;
 #endif
       }
@@ -1954,22 +1943,22 @@ p_number_chars(void)
       Yap_Error(TYPE_ERROR_NUMBER, t1, "number_chars/2");
       return(FALSE);
     } else if (IsIntTerm(t1)) {
-#if SHORT_INTS
-      sprintf(String, "%ld", IntOfTerm(t1));
-#else
-      sprintf(String, "%d", IntOfTerm(t1));
-#endif
+      sprintf(String, Int_FORMAT, IntOfTerm(t1));
     } else if (IsFloatTerm(t1)) {
       sprintf(String, "%f", FloatOfTerm(t1));
     } else if (IsLongIntTerm(t1)) {
-#if SHORT_INTS
-      sprintf(String, "%ld", LongIntOfTerm(t1));
-#else
-      sprintf(String, "%d", LongIntOfTerm(t1));
-#endif
+      sprintf(String, Int_FORMAT, LongIntOfTerm(t1));
 #if USE_GMP
     } else if (IsBigIntTerm(t1)) {
-      mpz_get_str(String, 10, Yap_BigIntOfTerm(t1));
+      if (!Yap_gmp_to_string(t1, String, ((char *)AuxSp-String)-1024, 10 )) {
+	size_t sz = Yap_gmp_to_size(t1, 10);
+	Yap_ReleasePreAllocCodeSpace((ADDR)String);
+	if (!Yap_ExpandPreAllocCodeSpace(sz, NULL, TRUE)) {
+	  Yap_Error(OUT_OF_AUXSPACE_ERROR, TermNil, Yap_ErrorMessage);
+	  return FALSE;
+	}
+	goto restart_aux;
+      }
 #endif
     }
     if (yap_flags[YAP_TO_CHARS_FLAG] == QUINTUS_TO_CHARS) {
@@ -2108,24 +2097,22 @@ p_number_atom(void)
 
     if (IsIntTerm(t1)) {
 
-#if SHORT_INTS
-      sprintf(String, "%ld", IntOfTerm(t1));
-#else
-      sprintf(String, "%d", IntOfTerm(t1));
-#endif
+      sprintf(String, Int_FORMAT, IntOfTerm(t1));
     } else if (IsFloatTerm(t1)) {
       sprintf(String, "%f", FloatOfTerm(t1));
     } else if (IsLongIntTerm(t1)) {
 
-#if SHORT_INTS
-      sprintf(String, "%ld", LongIntOfTerm(t1));
-#else
-      sprintf(String, "%d", LongIntOfTerm(t1));
-#endif
+      sprintf(String, Int_FORMAT, LongIntOfTerm(t1));
 
 #if USE_GMP
     } else if (IsBigIntTerm(t1)) {
-      mpz_get_str(String, 10, Yap_BigIntOfTerm(t1));
+      while (!Yap_gmp_to_string(t1, String, ((char *)AuxSp-String)-1024, 10 )) {
+	size_t sz = Yap_gmp_to_size(t1, 10);
+	if (!(String = Yap_ExpandPreAllocCodeSpace(sz, NULL, TRUE))) {
+	  Yap_Error(OUT_OF_AUXSPACE_ERROR, t1, Yap_ErrorMessage);
+	  return FALSE;
+	}
+      }
 #endif
     } else {
       Yap_Error(TYPE_ERROR_NUMBER, t1, "number_atom/2");
@@ -2174,22 +2161,20 @@ p_number_codes(void)
   }
   if (IsNonVarTerm(t1) && IsVarTerm(t)) {
     if (IsIntTerm(t1)) {
-#if SHORT_INTS
-      sprintf(String, "%ld", IntOfTerm(t1));
-#else
-      sprintf(String, "%d", IntOfTerm(t1));
-#endif
+      sprintf(String, Int_FORMAT, IntOfTerm(t1));
     } else if (IsFloatTerm(t1)) {
       sprintf(String, "%f", FloatOfTerm(t1));
     } else if (IsLongIntTerm(t1)) {
-#if SHORT_INTS
-      sprintf(String, "%ld", LongIntOfTerm(t1));
-#else
-      sprintf(String, "%d", LongIntOfTerm(t1));
-#endif
+      sprintf(String, Int_FORMAT, LongIntOfTerm(t1));
 #if USE_GMP
     } else if (IsBigIntTerm(t1)) {
-      mpz_get_str(String, 10, Yap_BigIntOfTerm(t1));
+      while (!Yap_gmp_to_string(t1, String, ((char *)AuxSp-String)-1024, 10 )) {
+	size_t sz = Yap_gmp_to_size(t1, 10);
+	if (!(String = Yap_ExpandPreAllocCodeSpace(sz, NULL, TRUE))) {
+	  Yap_Error(OUT_OF_AUXSPACE_ERROR, t1, Yap_ErrorMessage);
+	  return FALSE;
+	}
+      }
 #endif
     } else {
       Yap_Error(TYPE_ERROR_NUMBER, t1, "number_codes/2");
@@ -2273,22 +2258,20 @@ p_atom_number(void)
       }
     }
     if (IsIntTerm(t2)) {
-#if SHORT_INTS
-      sprintf(String, "%ld", IntOfTerm(t2));
-#else
-      sprintf(String, "%d", IntOfTerm(t2));
-#endif
+      sprintf(String, Int_FORMAT, IntOfTerm(t2));
     } else if (IsFloatTerm(t2)) {
       sprintf(String, "%g", FloatOfTerm(t2));
     } else if (IsLongIntTerm(t2)) {
-#if SHORT_INTS
-      sprintf(String, "%ld", LongIntOfTerm(t2));
-#else
-      sprintf(String, "%d", LongIntOfTerm(t2));
-#endif
+      sprintf(String, Int_FORMAT, LongIntOfTerm(t2));
 #if USE_GMP
     } else if (IsBigIntTerm(t2)) {
-      mpz_get_str(String, 10, Yap_BigIntOfTerm(t2));
+      while (!Yap_gmp_to_string(t2, String, ((char *)AuxSp-String)-1024, 10 )) {
+	size_t sz = Yap_gmp_to_size(t2, 10);
+	if (!(String = Yap_ExpandPreAllocCodeSpace(sz, NULL, TRUE))) {
+	  Yap_Error(OUT_OF_AUXSPACE_ERROR, t2, Yap_ErrorMessage);
+	  return FALSE;
+	}
+      }
 #endif
     } else {
       Yap_Error(TYPE_ERROR_NUMBER, t2, "atom_number/2");
@@ -3141,7 +3124,7 @@ p_flags(void)
     return (FALSE);
   if (EndOfPAEntr(pe))
     return (FALSE);
-  LOCK(pe->PELock);
+  PELOCK(92,pe);
   if (!Yap_unify_constant(ARG3, MkIntegerTerm(pe->PredFlags))) {
     UNLOCK(pe->PELock);
     return(FALSE);
@@ -3456,7 +3439,10 @@ p_statistics_heap_info(void)
 #if USE_SYSTEM_MALLOC && HAVE_MALLINFO
   struct mallinfo mi = mallinfo();
 
-  Term tmax = MkIntegerTerm((mi.arena+mi.hblkhd)-Yap_HoleSize);
+  UInt sstack = Yap_HoleSize+(Yap_TrailTop-Yap_GlobalBase);
+  UInt mmax = (mi.arena+mi.hblkhd);
+  Term tmax = MkIntegerTerm(mmax-sstack);
+  tusage = MkIntegerTerm(mmax-(mi.fordblks+sstack));
 #else
   Term tmax = MkIntegerTerm((Yap_GlobalBase - Yap_HeapBase)-Yap_HoleSize);
 #endif
@@ -3653,28 +3639,19 @@ p_access_yap_flags(void)
   }
 #ifdef TABLING
   if (flag == TABLING_MODE_FLAG) {
-    int n = 0;
-    if (IsMode_CompletedOn(yap_flags[flag])) {
-      if (IsMode_LoadAnswers(yap_flags[flag]))
-	tout = MkAtomTerm(AtomLoadAnswers);
-      else
-	tout = MkAtomTerm(AtomExecAnswers);
-      n++;
-    }
-    if (IsMode_SchedulingOn(yap_flags[flag])) {
-      Term taux = tout;
-      if (IsMode_Local(yap_flags[flag]))
-	tout = MkAtomTerm(AtomLocalA);
-      else
-	tout = MkAtomTerm(AtomBatched);
-      if (n) {
-	taux = MkPairTerm(taux, MkAtomTerm(AtomNil));
-	tout = MkPairTerm(tout, taux);
-      }
-      n++;
-    }
-    if (n == 0)
-      tout = MkAtomTerm(AtomDefault);
+    tout = TermNil;
+    if (IsMode_LocalTrie(yap_flags[flag]))
+      tout = MkPairTerm(MkAtomTerm(AtomLocalTrie), tout);
+    else if (IsMode_GlobalTrie(yap_flags[flag]))
+      tout = MkPairTerm(MkAtomTerm(AtomGlobalTrie), tout);
+    if (IsMode_ExecAnswers(yap_flags[flag]))
+      tout = MkPairTerm(MkAtomTerm(AtomExecAnswers), tout);
+    else if (IsMode_LoadAnswers(yap_flags[flag]))
+      tout = MkPairTerm(MkAtomTerm(AtomLoadAnswers), tout);
+    if (IsMode_Batched(yap_flags[flag]))
+      tout = MkPairTerm(MkAtomTerm(AtomBatched), tout);
+    else if (IsMode_Local(yap_flags[flag]))
+      tout = MkPairTerm(MkAtomTerm(AtomLocal), tout);
   } else
 #endif /* TABLING */
   tout = MkIntegerTerm(yap_flags[flag]);
@@ -3801,14 +3778,7 @@ p_set_yap_flags(void)
     if (value == 0) {  /* default */
       tab_ent_ptr tab_ent = GLOBAL_root_tab_ent;
       while(tab_ent) {
-	if (IsDefaultMode_Local(TabEnt_mode(tab_ent)))
-	  SetMode_Local(TabEnt_mode(tab_ent));
-	else
-	  SetMode_Batched(TabEnt_mode(tab_ent));
-	if (IsDefaultMode_LoadAnswers(TabEnt_mode(tab_ent)))
-	  SetMode_LoadAnswers(TabEnt_mode(tab_ent));
-	else
-	  SetMode_ExecAnswers(TabEnt_mode(tab_ent));
+	TabEnt_mode(tab_ent) = TabEnt_flags(tab_ent);
 	tab_ent = TabEnt_next(tab_ent);
       }
       yap_flags[TABLING_MODE_FLAG] = 0;
@@ -3819,7 +3789,6 @@ p_set_yap_flags(void)
 	tab_ent = TabEnt_next(tab_ent);
       }
       SetMode_Batched(yap_flags[TABLING_MODE_FLAG]);
-      SetMode_SchedulingOn(yap_flags[TABLING_MODE_FLAG]);
     } else if (value == 2) {  /* local */
       tab_ent_ptr tab_ent = GLOBAL_root_tab_ent;
       while(tab_ent) {
@@ -3827,7 +3796,6 @@ p_set_yap_flags(void)
 	tab_ent = TabEnt_next(tab_ent);
       }
       SetMode_Local(yap_flags[TABLING_MODE_FLAG]);
-      SetMode_SchedulingOn(yap_flags[TABLING_MODE_FLAG]);
     } else if (value == 3) {  /* exec_answers */
       tab_ent_ptr tab_ent = GLOBAL_root_tab_ent;
       while(tab_ent) {
@@ -3835,7 +3803,6 @@ p_set_yap_flags(void)
 	tab_ent = TabEnt_next(tab_ent);
       }
       SetMode_ExecAnswers(yap_flags[TABLING_MODE_FLAG]);
-      SetMode_CompletedOn(yap_flags[TABLING_MODE_FLAG]);
     } else if (value == 4) {  /* load_answers */
       tab_ent_ptr tab_ent = GLOBAL_root_tab_ent;
       while(tab_ent) {
@@ -3843,7 +3810,20 @@ p_set_yap_flags(void)
 	tab_ent = TabEnt_next(tab_ent);
       }
       SetMode_LoadAnswers(yap_flags[TABLING_MODE_FLAG]);
-      SetMode_CompletedOn(yap_flags[TABLING_MODE_FLAG]);
+    } else if (value == 5) {  /* local_trie */
+      tab_ent_ptr tab_ent = GLOBAL_root_tab_ent;
+      while(tab_ent) {
+	SetMode_LocalTrie(TabEnt_mode(tab_ent));
+	tab_ent = TabEnt_next(tab_ent);
+      }
+      SetMode_LocalTrie(yap_flags[TABLING_MODE_FLAG]);
+    } else if (value == 6) {  /* global_trie */
+      tab_ent_ptr tab_ent = GLOBAL_root_tab_ent;
+      while(tab_ent) {
+	SetMode_GlobalTrie(TabEnt_mode(tab_ent));
+	tab_ent = TabEnt_next(tab_ent);
+      }
+      SetMode_GlobalTrie(yap_flags[TABLING_MODE_FLAG]);
     } 
     break;
 #endif /* TABLING */
@@ -3854,8 +3834,8 @@ p_set_yap_flags(void)
     break;
   case QUIET_MODE_FLAG:
     if (value != 0  && value != 1)
-      return(FALSE);
-    yap_flags[VARS_CAN_HAVE_QUOTE_FLAG] = value;
+      return FALSE;
+    yap_flags[QUIET_MODE_FLAG] = value;
     break;
   default:
     return(FALSE);
@@ -4020,7 +4000,7 @@ p_in_range2(void) {
 
 static Int
 p_max_tagged_integer(void) {
-  return Yap_unify(ARG1, MkIntTerm(MAX_ABS_INT-1L));
+  return Yap_unify(ARG1, MkIntTerm(MAX_ABS_INT-((CELL)1)));
 }
 
 static Int
@@ -4155,8 +4135,8 @@ Yap_InitCPreds(void)
   Yap_InitCPred("$has_yap_or", 0, p_has_yap_or, SafePredFlag|SyncPredFlag|HiddenPredFlag);
   Yap_InitCPred("$has_eam", 0, p_has_eam, SafePredFlag|SyncPredFlag|HiddenPredFlag);
 #ifndef YAPOR
-  Yap_InitCPred("$default_sequential", 1, p_default_sequential, SafePredFlag|SyncPredFlag|HiddenPredFlag);
-  Yap_InitCPred("$yapor_threads", 1, p_yapor_threads, SafePredFlag|SyncPredFlag|HiddenPredFlag);
+  Yap_InitCPred("$c_default_sequential", 1, p_default_sequential, SafePredFlag|SyncPredFlag|HiddenPredFlag);
+  Yap_InitCPred("$c_yapor_threads", 1, p_yapor_threads, SafePredFlag|SyncPredFlag|HiddenPredFlag);
 #endif
 #ifdef INES
   Yap_InitCPred("euc_dist", 3, p_euc_dist, SafePredFlag);
@@ -4168,9 +4148,6 @@ Yap_InitCPreds(void)
 #endif
 #ifdef DEBUG
   Yap_InitCPred("dump_active_goals", 0, p_dump_active_goals, SafePredFlag|SyncPredFlag);
-#endif
-#ifndef YAPOR
-  Yap_InitCPred("$yapor_threads", 1, p_yapor_threads, SafePredFlag|SyncPredFlag);
 #endif
 
   Yap_InitArrayPreds();

@@ -116,7 +116,7 @@ char yap_pwd[YAP_FILENAME_MAX];
 STD_PROTO (void exit, (int));
 
 #ifdef _WIN32
-static void
+void
 Yap_WinError(char *yap_error)
 {
   char msg[256];
@@ -1033,6 +1033,139 @@ p_srandom (void)
 
 STATIC_PROTO (void InitSignals, (void));
 
+#define PLSIG_PREPARED 0x01		/* signal is prepared */
+#define PLSIG_THROW    0x02		/* throw signal(num, name) */
+#define PLSIG_SYNC     0x04		/* call synchronously */
+#define PLSIG_NOFRAME  0x08		/* Do not create a Prolog frame */
+
+#define SIG_PROLOG_OFFSET	32	/* Start of Prolog signals */
+
+#define SIG_EXCEPTION	  (SIG_PROLOG_OFFSET+0)
+#ifdef O_ATOMGC
+#define SIG_ATOM_GC	  (SIG_PROLOG_OFFSET+1)
+#endif
+#define SIG_GC		  (SIG_PROLOG_OFFSET+2)
+#ifdef O_PLMT
+#define SIG_THREAD_SIGNAL (SIG_PROLOG_OFFSET+3)
+#endif
+#define SIG_FREECLAUSES	  (SIG_PROLOG_OFFSET+4)
+#define SIG_PLABORT	  (SIG_PROLOG_OFFSET+5)
+
+static struct signame
+{ int 	      sig;
+  const char *name;
+  int	      flags;
+} signames[] =
+{
+#ifdef SIGHUP
+  { SIGHUP,	"hup",    0},
+#endif
+  { SIGINT,	"int",    0},
+#ifdef SIGQUIT
+  { SIGQUIT,	"quit",   0},
+#endif
+  { SIGILL,	"ill",    0},
+  { SIGABRT,	"abrt",   0},
+  { SIGFPE,	"fpe",    PLSIG_THROW},
+#ifdef SIGKILL
+  { SIGKILL,	"kill",   0},
+#endif
+  { SIGSEGV,	"segv",   0},
+#ifdef SIGPIPE
+  { SIGPIPE,	"pipe",   0},
+#endif
+#ifdef SIGALRM
+  { SIGALRM,	"alrm",   PLSIG_THROW},
+#endif
+  { SIGTERM,	"term",   0},
+#ifdef SIGUSR1
+  { SIGUSR1,	"usr1",   0},
+#endif
+#ifdef SIGUSR2
+  { SIGUSR2,	"usr2",   0},
+#endif
+#ifdef SIGCHLD
+  { SIGCHLD,	"chld",   0},
+#endif
+#ifdef SIGCONT
+  { SIGCONT,	"cont",   0},
+#endif
+#ifdef SIGSTOP
+  { SIGSTOP,	"stop",   0},
+#endif
+#ifdef SIGTSTP
+  { SIGTSTP,	"tstp",   0},
+#endif
+#ifdef SIGTTIN
+  { SIGTTIN,	"ttin",   0},
+#endif
+#ifdef SIGTTOU
+  { SIGTTOU,	"ttou",   0},
+#endif
+#ifdef SIGTRAP
+  { SIGTRAP,	"trap",   0},
+#endif
+#ifdef SIGBUS
+  { SIGBUS,	"bus",    0},
+#endif
+#ifdef SIGSTKFLT
+  { SIGSTKFLT,	"stkflt", 0},
+#endif
+#ifdef SIGURG
+  { SIGURG,	"urg",    0},
+#endif
+#ifdef SIGIO
+  { SIGIO,	"io",     0},
+#endif
+#ifdef SIGPOLL
+  { SIGPOLL,	"poll",   0},
+#endif
+#ifdef SIGXCPU
+  { SIGXCPU,	"xcpu",   PLSIG_THROW},
+#endif
+#ifdef SIGXFSZ
+  { SIGXFSZ,	"xfsz",   PLSIG_THROW},
+#endif
+#ifdef SIGVTALRM
+  { SIGVTALRM,	"vtalrm", PLSIG_THROW},
+#endif
+#ifdef SIGPROF
+  { SIGPROF,	"prof",   0},
+#endif
+#ifdef SIGPWR
+  { SIGPWR,	"pwr",    0},
+#endif
+  { SIG_EXCEPTION,     "prolog:exception",     0 },
+#ifdef SIG_ATOM_GC
+  { SIG_ATOM_GC,   "prolog:atom_gc",       0 },
+#endif
+  { SIG_GC,	       "prolog:gc",	       0 },
+#ifdef SIG_THREAD_SIGNAL
+  { SIG_THREAD_SIGNAL, "prolog:thread_signal", 0 },
+#endif
+
+  { -1,		NULL,     0}
+};
+
+/* SWI emulation */
+int
+Yap_signal_index(const char *name)
+{ struct signame *sn = signames;
+  char tmp[12];
+
+  if ( strncmp(name, "SIG", 3) == 0 && strlen(name) < 12 ) 
+    { char *p = (char *)name+3, *q = tmp;
+      while ((*q++ = tolower(*p++))) {};
+      name = tmp;
+    }
+
+  for( ; sn->name; sn++ )
+  { if ( !strcmp(sn->name, name) )
+      return sn->sig;
+  }
+
+  return -1;
+}
 
 #if (defined(__svr4__) || defined(__SVR4))
 
@@ -1059,8 +1192,8 @@ HandleSIGSEGV(int   sig,   siginfo_t   *sip, ucontext_t *uap)
       sip->si_code != SI_NOINFO &&
       sip->si_code == SEGV_MAPERR &&
       (void *)(sip->si_addr) > (void *)(Yap_HeapBase) &&
-      (void *)(sip->si_addr) < (void *)(Yap_TrailTop+64 * 1024L)) {
-    Yap_growtrail(64 * 1024L, TRUE);
+      (void *)(sip->si_addr) < (void *)(Yap_TrailTop+K64)) {
+    Yap_growtrail(K64, TRUE);
   }  else
 #endif
     {
@@ -1204,7 +1337,7 @@ SearchForTrailFault(siginfo_t *siginfo)
   if ((ptr > (void *)Yap_TrailTop-1024  && 
        TR < (tr_fr_ptr) Yap_TrailTop+(64*1024))) {
     if (!Yap_growtrail(64*1024, TRUE)) {
-      Yap_Error(OUT_OF_TRAIL_ERROR, TermNil, "YAP failed to reserve %ld bytes in growtrail", 64*1024L);
+      Yap_Error(OUT_OF_TRAIL_ERROR, TermNil, "YAP failed to reserve %ld bytes in growtrail", K64);
     }
     /* just in case, make sure the OS keeps the signal handler. */
     /*    my_signal_info(SIGSEGV, HandleSIGSEGV); */
@@ -1334,13 +1467,13 @@ SearchForTrailFault(void)
 #if  OS_HANDLES_TR_OVERFLOW && !USE_SYSTEM_MALLOC
   if ((TR > (tr_fr_ptr)Yap_TrailTop-1024  && 
        TR < (tr_fr_ptr)Yap_TrailTop+(64*1024))|| Yap_DBTrailOverflow()) {
-    long trsize = 64*2014L;
+    long trsize = K64;
 
     while ((CELL)TR > (CELL)Yap_TrailTop+trsize) {
-      trsize += 64*2014L;
+      trsize += K64;
     }
     if (!Yap_growtrail(trsize, TRUE)) {
-      Yap_Error(OUT_OF_TRAIL_ERROR, TermNil, "YAP failed to reserve %ld bytes in growtrail", 64*1024L);
+      Yap_Error(OUT_OF_TRAIL_ERROR, TermNil, "YAP failed to reserve %ld bytes in growtrail", K64);
     }
     /* just in case, make sure the OS keeps the signal handler. */
     /*    my_signal_info(SIGSEGV, HandleSIGSEGV); */
@@ -1437,6 +1570,10 @@ InteractSIGINT(int ch) {
     /* exit */
     Yap_exit(0);
     return -1;
+  case 'g':
+    /* exit */
+    Yap_signal (YAP_STACK_DUMP_SIGNAL);
+    return -1;
   case 't':
     /* start tracing */
     Yap_signal (YAP_TRACE_SIGNAL);
@@ -1459,7 +1596,7 @@ InteractSIGINT(int ch) {
     /* show an helpful message */
     fprintf(Yap_stderr, "Please press one of:\n");
     fprintf(Yap_stderr, "  a for abort\n  c for continue\n  d for debug\n");
-    fprintf(Yap_stderr, "  e for exit\n  s for statistics\n  t for trace\n");
+    fprintf(Yap_stderr, "  e for exit\n  g for stack dump\n  s for statistics\n  t for trace\n");
     fprintf(Yap_stderr, "  b for break\n");
     return(0);
   }
@@ -3211,7 +3348,7 @@ Yap_InitSysPreds(void)
   Yap_InitCPred ("virtual_alarm", 4, p_virtual_alarm, SafePredFlag|SyncPredFlag|HiddenPredFlag);
   Yap_InitCPred ("enable_interrupts", 0, p_enable_interrupts, SafePredFlag);
   Yap_InitCPred ("disable_interrupts", 0, p_disable_interrupts, SafePredFlag);
-  CurrentModule = SYSTEM_MODULE;
+  CurrentModule = OPERATING_SYSTEM_MODULE;
   Yap_InitCPred ("true_file_name", 2, p_true_file_name, SyncPredFlag);
   Yap_InitCPred ("true_file_name", 3, p_true_file_name3, SyncPredFlag);
   CurrentModule = cm;

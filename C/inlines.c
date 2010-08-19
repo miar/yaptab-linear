@@ -282,15 +282,15 @@ p_equal(void)
 }
 
 static Int 
-p_eq(void)
+eq(Term t1, Term t2)
 {				/* ? == ? */
       BEGD(d0);
-      d0 = ARG1;
+      d0 = t1;
       deref_head(d0, p_eq_unk1);
     p_eq_nvar1:
       /* first argument is bound */
       BEGD(d1);
-      d1 = ARG2;
+      d1 = t2;
       deref_head(d1, p_eq_nvar1_unk2);
     p_eq_nvar1_nvar2:
       /* both arguments are bound */
@@ -321,7 +321,7 @@ p_eq(void)
 	    return(LongIntOfTerm(d0) == LongIntOfTerm(d1));
 #ifdef USE_GMP
 	  case (CELL)FunctorBigInt:
-	    return (mpz_cmp(Yap_BigIntOfTerm(d0), Yap_BigIntOfTerm(d1)) == 0);
+	    return (Yap_gmp_tcmp_big_big(d0, d1) == 0);
 #endif
 	  case (CELL)FunctorDouble:
 	    return(FloatOfTerm(d0) == FloatOfTerm(d1));
@@ -363,6 +363,18 @@ p_eq(void)
       ENDP(pt0);
 
       ENDD(d0);
+}
+
+static Int 
+p_eq(void)
+{				/* ? == ? */
+  return eq(ARG1,ARG2);
+}
+
+int 
+Yap_eq(Term t1, Term t2)
+{				/* ? == ? */
+  return eq(t1,t2);
 }
 
 static Int 

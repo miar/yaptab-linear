@@ -1,4 +1,8 @@
 
+  /* This file, rglobals.h, was generated automatically by "yap -L misc/buildheap"
+     please do not update, update misc/GLOBALS instead */
+
+
 
 
 
@@ -17,6 +21,10 @@
 
 
 static void RestoreWorker(int wid) {
+
+
+
+
 
 
 
@@ -131,6 +139,21 @@ static void RestoreWorker(int wid) {
   FOREIGN_WL(wid)->global_variables = PtoGlobalEAdjust(FOREIGN_WL(wid)->global_variables);
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #if (defined(YAPOR) || defined(TABLING)) && defined(THREADS)
 
 #endif
@@ -168,6 +191,13 @@ static void RestoreGlobal(void) {
 
 
 
+
+
+
+
+
+
+
 #if HAVE_LIBREADLINE
 
 
@@ -181,4 +211,9 @@ static void RestoreGlobal(void) {
 
 
 #endif
+
+
+
+
+
 }

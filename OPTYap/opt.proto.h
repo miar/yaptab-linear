@@ -1,141 +1,121 @@
-/**********************************************************************
-                                                               
-                       The OPTYap Prolog system                
-  OPTYap extends the Yap Prolog system to support or-parallel tabling
-                                                               
-  Copyright:   R. Rocha and NCC - University of Porto, Portugal
-  File:        opt.proto.h
-  version:     $Id: opt.proto.h,v 1.12 2005-11-04 01:17:17 vsc Exp $   
-                                                                     
-**********************************************************************/
+/************************************************************************
+**                                                                     **
+**                   The YapTab/YapOr/OPTYap systems                   **
+**                                                                     **
+** YapTab extends the Yap Prolog engine to support sequential tabling  **
+** YapOr extends the Yap Prolog engine to support or-parallelism       **
+** OPTYap extends the Yap Prolog engine to support or-parallel tabling **
+**                                                                     **
+**                                                                     **
+**      Yap Prolog was developed at University of Porto, Portugal      **
+**                                                                     **
+************************************************************************/
 
-/* -------------- **
-**  opt.memory.c  **
-** -------------- */
+/***************************
+**      opt.memory.c      **
+***************************/
 
 #ifdef YAPOR
 #ifdef SHM_MEMORY_MAPPING_SCHEME
-void shm_map_memory(int id, int size, void *shmaddr);
+void shm_map_memory(int, int, void *);
 #else /* MMAP_MEMORY_MAPPING_SCHEME */
 void open_mapfile(long);
 void close_mapfile(void);
 #endif /* MEMORY_MAPPING_SCHEME */
-void map_memory(long HeapArea, long GlobalLocalArea, long TrailAuxArea, int n_workers);
+void map_memory(long, long, long, int);
 void unmap_memory(void);
 void remap_memory(void);
 #endif /* YAPOR */
 
 
-/* ------------ **
-**  opt.misc.c  **
-** ------------ */
 
-void itos(int i, char *s);
-void information_message(const char *mesg,...);
-#if defined(YAPOR_ERRORS) || defined(TABLING_ERRORS)
-void error_message(const char *mesg, ...);
-#endif /* YAPOR_ERRORS || TABLING_ERRORS */
+/*************************
+**      opt.init.c      **
+*************************/
 
-
-/* ------------ **
-**  opt.init.c  **
-** ------------ */
-
-void Yap_init_global(int max_table_size, int n_workers, int sch_loop, int delay_load);
-void init_local(void);
+void Yap_init_global(int, int, int, int);
+void Yap_init_local(void);
 void make_root_frames(void);
 #ifdef YAPOR
 void init_workers(void);
 #endif /* YAPOR */
+void itos(int, char *);
 
 
-/* ------------- **
-**  opt.preds.c  **
-** ------------- */
+
+/**************************
+**      opt.preds.c      **
+**************************/
 
 #ifdef YAPOR
 void finish_yapor(void);
 #endif /* YAPOR */
 
 
-/* ------------- **
-**  tab.tries.c  **
-** ------------- */
+
+/**************************
+**      tab.tries.c      **
+**************************/
 
 #ifdef TABLING
-sg_fr_ptr subgoal_search(yamop *preg, CELL **Yaddr);
-ans_node_ptr answer_search(sg_fr_ptr sg_fr, CELL *subs_ptr);
-void load_answer_trie(ans_node_ptr ans_node, CELL *subs_ptr);
-void private_completion(sg_fr_ptr sg_fr);
-void free_subgoal_trie_branch(sg_node_ptr node, int nodes_left, int nodes_extra, int position);
-void free_answer_trie_branch(ans_node_ptr node, int position);
-void update_answer_trie(sg_fr_ptr sg_fr);
-void traverse_table(tab_ent_ptr tab_ent, int show_table);
-void table_stats(void);
+sg_fr_ptr subgoal_search(yamop *, CELL **);
+ans_node_ptr answer_search(sg_fr_ptr, CELL *);
+void load_answer(ans_node_ptr, CELL *);
+CELL *exec_substitution(gt_node_ptr, CELL *);
+void update_answer_trie(sg_fr_ptr);
+void free_subgoal_trie(sg_node_ptr, int, int);
+void free_answer_trie(ans_node_ptr, int, int);
+void free_subgoal_hash_chain(sg_hash_ptr);
+void free_answer_hash_chain(ans_hash_ptr);
+void show_table(tab_ent_ptr, int);
+void show_global_trie(int);
 #endif /* TABLING */
 
 
-/* --------------- **
-**  tab.suspend.c  **
-** --------------- */
 
-#if defined(TABLING) && defined(YAPOR)
+/*******************************
+**      tab.completion.c      **
+*******************************/
+
+#ifdef TABLING 
+void private_completion(sg_fr_ptr);
+#ifdef YAPOR
 void public_completion(void);
-void complete_suspension_frames(or_fr_ptr or_fr);
+void complete_suspension_frames(or_fr_ptr);
 void suspend_branch(void);
-void resume_suspension_frame(susp_fr_ptr resume_fr, or_fr_ptr top_or_fr);
-#endif /* TABLING && YAPOR */
+void resume_suspension_frame(susp_fr_ptr, or_fr_ptr);
+#endif /* YAPOR */
+#endif /* TABLING */
 
 
-/* ------------- **
-**  or.engine.c  **
-** ------------- */
 
-#ifdef ENV_COPY
-void make_root_choice_point(void);
-void free_root_choice_point(void);
-int q_share_work(int p);
-void p_share_work(void);
-#endif /* ENV_COPY */
+/**************************
+**      or.engine.c      **
+**************************/
 
-
-/* ---------------- **
-**  or.cowengine.c  **
-** ---------------- */
-
-#ifdef ACOW
+#ifdef YAPOR
 void make_root_choice_point(void);
 void free_root_choice_point(void);
 int q_share_work(int p);
 int p_share_work(void);
-#endif /* ACOW */
+#endif /* YAPOR */
 
 
-/* ---------------- **
-**  or.sbaengine.c  **
-** ---------------- */
 
-#ifdef SBA
-void make_root_choice_point(void);
-void free_root_choice_point(void);
-int q_share_work(int p);
-void p_share_work(void);
-#endif /* SBA */
-
-
-/* ---------------- **
-**  or.scheduler.c  **
-** ---------------- */
+/*****************************
+**      or.scheduler.c      **
+*****************************/
 
 #ifdef YAPOR
 int get_work(void);
 #endif /* YAPOR */
 
 
-/* ---------- **
-**  or.cut.c  **
-** ---------- */
+
+/***********************
+**      or.cut.c      **
+***********************/
 
 #ifdef YAPOR
-void prune_shared_branch(choiceptr prune_cp);
+void prune_shared_branch(choiceptr);
 #endif /* YAPOR */

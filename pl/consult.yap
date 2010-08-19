@@ -66,7 +66,7 @@ load_files(Files,Opts) :-
 '$process_lf_opts'(V,_,_,_,_,_,_,_,_,_,_,_,_,Call) :-
 	var(V), !,
 	'$do_error'(instantiation_error,Call).
-'$process_lf_opts'([],_,_,_,_,_,_,_,Encoding,_,_,_,_,_) :-
+'$process_lf_opts'([],_,InfLevel,_,_,_,_,_,Encoding,_,_,_,_,_) :-
 	(var(Encoding) ->
 	    '$default_encoding'(Encoding)
 	    ;
@@ -78,12 +78,16 @@ load_files(Files,Opts) :-
 '$process_lf_opts'([Opt|_],_,_,_,_,_,_,_,_,_,_,_,_,Call) :-
 	'$do_error'(domain_error(unimplemented_option,Opt),Call).
 
-'$process_lf_opt'(autoload(true),_,InfLevel,_,_,_,_,_,_,_,_,_,_,_) :-
+'$process_lf_opt'(autoload(true),Silent,InfLevel,_,_,_,_,_,_,_,_,_,_,_) :-
 	get_value('$verbose_auto_load',VAL),
 	(VAL = true ->
-	    InfLevel = informational
+	    InfLevel = informational,
+	    (get_value('$lf_verbose',informational) -> true ;  Silent = silent),
+	    set_value('$lf_verbose',informational)
 	;
-	    InfLevel = silent
+	    InfLevel = silent,
+	    (get_value('$lf_verbose',silent) -> true ;  Silent = informational),
+	    set_value('$lf_verbose',silent)
 	).
 '$process_lf_opt'(autoload(false),_,_,_,_,_,_,_,_,_,_,_,_,_).
 '$process_lf_opt'(derived_from(File),_,_,_,_,_,_,_,_,_,_,_,Files,Call) :-
@@ -112,13 +116,15 @@ load_files(Files,Opts) :-
 	'$do_error'(domain_error(unimplemented_option,qcompile),Call).
 '$process_lf_opt'(qcompile(false),_,_,_,_,false,_,_,_,_,_,_,_,_).
 '$process_lf_opt'(silent(true),Silent,silent,_,_,_,_,_,_,_,_,_,_,_) :-
-	( nb_getval('$lf_verbose',Silent) -> true ;  Silent = informational),
-	nb_setval('$lf_verbose',silent).
+	( get_value('$lf_verbose',silent) -> true ;  Silent = informational),
+	set_value('$lf_verbose',silent).
+'$process_lf_opt'(silent(false),Silent,informational,_,_,_,_,_,_,_,_,_,_,_) :-
+	( get_value('$lf_verbose',informational) -> true ;  Silent = silent),
+	set_value('$lf_verbose',informational).
 '$process_lf_opt'(skip_unix_comments,_,_,_,_,_,_,_,_,skip_unix_comments,_,_,_,_).
 '$process_lf_opt'(compilation_mode(source),_,_,_,_,_,_,_,_,_,source,_,_,_).
 '$process_lf_opt'(compilation_mode(compact),_,_,_,_,_,_,_,_,_,compact,_,_,_).
 '$process_lf_opt'(compilation_mode(assert_all),_,_,_,_,_,_,_,_,_,assert_all,_,_,_).
-'$process_lf_opt'(silent(false),_,_,_,_,_,_,_,_,_,_,_,_,_).
 '$process_lf_opt'(consult(reconsult),_,_,_,_,_,_,_,_,_,_,reconsult,_,_).
 '$process_lf_opt'(consult(consult),_,_,_,_,_,_,_,_,_,_,consult,_,_).
 '$process_lf_opt'(stream(Stream),_,_,_,_,_,_,Stream,_,_,_,_,Files,Call) :-
@@ -172,7 +178,7 @@ load_files(Files,Opts) :-
 
 '$close_lf'(Silent) :- 
 	nonvar(Silent), !,
-	nb_setval('$lf_verbose',Silent).
+	set_value('$lf_verbose',Silent).
 '$close_lf'(_).
 
 ensure_loaded(Fs) :-
@@ -181,9 +187,9 @@ ensure_loaded(Fs) :-
 compile(Fs) :-
 	'$load_files'(Fs, [], compile(Fs)).
 
-consult(Fs) :-
-	'$has_yap_or',
-	'$do_error'(context_error(consult(Fs),clause),query).
+% consult(Fs) :-
+% 	'$has_yap_or',
+% 	'$do_error'(context_error(consult(Fs),clause),query).
 consult(V) :-
 	var(V), !,
 	'$do_error'(instantiation_error,consult(V)).
@@ -265,7 +271,6 @@ use_module(M,F,Is) :-
 	    true
 	),
 	'$loop'(Stream,Reconsult),
-	( recorded('$dialect',swi,_) -> '$exec_initialisation_goals' ; true ),
 	H is heapused-H0, '$cputime'(TF,_), T is TF-T0,
 	'$current_module'(Mod,OldModule),
 	print_message(InfLevel, loaded(EndMsg, File, Mod, T, H)),
@@ -304,7 +309,7 @@ use_module(M,F,Is) :-
 
 '$consult_infolevel'(InfoLevel) :- nonvar(InfoLevel), !.
 '$consult_infolevel'(InfoLevel) :-
-	nb_getval('$lf_verbose',InfoLevel), InfoLevel \= [], !.
+	get_value('$lf_verbose',InfoLevel), InfoLevel \= [], !.
 '$consult_infolevel'(informational).
 
 '$start_reconsulting'(F) :-
@@ -322,9 +327,12 @@ use_module(M,F,Is) :-
 	'$show_consult_level'(Level1),
 	% it will be done after we leave the current consult level.
 	Level is Level1-1,
-	recorda('$initialisation',do(Level,G),_),
+	recordz('$initialisation',do(Level,G),_),
 	fail.
 '$initialization'(_).
+
+initialization(G,OPT) :-
+	'$initialization'(G,OPT).
 
 '$initialization'(G,OPT) :-
 	( 
@@ -386,12 +394,13 @@ use_module(M,F,Is) :-
 	'$notrace'(G),
 	fail.
 '$exec_initialisation_goals' :-
-	'$show_consult_level'(Level1),
-	( recorded('$dialect',swi,_) -> Level is Level1-1 ; Level = Level1),
-	recorded('$initialisation',do(Level,G),R),
-	erase(R),
-	G \= '$',
+	'$show_consult_level'(Level),
 	'$current_module'(M),
+	findall(
+		G,
+		(recorded('$initialisation',do(Level,G),R), erase(R), G\='$'),
+		LGs),
+	lists:member(G,LGs),
 	nb_getval('$system_mode', OldMode),
         ( OldMode == on -> '$exit_system_mode' ; true ),
 	% run initialization under user control (so allow debugging this stuff).
@@ -413,7 +422,7 @@ use_module(M,F,Is) :-
 	'$include'(F, Status),
 	'$include'(Fs, Status).
 '$include'(X, Status) :-
-	nb_getval('$lf_verbose',Verbosity),
+	get_value('$lf_verbose',Verbosity),
 	'$find_in_path'(X,Y,include(X)),
 	nb_getval('$included_file',OY),
 	nb_setval('$included_file', Y),
@@ -694,7 +703,7 @@ absolute_file_name(File,Opts,TrueFileName) :-
 
 '$process_fn_opts'(V,_,_,_,_,_,_,_,_,G) :- var(V), !,
 	'$do_error'(instantiation_error, G).
-'$process_fn_opts'([],[],_,source,read,error,first,false,false,_) :- !.
+'$process_fn_opts'([],[],_,source,none,error,first,false,false,_) :- !.
 '$process_fn_opts'([Opt|Opts],Extensions,RelTo,Type,Access,FErrors,Solutions,Expand,Debug,G) :- !,
 	'$process_fn_opt'(Opt,Extensions,RelTo,Type,Access,FErrors,Solutions,Expand,Debug,Extensions0,RelTo0,Type0,Access0,FErrors0,Solutions0,Expand0,Debug0,G),
 	'$process_fn_opts'(Opts,Extensions0,RelTo0,Type0,Access0,FErrors0,Solutions0,Expand0,Debug0,G).
@@ -785,24 +794,17 @@ absolute_file_name(File,Opts,TrueFileName) :-
 '$find_in_path'(user,_,user_input, _) :- !.
 '$find_in_path'(user_input,_,user_input, _) :- !.
 '$find_in_path'(library(F0),_,_, _) :-
-	'$cat_file_name'(F0,F),
 	% make sure library_directory is open.
 	\+ clause(user:library_directory(_),_),
 	'$system_library_directories'(D),
 	assert(user:library_directory(D)),
 	fail.
 '$find_in_path'(commons(F0),_,_, _) :-
-	'$cat_file_name'(F0,F),
 	% make sure library_directory is open.
 	\+ clause(user:commons_directory(_),_),
 	'$system_commons_directories'(D),
 	assert(user:commons_directory(D)),
 	fail.
-'$find_in_path'(library(File0),Opts,NewFile, Call) :- !,
-	'$dir_separator'(D),
-	'$cat_file_name'(File0,File),
-	atom_codes(A,[D]),
-	'$extend_path_directory'(library, A, File, Opts, NewFile, Call).
 '$find_in_path'(S, Opts, NewFile, Call) :-
 	S =.. [Name,File0], !,
 	'$dir_separator'(D),
@@ -830,7 +832,7 @@ absolute_file_name(File,Opts,TrueFileName) :-
 	atom_codes(File, L).
 
 '$get_abs_file'(File,opts(_,D0,_,_,_,_,_),AbsFile) :-
-	system:true_file_name(File,D0,AbsFile).
+	operating_system_support:true_file_name(File,D0,AbsFile).
 
 '$search_in_path'(File,opts(Extensions,_,_,Access,_,_,_),F) :-
 	'$add_extensions'(Extensions,File,F),
@@ -863,10 +865,7 @@ absolute_file_name(File,Opts,TrueFileName) :-
 '$type_extension'(source,'.yap').
 '$type_extension'(source,'.pl').
 '$type_extension'(source,'').
-'$type_extension'(executable,'.so').
-'$type_extension'(executable,'.dylib').
-'$type_extension'(executable,'.dll').
-'$type_extension'(executable,'').
+'$type_extension'(executable,Suffix) :- '$obj_suffix'(String), atom_codes(Suffix, String).
 '$type_extension'(qlf,'.qlf').
 '$type_extension'(qlf,'').
 '$type_extension'(directory,'').
@@ -1020,4 +1019,42 @@ make :-
 	'$load_files'(F1, [if(changed)],make),
 	fail.
 make.
+
+file_name_extension(A1,A2,F) :-
+	var(F),
+	nonvar(A1), nonvar(A2), !,
+	atom_codes(A2, S2),
+	(
+	 S2 = [0'.|_] %'
+	->
+	 atom_concat(A1, A2, F)
+	;
+	 atom_concat([A1, '.', A2], F)
+	).
+file_name_extension(A1,A2,F) :-
+	var(F), !,
+	'$do_error'(instantiation_error,file_name_extension(A1,A2,F)).
+file_name_extension(A1,A2,F) :-
+	nonvar(A2), !,
+	atom_codes(F, S),
+	atom_codes(A2, S2),
+	'$file_name_extension'(S, S1, E2),
+	(
+	 S2 = [0'.|E2] %'
+	->
+	 true 
+	;
+	 S2 = E2
+	),
+	atom_codes(A1, S1).
+file_name_extension(A1,A2,F) :-
+	atom_codes(F, S),
+	'$file_name_extension'(S, S1, S2),
+	atom_codes(A2, S2),
+	atom_codes(A1, S1).
+
+'$file_name_extension'(S, S1, S2) :-
+	lists:append(S1, [0'.|S2], S),
+	\+ lists:append(_, [0'.|_], S2), !.
+'$file_name_extension'(S, S, []).
 

@@ -28,6 +28,9 @@
 #if HAVE_STRING_H
 #include <string.h>
 #endif
+#if THREADS && !defined(TABLING)
+#include <opt.mavar.h>
+#endif
 
 #if !HAVE_STRNCAT
 #define strncat(s0,s1,sz)   strcat(s0,s1)
@@ -210,7 +213,7 @@ MoveLocalAndTrail(void)
 #endif
 }
 
-#if defined(THREADS) && defined(YAPOR)
+#ifdef THREADS
 
 static void
 CopyLocalAndTrail(void)
@@ -234,8 +237,6 @@ IncrementalCopyStacksFromWorker(void)
 	 (void *) (LOCAL_start_trail_copy),
 	 (size_t) (LOCAL_end_trail_copy - LOCAL_start_trail_copy));
 }
-
-#include "opt.mavar.h"
 
 static CELL
 worker_p_binding(int worker_p, CELL *aux_ptr)
@@ -268,14 +269,9 @@ RestoreTrail(int worker_p)
   while (TR != aux_tr) {
     CELL aux_cell = TrailTerm(--aux_tr);
     if (IsVarTerm(aux_cell)) {
-      if (aux_cell < LOCAL_start_global_copy || 
-          EQUAL_OR_YOUNGER_CP((choiceptr)LOCAL_end_local_copy, (choiceptr)aux_cell)) {
-#ifdef YAPOR_ERRORS
-        if ((CELL *)aux_cell < H0)
-          YAPOR_ERROR_MESSAGE("aux_cell < H0 (q_share_work)");
-        if ((ADDR)aux_cell > Yap_LocalBase)
-          YAPOR_ERROR_MESSAGE("aux_cell > LocalBase (q_share_work)");
-#endif /* YAPOR_ERRORS */
+      if (aux_cell < LOCAL_start_global_copy || EQUAL_OR_YOUNGER_CP((choiceptr)LOCAL_end_local_copy, (choiceptr)aux_cell)) {
+	YAPOR_ERROR_CHECKING((CELL *)aux_cell < H0, "RestoreTrail: aux_cell < H0");
+	YAPOR_ERROR_CHECKING((ADDR)aux_cell > Yap_LocalBase, "RestoreTrail: aux_cell > LocalBase");
 #ifdef TABLING
         *((CELL *) aux_cell) = TrailVal(aux_tr);
 #else
@@ -286,8 +282,9 @@ RestoreTrail(int worker_p)
     } else if (IsPairTerm(aux_cell)) {
       /* avoid frozen segments */
       aux_cell = (CELL) RepPair(aux_cell);
-      if ((ADDR) aux_cell >= TrailBase)
+      if (IN_BETWEEN(Yap_TrailBase, aux_cell, Yap_TrailTop)) {
         aux_tr = (tr_fr_ptr) aux_cell;
+      }
 #endif /* TABLING */
 #ifdef MULTI_ASSIGNMENT_VARIABLES
     } else if (IsApplTerm(aux_cell)) {
@@ -572,7 +569,7 @@ AdjustGlobal(long sz, int thread_copying)
 	*pt = GlobalAdjust(reg);
       else if (IsOldLocal(reg))
 	*pt = LocalAdjust(reg);
-      else if (IsOldCode(reg)) {
+      else if (IsOldCode(reg) || IsExtensionFunctor((Functor)reg)) {
 	Functor f;
 	f = (Functor)reg;
 	/* skip bitmaps */
@@ -1076,6 +1073,7 @@ fix_compiler_instructions(PInstr *pcpc)
       break;
       /* hopefully nothing to do */
     case nop_op:
+    case ensure_space_op:
     case get_atom_op:
     case put_atom_op:
     case get_num_op:
@@ -1245,7 +1243,7 @@ fix_tabling_info(void)
 static int
 do_growheap(int fix_code, UInt in_size, struct intermediates *cip, tr_fr_ptr *old_trp, TokEntry **tksp, VarEntry **vep)
 {
-  unsigned long size = sizeof(CELL) * 16 * 1024L;
+  unsigned long size = sizeof(CELL) * K16;
   int shift_factor = (heap_overflows > 8 ? 8 : heap_overflows);
   unsigned long sz =  size << shift_factor;
 
@@ -1261,7 +1259,7 @@ do_growheap(int fix_code, UInt in_size, struct intermediates *cip, tr_fr_ptr *ol
       size = YAP_ALLOC_SIZE;
     sz = AdjustPageSize(SizeOfOverflow);
   }
-  while(sz >= sizeof(CELL) * 16 * 1024L && !static_growheap(sz, fix_code, cip, old_trp, tksp, vep)) {
+  while(sz >= sizeof(CELL) * K16 && !static_growheap(sz, fix_code, cip, old_trp, tksp, vep)) {
     size = size/2;
     sz =  size << shift_factor;
     if (sz < in_size) {
@@ -1286,7 +1284,7 @@ do_growheap(int fix_code, UInt in_size, struct intermediates *cip, tr_fr_ptr *ol
 #ifdef TABLING
   fix_tabling_info();
 #endif /* TABLING */
-  if (sz >= sizeof(CELL) * 16 * 1024L) {
+  if (sz >= sizeof(CELL) * K16) {
     LOCK(SignalLock);
     ActiveSignals &= ~YAP_CDOVF_SIGNAL;
     if (!ActiveSignals)
@@ -1436,7 +1434,7 @@ Yap_growheap_in_parser(tr_fr_ptr *old_trp, TokEntry **tksp, VarEntry **vep)
 int
 Yap_growglobal(CELL **ptr)
 {
-  unsigned long sz = sizeof(CELL) * 16 * 1024L;
+  unsigned long sz = sizeof(CELL) * K16;
 
 #if defined(YAPOR) || defined(THREADS)
   if (NOfThreads != 1) {
@@ -1671,8 +1669,8 @@ static int do_growtrail(long size, int contiguous_only, int in_parser, tr_fr_ptr
   size *= 2;
   if (size < YAP_ALLOC_SIZE)
     size = YAP_ALLOC_SIZE;
-  if (size > 2048*1024)
-    size = 2048*1024;
+  if (size > M2)
+    size = M2;
   if (size < size0)
     size=size0;
   /* adjust to a multiple of 256) */
@@ -1833,7 +1831,7 @@ Yap_CopyThreadStacks(int worker_q, int worker_p, int incremental)
   Int p_size = FOREIGN_ThreadHandle(worker_p).ssize+FOREIGN_ThreadHandle(worker_p).tsize;
   Int q_size = FOREIGN_ThreadHandle(worker_q).ssize+FOREIGN_ThreadHandle(worker_q).tsize;
   if (p_size != q_size) {
-    if (!(FOREIGN_ThreadHandle(worker_q).stack_address = realloc(FOREIGN_ThreadHandle(worker_q).stack_address,p_size*1024))) {
+    if (!(FOREIGN_ThreadHandle(worker_q).stack_address = realloc(FOREIGN_ThreadHandle(worker_q).stack_address,p_size*K1))) {
       exit(1);
     }
   }
@@ -1876,9 +1874,9 @@ Yap_CopyThreadStacks(int worker_q, int worker_p, int incremental)
     LOCAL_end_local_copy = 
       (CELL)PtoLocAdjust((CELL *)LOCAL_end_local_copy);
     LOCAL_start_trail_copy = 
-      (CELL)PtoTRAdjust((CELL *)LOCAL_start_trail_copy);
+      (CELL)PtoTRAdjust((tr_fr_ptr)LOCAL_start_trail_copy);
     LOCAL_end_trail_copy = 
-      (CELL)PtoTRAdjust((CELL *)LOCAL_end_trail_copy);
+      (CELL)PtoTRAdjust((tr_fr_ptr)LOCAL_end_trail_copy);
     AdjustStacksAndTrail(0, STACK_INCREMENTAL_COPYING);
     RestoreTrail(worker_p);
     TR = (tr_fr_ptr) LOCAL_end_trail_copy;

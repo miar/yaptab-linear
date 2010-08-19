@@ -28,6 +28,7 @@ static char     SccsId[] = "%W% %G%";
 #include "alloc.h"
 #include "clause.h"
 #include "Foreign.h"
+
 #ifdef LOW_LEVEL_TRACER
 #include "tracer.h"
 #endif
@@ -86,6 +87,8 @@ ADDR Yap_HeapBase;
 struct restore_info rinfo[MAX_THREADS];
 
 struct thread_globs Yap_thread_gl[MAX_THREADS];
+
+pthread_t Yap_master_thread;
 
 #else
 
@@ -161,8 +164,6 @@ Int      Yap_PrologMode = BootMode;
 int      Yap_CritLocks = 0;
 
 /********* streams ********************************************/
-
-int Yap_c_input_stream, Yap_c_output_stream, Yap_c_error_stream;
 
 YP_FILE *Yap_stdin;
 YP_FILE *Yap_stdout;
@@ -1067,6 +1068,16 @@ InitLogDBErasedMarker(void)
   INIT_CLREF_COUNT(Yap_heap_regs->logdb_erased_marker);
 }
 
+#define SWIAtomToAtom(X) SWI_Atoms[(X)>>1]
+
+static void 
+InitSWIAtoms(void)
+{
+  int i=0, j=0;
+#include "iswiatoms.h"
+  Yap_InitSWIHash();
+}
+
 static void 
 InitAtoms(void)
 {
@@ -1124,7 +1135,8 @@ InitInvisibleAtoms(void)
 }
 
 #ifdef  THREADS
-InitThreadHandle(wid)
+static void
+InitThreadHandle(int wid)
 {
     FOREIGN_ThreadHandle(wid).in_use = FALSE;
     FOREIGN_ThreadHandle(wid).zombie = FALSE;
@@ -1136,6 +1148,20 @@ InitThreadHandle(wid)
 }
 #endif
 
+static void
+InitSWIBuffers(int wid)
+{
+  int i;
+
+  FOREIGN_WL(wid)->SWI_buffers_[0] = malloc(SWI_BUF_SIZE);
+  FOREIGN_WL(wid)->SWI_buffers_sz_[0] = SWI_BUF_SIZE;
+  for (i=1; i <= SWI_BUF_RINGS; i++) {
+    FOREIGN_WL(wid)->SWI_buffers_[i] = NULL;
+    FOREIGN_WL(wid)->SWI_buffers_sz_[i] = 0;
+  }
+}
+
+
 static void 
 InitFirstWorkerThreadHandle(void)
 {
@@ -1144,7 +1170,6 @@ InitFirstWorkerThreadHandle(void)
   ThreadHandle.in_use = TRUE;
   ThreadHandle.default_yaam_regs = 
     &Yap_standard_regs;
-  ThreadHandle.pthread_handle = pthread_self();
   ThreadHandle.pthread_handle = pthread_self();
   pthread_mutex_init(&FOREIGN_ThreadHandle(0).tlock, NULL);
   pthread_mutex_init(&FOREIGN_ThreadHandle(0).tlock_status, NULL);
@@ -1171,7 +1196,7 @@ Yap_CloseScratchPad(void)
 #include "iglobals.h"
 
 #if defined(YAPOR) || defined(THREADS)
-#define MAX_INITS 1
+#define MAX_INITS MAX_WORKERS
 #else
 #define MAX_INITS 1
 #endif
@@ -1234,6 +1259,7 @@ Yap_InitWorkspace(UInt Heap, UInt Stack, UInt Trail, UInt Atts, UInt max_table_s
 #ifdef THREADS
   pthread_key_create(&Yap_yaamregs_key, NULL);
   pthread_setspecific(Yap_yaamregs_key, (const void *)&Yap_standard_regs);
+  Yap_master_thread = pthread_self();
 #else
   /* In this case we need to initialise the abstract registers */
   Yap_regp = &Yap_standard_regs;

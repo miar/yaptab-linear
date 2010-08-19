@@ -95,6 +95,8 @@ typedef enum {
   op_lgamma,
   op_erf,
   op_erfc,
+  op_rational,
+  op_rationalize,
   op_random1
 } arith1_op;
 
@@ -121,7 +123,8 @@ typedef enum {
   /* op_power, */
   op_gcd,
   op_min,
-  op_max
+  op_max,
+  op_rdiv
 } arith2_op;
 
 Functor     STD_PROTO(EvalArg,(Term));
@@ -210,43 +213,101 @@ ETypeOfTerm(Term t)
       return double_e;
     if (f == FunctorLongInt)
       return long_int_e;
-    if (f == FunctorBigInt)
+    if (f == FunctorBigInt) {
       return big_int_e;
+    }
   }
   return db_ref_e;
 }
 
 #if USE_GMP
+Term  STD_PROTO(Yap_gmq_rdiv_int_int,(Int, Int));
+Term  STD_PROTO(Yap_gmq_rdiv_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmq_rdiv_big_int,(Term, Int));
+Term  STD_PROTO(Yap_gmq_rdiv_big_big,(Term, Term));
+
 Term  STD_PROTO(Yap_gmp_add_ints,(Int, Int));
 Term  STD_PROTO(Yap_gmp_sub_ints,(Int, Int));
 Term  STD_PROTO(Yap_gmp_mul_ints,(Int, Int));
 Term  STD_PROTO(Yap_gmp_sll_ints,(Int, Int));
-Term  STD_PROTO(Yap_gmp_add_int_big,(Int, MP_INT *));
-Term  STD_PROTO(Yap_gmp_sub_int_big,(Int, MP_INT *));
-Term  STD_PROTO(Yap_gmp_sub_big_int,(MP_INT *, Int));
-Term  STD_PROTO(Yap_gmp_mul_int_big,(Int, MP_INT *));
-Term  STD_PROTO(Yap_gmp_div_big_int,(MP_INT *, Int));
-Term  STD_PROTO(Yap_gmp_and_int_big,(Int, MP_INT *));
-Term  STD_PROTO(Yap_gmp_ior_int_big,(Int, MP_INT *));
-Term  STD_PROTO(Yap_gmp_sll_big_int,(MP_INT *, Int));
-Term  STD_PROTO(Yap_gmp_add_big_big,(MP_INT *, MP_INT *));
-Term  STD_PROTO(Yap_gmp_sub_big_big,(MP_INT *, MP_INT *));
-Term  STD_PROTO(Yap_gmp_mul_big_big,(MP_INT *, MP_INT *));
-Term  STD_PROTO(Yap_gmp_div_big_big,(MP_INT *, MP_INT *));
-Term  STD_PROTO(Yap_gmp_and_big_big,(MP_INT *, MP_INT *));
-Term  STD_PROTO(Yap_gmp_ior_big_big,(MP_INT *, MP_INT *));
-Term  STD_PROTO(Yap_gmp_mod_big_big,(MP_INT *, MP_INT *));
-Term  STD_PROTO(Yap_gmp_mod_big_int,(MP_INT *, Int));
-Term  STD_PROTO(Yap_gmp_mod_int_big,(Int, MP_INT *));
-Term  STD_PROTO(Yap_gmp_exp_ints,(Int,Int));
-Term  STD_PROTO(Yap_gmp_exp_big_int,(MP_INT *,Int));
+Term  STD_PROTO(Yap_gmp_add_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_sub_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_sub_big_int,(Term, Int));
+Term  STD_PROTO(Yap_gmp_mul_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_div_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_div_big_int,(Term, Int));
+Term  STD_PROTO(Yap_gmp_fdiv_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_fdiv_big_int,(Term, Int));
+Term  STD_PROTO(Yap_gmp_and_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_ior_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_xor_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_sll_big_int,(Term, Int));
+Term  STD_PROTO(Yap_gmp_add_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_sub_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_mul_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_div_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_fdiv_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_and_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_ior_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_xor_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_mod_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_mod_big_int,(Term, Int));
+Term  STD_PROTO(Yap_gmp_mod_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_rem_big_big,(Term, Term));
+Term  STD_PROTO(Yap_gmp_rem_big_int,(Term, Int));
+Term  STD_PROTO(Yap_gmp_rem_int_big,(Int, Term));
+Term  STD_PROTO(Yap_gmp_exp_int_int,(Int,Int));
+Term  STD_PROTO(Yap_gmp_exp_int_big,(Int,Term));
+Term  STD_PROTO(Yap_gmp_exp_big_int,(Term,Int));
+Term  STD_PROTO(Yap_gmp_exp_big_big,(Term,Term));
+Term  STD_PROTO(Yap_gmp_gcd_int_big,(Int,Term));
+Term  STD_PROTO(Yap_gmp_gcd_big_big,(Term,Term));
 
 Term  STD_PROTO(Yap_gmp_big_from_64bits,(YAP_LONG_LONG));
 
-Term   STD_PROTO(Yap_gmp_add_float_big,(Float, MP_INT *));
-Term   STD_PROTO(Yap_gmp_sub_float_big,(Float, MP_INT *));
-Term   STD_PROTO(Yap_gmp_sub_big_float,(MP_INT *, Float));
-Term   STD_PROTO(Yap_gmp_mul_float_big,(Float, MP_INT *));
+Term  STD_PROTO(Yap_gmp_float_to_big,(Float));
+Term  STD_PROTO(Yap_gmp_float_to_rational,(Float));
+Term  STD_PROTO(Yap_gmp_float_rationalize,(Float));
+Float STD_PROTO(Yap_gmp_to_float,(Term));
+Term  STD_PROTO(Yap_gmp_add_float_big,(Float, Term));
+Term  STD_PROTO(Yap_gmp_sub_float_big,(Float, Term));
+Term  STD_PROTO(Yap_gmp_sub_big_float,(Term, Float));
+Term  STD_PROTO(Yap_gmp_mul_float_big,(Float, Term));
+Term  STD_PROTO(Yap_gmp_fdiv_float_big,(Float, Term));
+Term  STD_PROTO(Yap_gmp_fdiv_big_float,(Term, Float));
+
+int   STD_PROTO(Yap_gmp_cmp_big_int,(Term, Int));
+#define Yap_gmp_cmp_int_big(I, T) (-Yap_gmp_cmp_big_int(T, I))
+int   STD_PROTO(Yap_gmp_cmp_big_float,(Term, Float));
+#define Yap_gmp_cmp_float_big(D, T) (-Yap_gmp_cmp_big_float(T, D))
+int   STD_PROTO(Yap_gmp_cmp_big_big,(Term, Term));
+
+int   STD_PROTO(Yap_gmp_tcmp_big_int,(Term, Int));
+#define Yap_gmp_tcmp_int_big(I, T) (-Yap_gmp_tcmp_big_int(T, I))
+int   STD_PROTO(Yap_gmp_tcmp_big_float,(Term, Float));
+#define Yap_gmp_tcmp_float_big(D, T) (-Yap_gmp_tcmp_big_float(T, D))
+int   STD_PROTO(Yap_gmp_tcmp_big_big,(Term, Term));
+
+Term  STD_PROTO(Yap_gmp_neg_int,(Int));
+Term  STD_PROTO(Yap_gmp_abs_big,(Term));
+Term  STD_PROTO(Yap_gmp_neg_big,(Term));
+Term  STD_PROTO(Yap_gmp_unot_big,(Term));
+Term  STD_PROTO(Yap_gmp_floor,(Term));
+Term  STD_PROTO(Yap_gmp_ceiling,(Term));
+Term  STD_PROTO(Yap_gmp_round,(Term));
+Term  STD_PROTO(Yap_gmp_trunc,(Term));
+Term  STD_PROTO(Yap_gmp_float_fractional_part,(Term));
+Term  STD_PROTO(Yap_gmp_float_integer_part,(Term));
+Term  STD_PROTO(Yap_gmp_sign,(Term));
+Term  STD_PROTO(Yap_gmp_lsb,(Term));
+Term  STD_PROTO(Yap_gmp_msb,(Term));
+Term  STD_PROTO(Yap_gmp_popcount,(Term));
+
+char *  STD_PROTO(Yap_gmp_to_string,(Term, char *, size_t, int));
+size_t  STD_PROTO(Yap_gmp_to_size,(Term, int));
+
+int   STD_PROTO(Yap_term_to_existing_big,(Term, MP_INT *));
+int   STD_PROTO(Yap_term_to_existing_rat,(Term, MP_RAT *));
 #endif
 
 inline EXTERN Term Yap_Mk64IntegerTerm(YAP_LONG_LONG);

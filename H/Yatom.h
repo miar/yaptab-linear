@@ -1394,8 +1394,8 @@ typedef enum
 
 #include "YapHeap.h"
 
-#define  PredHashInitialSize      1039L
-#define  PredHashIncrement        7919L
+#define  PredHashInitialSize      ((UInt)1039)
+#define  PredHashIncrement        ((UInt)7919)
 
 EXTERN inline UInt STD_PROTO(PRED_HASH, (FunctorEntry *, Term, UInt));
 
@@ -1519,5 +1519,15 @@ PredPropByAtom (Atom at, Term cur_mod)
     }
   return Yap_NewPredPropByAtom (ae, cur_mod);
 }
+
+#if DEBUG_PELOCKING
+#define PELOCK(I,Z)						\
+  { LOCK((Z)->PELock); (Z)->StatisticsForPred.NOfEntries=(I);(Z)->StatisticsForPred.NOfHeadSuccesses=pthread_self(); }
+#define UNLOCKPE(I,Z)						\
+  ( (Z)->StatisticsForPred.NOfRetries=(I),  UNLOCK((Z)->PELock) )
+#else
+#define PELOCK(I,Z) LOCK((Z)->PELock)
+#define UNLOCKPE(I,Z)	UNLOCK((Z)->PELock)
+#endif
 
 #endif

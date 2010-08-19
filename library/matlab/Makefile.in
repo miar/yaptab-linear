@@ -14,11 +14,12 @@ BINDIR = $(EROOTDIR)/bin
 #
 # where YAP should look for libraries
 #
-LIBDIR=@libdir@/Yap
+LIBDIR=@libdir@
+YAPLIBDIR=@libdir@/Yap
 #
 #
 CC=@CC@
-CFLAGS= @CFLAGS@ $(YAP_EXTRAS) $(DEFS) -I$(srcdir) -I../.. -I$(srcdir)/../../include @MATLAB_INCLUDE@
+CFLAGS= @SHLIB_CFLAGS@ $(YAP_EXTRAS) $(DEFS) -I$(srcdir) -I../.. -I$(srcdir)/../../include @MATLAB_INCLUDE@
 #
 #
 # You shouldn't need to change what follows.
@@ -29,14 +30,13 @@ INSTALL_PROGRAM=@INSTALL_PROGRAM@
 SHELL=/bin/sh
 RANLIB=@RANLIB@
 srcdir=@srcdir@
-SHLIB_CFLAGS=@SHLIB_CFLAGS@
-SHLIB_SUFFIX=@SHLIB_SUFFIX@
+SO=@SO@
 #4.1VPATH=@srcdir@:@srcdir@/OPTYap
 CWD=$(PWD)
 #
 
 OBJS=matlab.o
-SOBJS=matlab@SHLIB_SUFFIX@
+SOBJS=matlab.@SO@
 
 #in some systems we just create a single object, in others we need to
 # create a libray
@@ -44,16 +44,16 @@ SOBJS=matlab@SHLIB_SUFFIX@
 all: $(SOBJS) 
 
 matlab.o: $(srcdir)/matlab.c
-	$(CC) -c $(CFLAGS) $(SHLIB_CFLAGS) $(srcdir)/matlab.c -o matlab.o
+	$(CC) -c $(CFLAGS) $(srcdir)/matlab.c -o matlab.o
 
-@DO_SECOND_LD@%@SHLIB_SUFFIX@: %.o
-@DO_SECOND_LD@	@SHLIB_LD@ -o $@ $<
+@DO_SECOND_LD@%.@SO@: %.o
+@DO_SECOND_LD@	@SHLIB_LD@ -o $@ $<  @EXTRA_LIBS_FOR_DLLS@
 
-@DO_SECOND_LD@matlab@SHLIB_SUFFIX@: matlab.o
-@DO_SECOND_LD@	@SHLIB_LD@ -o matlab@SHLIB_SUFFIX@ matlab.o
+@DO_SECOND_LD@matlab.@SO@: matlab.o
+@DO_SECOND_LD@	@SHLIB_LD@ -o matlab.@SO@ matlab.o  @EXTRA_LIBS_FOR_DLLS@
 
 install: all
-	$(INSTALL_PROGRAM) $(SOBJS) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROGRAM) $(SOBJS) $(DESTDIR)$(YAPLIBDIR)
 
 clean:
 	rm -f *.o *~ $(OBJS) $(SOBJS) *.BAK

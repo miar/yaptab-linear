@@ -30,6 +30,8 @@ otherwise.
 
 (:- G) :- '$execute'(G), !.
 
+(?- G) :- '$execute'(G).
+
 '$$!'(CP) :- '$cut_by'(CP).
 
 [] :- true.
@@ -50,12 +52,9 @@ otherwise.
 
 :- compile_expressions.
 
-lists:append([], L, L).
-lists:append([H|T], L, [H|R]) :-
-	lists:append(T, L, R).
-
-
 :- [
+    % lists is often used.
+   	 'lists.yap',
    	 'yio.yap',
 	 'debug.yap',
 	 'checker.yap',
@@ -93,24 +92,6 @@ lists:append([H|T], L, [H|R]) :-
 
 :- source.
 
-%   memberchk(+Element, +Set)
-%   means the same thing, but may only be used to test whether a known
-%   Element occurs in a known Set.  In return for this limited use, it
-%   is more efficient when it is applicable.
-
-lists:memberchk(X,[X|_]) :- !.
-lists:memberchk(X,[_|L]) :-
-	lists:memberchk(X,L).
-
-%   member(?Element, ?Set)
-%   is true when Set is a list, and Element occurs in it.  It may be used
-%   to test for an element or to enumerate all the elements by backtracking.
-%   Indeed, it may be used to generate the Set!
-
-lists:member(X,[X|_]).
-lists:member(X,[_|L]) :-
-	lists:member(X,L).
-
 :- no_source.
 
 
@@ -131,6 +112,7 @@ system_mode(verbose,off) :- set_value('$verbose',off).
 :- use_module('hacks.yap').
 :- use_module('attributes.yap').
 :- use_module('corout.yap').
+:- use_module('dialect.yap').
 
 '$system_module'('$messages').
 '$system_module'('$hacks').
@@ -157,6 +139,8 @@ yap_hacks:cut_by(CP) :- '$$cut_by'(CP).
 % cleanup ensure loaded and recover some data-base space.
 %
 :- ( recorded('$loaded','$loaded'(_,_,_),R), erase(R), fail ; true ).
+
+:- dynamic autoloader:autoload/0.
 
 :- set_value('$user_module',user), '$protect'.
 

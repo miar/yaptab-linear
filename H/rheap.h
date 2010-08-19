@@ -379,6 +379,7 @@ AdjustSwitchTable(op_numbers op, yamop *table, COUNT i)
 
 STATIC_PROTO(void  RestoreAtomList, (Atom));
 STATIC_PROTO(void  RestoreAtom, (AtomEntry *));
+STATIC_PROTO(void  RestoreHashPreds, (void));
 
 static void
 RestoreAtoms(void)
@@ -650,6 +651,19 @@ CleanSIndex(StaticIndex *idx, int recurse)
   }
 }
 
+static void 
+RestoreSWIAtoms(void)
+{
+  int i, j;
+  for (i=0; i < N_SWI_ATOMS; i++) {
+    SWI_Atoms[i] = AtomAdjust(SWI_Atoms[i]);
+  }
+  for (j=0; j < N_SWI_FUNCTORS; j++) {
+    SWI_Functors[j] = FuncAdjust(SWI_Functors[j]);
+  }
+  RestoreSWIHash();
+}
+
 static void
 RestorePredHash(void)
 {
@@ -658,7 +672,7 @@ RestorePredHash(void)
     Yap_Error(FATAL_ERROR,MkIntTerm(0),"restore should find predicate hash table");
   }
   REINIT_RWLOCK(PredHashRWLock);
-  /* RestoreHashPreds() does most of the work */
+  RestoreHashPreds(); /* does most of the work */
 }
 
 static void
@@ -1356,6 +1370,7 @@ RestoreEntries(PropEntry *pp, int int_key)
 	  CleanCode(RepPredProp(p0));
 	  RepPredProp(p0)->NextOfPE =
 	    PropAdjust(RepPredProp(p0)->NextOfPE);
+	  p0 = RepPredProp(p0)->NextOfPE;
 	}
       }
       break;
