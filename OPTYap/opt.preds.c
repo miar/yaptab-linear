@@ -783,7 +783,7 @@ Int p_print_drs_opt(void) {
   fprintf(Yap_stdout,"| Nr of all consumer  nodes                                        = %d \n", LOCAL_nr_consumers);
   fprintf(Yap_stdout,"| Nr of all nodes                       (CONSU + FOLLOW + GENER)   = %d \n", LOCAL_nr_consumers+LOCAL_nr_generators);  
 /* LOCAL_consumed_answers. only answers subject to drs condition.(not drs->load_answer_trie.  drs->DRS_LOCAL_answer_resolution) */
-  fprintf(Yap_stdout,"| Nr of consumed answers                (DRS + NOT BATCHED)        = %d \n", LOCAL_nr_consumed_answers); 
+  fprintf(Yap_stdout,"| Nr of consumed answers                (DRS - LOCAL SCHED ONLY)   = %d \n", LOCAL_nr_consumed_answers); 
   fprintf(Yap_stdout,"| Nr of consumed alternatives                                      = %d \n", LOCAL_nr_consumed_alternatives);
   fprintf(Yap_stdout,"| Nr of propagate dependencies cicles                              = %d \n", LOCAL_nr_propagate_depen_cicles);
   fprintf(Yap_stdout,"| Nr of is leader and has new answers                              = %d \n", LOCAL_nr_is_leader_and_has_new_answers);

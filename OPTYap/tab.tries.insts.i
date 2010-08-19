@@ -90,7 +90,7 @@
           B = cp;                                     \
           YAPOR_SET_LOAD(B);                          \
           SET_BB(B);                                  \
-          TABLING_ERRORS_check_stack;                 \
+          /*TABLING_ERRORS_check_stack;*/	      \
 	}                                             \
         copy_arity_stack()
 

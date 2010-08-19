@@ -271,6 +271,7 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
         memcpy(SuspFr_trail_start(SUSP_FR), SuspFr_trail_reg(SUSP_FR), TR_SIZE)
 
 
+#ifdef LINEAR_TABLING
 #define new_subgoal_frame(SG_FR, CODE)                             \
         { register ans_node_ptr ans_node;                          \
           ALLOC_SUBGOAL_FRAME(SG_FR);                              \
@@ -292,6 +293,24 @@ STD_PROTO(static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames, (tg_sol_fr_p
 	  SgFr_init_linear_tabling_fields(SG_FR,TAB_ENT);          \
 	}
 
+#else /*!LINEAR_TABLING */
+#define new_subgoal_frame(SG_FR, CODE)                             \
+        { register ans_node_ptr ans_node;                          \
+          INIT_LOCK(SgFr_lock(SG_FR));                             \
+          SgFr_code(SG_FR) = CODE;                                 \
+          SgFr_state(SG_FR) = ready;                               \
+          new_answer_trie_node(ans_node, 0, 0, NULL, NULL, NULL);  \
+          SgFr_hash_chain(SG_FR) = NULL;                           \
+          SgFr_answer_trie(SG_FR) = ans_node;                      \
+          SgFr_first_answer(SG_FR) = NULL;                         \
+          SgFr_last_answer(SG_FR) = NULL;                          \
+	}
+
+#define init_subgoal_frame(SG_FR) 		                   \
+        { SgFr_init_yapor_fields(SG_FR);                           \
+          SgFr_state(SG_FR) = evaluating;                          \
+	}
+#endif /*LINEAR_TABLING */
 
 #define new_dependency_frame(DEP_FR, DEP_ON_STACK, TOP_OR_FR, LEADER_CP, CONS_CP, SG_FR, NEXT)         \
         ALLOC_DEPENDENCY_FRAME(DEP_FR);                                                                \

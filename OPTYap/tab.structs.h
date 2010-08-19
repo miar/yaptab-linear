@@ -161,6 +161,7 @@ typedef struct subgoal_frame {
   struct or_frame *top_or_frame_on_generator_branch;
 #endif /* YAPOR */
   yamop *code_of_subgoal;
+#ifdef LINEAR_TABLING
   enum {
     incomplete               = 0,  /* INCOMPLETE_TABLING */
     ready                    = 1,
@@ -172,6 +173,17 @@ typedef struct subgoal_frame {
     compiled                 = 7,
     compiled_in_use          = 8   /* LIMIT_TABLING */
   } state_flag;  /* do not change order !!! */
+#else /*!LINEAR_TABLING */
+  enum {
+    incomplete               = 0,  /* INCOMPLETE_TABLING */
+    ready                    = 1,
+    evaluating               = 2,
+    complete                 = 3,
+    complete_in_use          = 4,  /* LIMIT_TABLING */
+    compiled                 = 5,
+    compiled_in_use          = 6   /* LIMIT_TABLING */
+  } state_flag;  /* do not change order !!! */
+#endif /*LINEAR_TABLING */
   choiceptr generator_choice_point;
   struct answer_hash *hash_chain;
   struct answer_trie_node *answer_trie;
@@ -207,13 +219,11 @@ typedef struct subgoal_frame {
 #endif /* LINEAR_TABLING_DRE */
   yamop  *loop_alts;
   struct answer_trie_node *batched_answer;
-  //  int batched_consuming_answers;
 #endif /* LINEAR_TABLING */
   struct subgoal_frame *next;
 } *sg_fr_ptr;
 
 
-//#define SgFr_batched_consuming_answers(X)  ((X)->batched_consuming_answers)
 
 #define SgFr_current_batched_answer(X)                ((X)->batched_answer)
 

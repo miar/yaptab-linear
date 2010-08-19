@@ -925,10 +925,12 @@ ans_node_ptr answer_search(sg_fr_ptr sg_fr, CELL *subs_ptr) {
 
 void load_answer_trie(ans_node_ptr ans_node, CELL *subs_ptr) {
 
+#ifdef LINEAR_TABLING
 #if defined(DUMMY_PRINT) && !defined(LINEAR_TABLING_DRS)
   if((LOAD_CP(B)->type_of_node)==1)
      LOCAL_nr_consumed_answers++;  
 #endif /* DUMMY_PRINT && !LINEAR_TABLING_DRS */
+#endif /*LINEAR_TABLING */
 
   CELL *stack_vars_base, *stack_vars, *stack_terms_base, *stack_terms;
   int subs_arity, i, n_vars = -1;
@@ -1305,7 +1307,7 @@ void traverse_table(tab_ent_ptr tab_ent, int show_table) {
 	  //INFO_LINEAR_TABLING("INCOMPLETE");
 	} else {
 	  TrStat_answers_no++;
-	  INFO_LINEAR_TABLING("NO");
+	  //INFO_LINEAR_TABLING("NO");
 	  SHOW_TABLE("    NO\n");
 	}
       } else {  /* SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr) */
