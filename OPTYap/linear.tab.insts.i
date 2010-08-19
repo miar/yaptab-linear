@@ -330,8 +330,8 @@ ENDPBOp();
       sg_fr_ptr sg_fr;
       sg_fr = GEN_CP(B)->cp_sg_fr; 
 #if defined(DUMMY_PRINT) && defined(LINEAR_TABLING_DRE)
-      int type_of_node=0; /*0-follower   1- drs generator */
-      if (SgFr_pioneer(sg_fr)==B)
+      int type_of_node=0; /*0-follower or (batched  && leader)   1- drs generator */
+      if (IS_LOCAL_SF(sg_fr) && SgFr_pioneer(sg_fr)==B)
 	type_of_node=1;
 #endif /*DUMMY_PRINT && LINEAR_TABLING_DRE*/
       INFO_LINEAR_TABLING("sgfr(%p)->state=%d\n",sg_fr,SgFr_state(sg_fr));
@@ -360,7 +360,6 @@ ENDPBOp();
 	  GONext();
 	} else  {
 	  /* answers -> get first answer */
-	  //	    if(TrNode_child(ans_node) != NULL) {
 #ifdef DUMMY_PRINT
 #ifdef LINEAR_TABLING_DRE
 	  store_loader_node(tab_ent, ans_node,type_of_node);
@@ -370,7 +369,6 @@ ENDPBOp();
 #else /*!DUMMY_PRINT */
 	  store_loader_node(tab_ent, ans_node);
 #endif /*DUMMY_PRINT */
-	  //	    }
 	  PREG = (yamop *) CPREG;
 	  PREFETCH_OP(PREG);
 	  load_answer_trie(ans_node, YENV);
@@ -432,49 +430,52 @@ BOp(table_completion, Otapl)
 	/*----------launch alternative (if any) ----------------------------*/
 	if (IS_LEADER(sg_fr) && HAS_NEW_ANSWERS(sg_fr) ) {  
 	  INFO_LINEAR_TABLING("is_leader and has new answers");
-	  DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc();	
-#ifdef LINEAR_TABLING_DSLA
-
+	  DUMMY_LOCAL_nr_is_leader_and_has_new_answers_inc();
+	  if (IS_LOCAL_SF(sg_fr)){
+//#ifdef LINEAR_TABLING_DSLA -- TO REMOVE
 #ifdef LINEAR_TABLING_DRE
-	   if( SgFr_pioneer(sg_fr)==B)
+	    if( SgFr_pioneer(sg_fr)==B)
 #endif /*LINEAR_TABLING_DRE*/
-	     { 
-	      while(LOCAL_max_scc !=sg_fr){                        
-		SgFr_state(LOCAL_max_scc) = looping_ready;
-		INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
-		LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
+	      { 
+		while(LOCAL_max_scc !=sg_fr){                        
+		  SgFr_state(LOCAL_max_scc) = looping_ready;
+		  INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
+		  LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
+		}
+	      } 
+	    SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr) = next_loop_alt;
+	    UNTAG_NEW_ANSWERS(sg_fr);
+	  }else{ /* is batched- do not change dymamically the stop alt */
+//#else  /*!LINEAR_TABLING_DSLA --- TO REMOVE*/
+	    if(next_loop_alt == SgFr_first_loop_alt(sg_fr)){
+#ifdef LINEAR_TABLING_DRE
+	      if( SgFr_pioneer(sg_fr)==B)
+#endif /*LINEAR_TABLING_DRE*/
+		{ 
+		  while(LOCAL_max_scc !=sg_fr){                        
+		    SgFr_state(LOCAL_max_scc) = looping_ready;
+		    INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
+		    LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
+		  }
+		}
+	      UNTAG_NEW_ANSWERS(sg_fr);		  
+	      if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){
+		SgFr_current_loop_alt(sg_fr) = next_loop_alt;
+		INFO_LINEAR_TABLING("table_completion answer");
+		SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);  
+		goto try_answer;		     
 	      }
-	     } 
-	  SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr) = next_loop_alt;
-	  UNTAG_NEW_ANSWERS(sg_fr);
-#else  /*!LINEAR_TABLING_DSLA --- TO REMOVE*/
-	      if(next_loop_alt == SgFr_first_loop_alt(sg_fr)){
-#ifdef LINEAR_TABLING_DRE
-   	        if( SgFr_pioneer(sg_fr)==B)
-#endif /*LINEAR_TABLING_DRE*/
-		  { 
-		    while(LOCAL_max_scc !=sg_fr){                        
-		      SgFr_state(LOCAL_max_scc) = looping_ready;
-		      INFO_LINEAR_TABLING("LOCAL_MAX_SCC=%p",LOCAL_max_scc);	
-		      LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
-		    }
-		  }
-		  UNTAG_NEW_ANSWERS(sg_fr);		  
-		  if (IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){
-		     SgFr_current_loop_alt(sg_fr) = next_loop_alt;
-		     INFO_LINEAR_TABLING("table_completion answer");
-		     SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);  
-		     goto try_answer;		     
-		  }
-	      }	    		 
-	      SgFr_current_loop_alt(sg_fr) = next_loop_alt;	    	
-#endif /*LINEAR_TABLING_DSLA*/
-	      table_completion_launch_next_loop_alt(sg_fr,next_loop_alt);	  
-	      GONext();          	
+	    }	    		 
+	    SgFr_current_loop_alt(sg_fr) = next_loop_alt;
+	  }
+//#endif /*LINEAR_TABLING_DSLA*/
+	    table_completion_launch_next_loop_alt(sg_fr,next_loop_alt);	  
+	    GONext();          	
 	}
 
 	if (next_loop_alt != SgFr_stop_loop_alt(sg_fr) ) {  
-	  INFO_LINEAR_TABLING("next loop alt!= stop loop alt");	  
+	  INFO_LINEAR_TABLING("next loop alt!= stop loop alt");
+	  SgFr_current_loop_alt(sg_fr) = next_loop_alt;	  
 	  table_completion_launch_next_loop_alt(sg_fr,next_loop_alt);	  
 	  GONext();     
 	}
@@ -485,8 +486,9 @@ BOp(table_completion, Otapl)
       if (HAS_NEW_ANSWERS(sg_fr)) {
        	  UNTAG_NEW_ANSWERS(sg_fr);
 	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
-	}	
-     goto answer_resolution;
+      }	
+      /*batched and not pioneer --> fail */
+      goto answer_resolution;
     } 
     
 #endif /*LINEAR_TABLING_DRE */    
@@ -496,7 +498,7 @@ BOp(table_completion, Otapl)
     if (IS_LEADER(sg_fr)){
       INFO_LINEAR_TABLING("is leader");
       private_completion(sg_fr);
-      /*dre and batched - leader and pioneer consumes all answers*/ 
+      /*dre batched leader and pioneer --> consumes all answers*/ 
       goto answer_resolution;      
     }
 
@@ -512,22 +514,26 @@ BOp(table_completion, Otapl)
       } 
       goto DRS_LOCAL_answer_resolution;
     }else{
-      /*fail*/ 
+      /*dre and batched and pioneer and not leader --> fail*/ 
       goto DRS_BATCHED_answer_resolution;
     }
     
 #endif /*LINEAR_TABLING_DRS */
+
       if (HAS_NEW_ANSWERS(sg_fr)) {
         /* bprolog test_cs_r (dra+dre+batched) leaves the system in a inconsistent state 
            because it has a cut, which cuts several subgoals, but one is not on 
            LOCAL_top_sg_fr chain and it is not reset and
            gets here like a pioneer and non lider state and no subgoals on 
-           LOCAL_top_sg_fr_on_branch chain */
+           LOCAL_top_sg_fr_on_branch chain -- TO FIX */
 	if (LOCAL_top_sg_fr_on_branch){
 	  UNTAG_NEW_ANSWERS(sg_fr);
 	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
 	}
       }
+      /* not leader */
+      /* dre pioneer */
+      /* batched --> fail */
+      /* local   --> consume all answers */
       goto answer_resolution;    
-
 ENDBOp();

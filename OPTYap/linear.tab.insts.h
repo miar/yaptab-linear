@@ -37,16 +37,17 @@
 
 
 #ifdef LINEAR_TABLING_DRE
-#DUMMY_DRE_table_try_with_looping_evaluating()                                                    \
+
+#define DUMMY_DRE_table_try_with_looping_evaluating()                                             \
     DUMMY_LOCAL_nr_followers_inc();                                                               \
     LOCAL_nr_consumed_alternatives++;                                                             \
-    INFO_LINEAR_TABLING("i7: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);  
+    INFO_LINEAR_TABLING("i7: LOCAL_nr_consumed_alternatives=%d",LOCAL_nr_consumed_alternatives);
 
 #endif /*LINEAR_TABLING_DRE */
 
 
 
-#else
+#else  /*!DUMMY_PRINT */
 
 #define store_loader_node(TAB_ENT, ANSWER)	              \
         { register choiceptr lcp;                             \
@@ -273,7 +274,7 @@ inline void propagate_dependencies(sg_fr_ptr sg_fr){
 #else  
        )){
 #endif /*LINEAR_TABLING_DRS */
-    DUMMY_LOCAL_nr_propagate_depen_cicles_inc();
+       DUMMY_LOCAL_nr_propagate_depen_cicles_inc();
        INFO_LINEAR_TABLING("sgfr_aux=%p",sf_aux);                                       
        TAG_AS_NO_LEADER(sf_aux);
 #ifdef LINEAR_TABLING_DRS
@@ -309,8 +310,9 @@ inline void propagate_dependencies(sg_fr_ptr sg_fr){
 
 inline void consume_all_answers_on_trie(tab_ent_ptr tab_ent,ans_node_ptr ans_node,sg_fr_ptr sg_fr) {
   /* answers -> get first answer */                     
-  UNLOCK(SgFr_lock(sg_fr));                             
+  UNLOCK(SgFr_lock(sg_fr));
 #ifdef DUMMY_PRINT
+  DUMMY_LOCAL_nr_consumers_inc();
   store_loader_node(tab_ent, ans_node,0);	       
 #else
   store_loader_node(tab_ent, ans_node);		
@@ -397,19 +399,10 @@ inline void table_try_with_looping_ready(sg_fr_ptr sg_fr){
   SgFr_pioneer(sg_fr)=B;
 #endif  /*LINEAR_TABLING_DRE*/
   if(IS_BATCHED_SF(sg_fr) && SgFr_first_answer(sg_fr)){
-    B->cp_ap= (yamop *)TRY_ANSWER;
-    /*goto table_try_answer instruction */
-    if (SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr)) {
-      /* yes answer --> procceed */
-     INFO_LINEAR_TABLING("yes answer -->proceed");
-     PREG = (yamop *) CPREG;
-     PREFETCH_OP(PREG);
-     YENV = ENV;
-     }else{ 
-      INFO_LINEAR_TABLING("table_try_with_looping_ready answer");
-      SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);
-      PREG= (yamop *) TRY_ANSWER; 
-     }
+    //B->cp_ap= (yamop *)TRY_ANSWER;
+    INFO_LINEAR_TABLING("table_try_with_looping_ready answer");
+    SgFr_current_batched_answer(LOCAL_top_sg_fr) = SgFr_first_answer(sg_fr);
+    PREG= (yamop *) TRY_ANSWER;   
   } else{     
     PREG = GET_CELL_VALUE(SgFr_current_loop_alt(sg_fr));
     PREFETCH_OP(PREG);
@@ -503,7 +496,6 @@ inline void table_trust(yamop* PREG_CI){
 
 
 inline void table_completion_launch_next_loop_alt(sg_fr_ptr sg_fr,yamop **next_loop_alt){
-  SgFr_current_loop_alt(sg_fr) = next_loop_alt;
   restore_generator_node(SgFr_arity(sg_fr), COMPLETION);
   YENV = (CELL *) PROTECT_FROZEN_B(B);
   set_cut(YENV, B->cp_b);

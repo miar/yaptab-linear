@@ -175,7 +175,6 @@
 
 #define fail_or_yes_answer(tab_ent,sg_fr)		      \
       ans_node_ptr ans_node;                                  \
-      DUMMY_LOCAL_nr_consumers_inc();                         \
       ans_node = SgFr_first_answer(sg_fr);                    \
       if (ans_node == NULL) {                                 \
 	/* no answers --> fail */                             \
@@ -275,18 +274,6 @@
 	SgFr_init_dra_fields(SG_FR);                                        \
 }
 
-
-/*          
-STD_PROTO(inline void table_try_single_with_ready, (sg_fr_ptr,yamop*));
-STD_PROTO(inline void table_try_with_ready, (sg_fr_ptr,yamop*,yamop*));
-STD_PROTO(inline void table_try_with_looping_ready, (sg_fr_ptr));
-STD_PROTO(inline void table_try_with_completed,(sg_fr_ptr,ans_node_ptr,tab_ent_ptr));
-STD_PROTO(inline void table_retry,(yamop*,yamop*));
-STD_PROTO(inline void table_trust,(yamop*));
-STD_PROTO(inline void consume_all_answers_on_trie, (tab_ent_ptr,ans_node_ptr,sg_fr_ptr));
-STD_PROTO(inline void propagate_dependencies, (sg_fr_ptr));
-STD_PROTO(inline void table_completion_launch_next_loop_alt, (sg_fr_ptr,yamop**));
-*/
 
 #endif /*LINEAR_TAB_MACROS_H */
 
