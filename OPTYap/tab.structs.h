@@ -175,6 +175,9 @@ struct consumer_choicept {
 struct loader_choicept {
   struct choicept cp;
   struct answer_trie_node *cp_last_answer;
+#if defined(LINEAR_TABLING) && defined(DUMMY_PRINT)
+  int type_of_node;
+#endif /*DUMMY_PRINT */  
 #ifdef LOW_LEVEL_TRACER
   struct pred_entry *cp_pred_entry;
 #endif /* LOW_LEVEL_TRACER */
@@ -195,6 +198,19 @@ typedef struct subgoal_frame {
   struct or_frame *top_or_frame_on_generator_branch;
 #endif /* YAPOR */
   yamop *code_of_subgoal;
+#ifdef LINEAR_TABLING
+  enum {
+    incomplete               = 0,  
+    ready                    = 1,
+    evaluating               = 2,
+    looping_ready            = 3,  
+    looping_evaluating       = 4,  
+    complete                 = 5,
+    complete_in_use          = 6,  /* LIMIT_TABLING */
+    compiled                 = 7,
+    compiled_in_use          = 8   /* LIMIT_TABLING */
+  } state_flag;  /* do not change order !!! */
+#else /*!LINEAR_TABLING */
   enum {  /* do not change order !!! */
     incomplete      = 0,  /* INCOMPLETE_TABLING */
     ready           = 1,
@@ -204,6 +220,7 @@ typedef struct subgoal_frame {
     compiled        = 5,
     compiled_in_use = 6   /* LIMIT_TABLING */
   } state_flag;
+#endif /*LINEAR_TABLING */
   choiceptr generator_choice_point;
   struct answer_trie_hash *hash_chain;
   struct answer_trie_node *answer_trie;
@@ -215,8 +232,57 @@ typedef struct subgoal_frame {
 #ifdef LIMIT_TABLING
   struct subgoal_frame *previous;
 #endif /* LIMIT_TABLING */
+#ifdef LINEAR_TABLING
+  int dfn;
+  yamop **first_looping_alt;
+  yamop **current_looping_alt;
+  yamop **stop_looping_alt;
+#ifdef LINEAR_TABLING_DRS
+  yamop *continuation_point;
+  struct answer_trie_node *loop_ans;
+  int consuming_answers;
+  struct answer_trie_node **stop_looping_ans;
+  struct answer_trie_node **current_looping_ans;
+  struct answer_trie_node *new_answer_trie;
+#endif /*LINEAR_TABLING_DRS*/
+  struct subgoal_frame *next_on_branch;
+  struct subgoal_frame *next_on_scc;
+#ifdef LINEAR_TABLING_DRA
+    yamop *current_alt; 
+#endif /*LINEAR_TABLING_DRA */
+#ifdef LINEAR_TABLING_DRE
+  yamop *next_alt;
+  struct choicept *pioneer;
+#endif /* LINEAR_TABLING_DRE */
+  yamop  *loop_alts;
+  struct answer_trie_node *batched_answer;
+#endif /* LINEAR_TABLING */
   struct subgoal_frame *next;
 } *sg_fr_ptr;
+
+
+#ifdef LINEAR_TABLING
+#define SgFr_current_batched_answer(X)                ((X)->batched_answer)
+#define SgFr_loop_alts(X)      ((X)->loop_alts)
+#define SgFr_new_answer_trie(X)        ((X)->new_answer_trie)
+#define SgFr_dfn(X)                    ((X)->dfn)
+#define SgFr_current_alt(X)            ((X)->current_alt)
+#define SgFr_next_alt(X)               ((X)->next_alt)
+#define SgFr_first_loop_alt(X)         ((X)->first_looping_alt)
+#define SgFr_current_loop_alt(X)       ((X)->current_looping_alt)
+#define SgFr_stop_loop_alt(X)          ((X)->stop_looping_alt)
+#define SgFr_consuming_answers(X)      ((X)->consuming_answers)
+#define SgFr_cp(X)                     ((X)->continuation_point)
+#define SgFr_loop_ans(X)               ((X)->loop_ans)
+#define SgFr_stop_loop_ans(X)          ((X)->stop_looping_ans)
+#define SgFr_current_loop_ans(X)       ((X)->current_looping_ans)
+#define SgFr_next_on_branch(X)         ((X)->next_on_branch)
+#define SgFr_next_on_scc(X)            ((X)->next_on_scc)
+#define SgFr_pioneer(X)                ((X)->pioneer)
+
+
+#endif /* LINEAR_TABLING */
+
 
 #define SgFr_lock(X)           ((X)->lock)
 #define SgFr_gen_worker(X)     ((X)->generator_worker)

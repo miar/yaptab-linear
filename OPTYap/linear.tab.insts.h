@@ -319,7 +319,7 @@ inline void consume_all_answers_on_trie(tab_ent_ptr tab_ent,ans_node_ptr ans_nod
 #endif
   PREG = (yamop *) CPREG;                             
   PREFETCH_OP(PREG);                                    
-  load_answer_trie(ans_node, YENV);                     
+  load_answer(ans_node, YENV);                     
   YENV = ENV;                                
   return;
 }
@@ -426,7 +426,7 @@ inline void table_try_with_completed(sg_fr_ptr sg_fr,ans_node_ptr ans_node,tab_e
       }
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
-      load_answer_trie(ans_node, YENV);
+      load_answer(ans_node, YENV);
       YENV = ENV;
     } else {
       /* execute compiled code from the trie */

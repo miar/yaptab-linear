@@ -21,6 +21,11 @@
 #endif /* HAVE_STRING_H */
 #include "opt.mavar.h"
 
+#ifdef LINEAR_TABLING
+#include "linear.tab.macros.h"
+#endif /*LINEAR TABLING */
+
+
 static inline Int freeze_current_cp(void);
 static inline void wake_frozen_cp(Int);
 static inline void abolish_frozen_cps_until(Int);
@@ -294,6 +299,30 @@ static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames(tg_sol_fr_ptr, int);
           GLOBAL_root_tab_ent = TAB_ENT;                         \
         }
 
+#ifdef LINEAR_TABLING
+#define new_subgoal_frame(SG_FR, CODE)                             \
+        { register ans_node_ptr ans_node;                          \
+          ALLOC_SUBGOAL_FRAME(SG_FR);                              \
+	  ALLOC_ALTERNATIVES_BUCKET(SgFr_loop_alts(SG_FR));	   \
+          SgFr_allocate_drs_looping_structure(SG_FR); 		   \
+          INIT_LOCK(SgFr_lock(SG_FR));                             \
+          SgFr_code(SG_FR) = CODE;                                 \
+          SgFr_state(SG_FR) = ready;                               \
+          new_answer_trie_node(ans_node, 0, 0, NULL, NULL, NULL);  \
+          SgFr_hash_chain(SG_FR) = NULL;                           \
+          SgFr_answer_trie(SG_FR) = ans_node;                      \
+          SgFr_first_answer(SG_FR) = NULL;                         \
+          SgFr_last_answer(SG_FR) = NULL;                          \
+	}
+
+#define init_subgoal_frame(SG_FR,TAB_ENT) 		           \
+        { SgFr_init_yapor_fields(SG_FR);                           \
+          SgFr_state(SG_FR) = evaluating;                          \
+	  SgFr_init_linear_tabling_fields(SG_FR,TAB_ENT);          \
+	}
+
+#else /*!LINEAR_TABLING */
+
 #define new_subgoal_frame(SG_FR, CODE)                             \
         { register ans_node_ptr ans_node;                          \
           new_answer_trie_node(ans_node, 0, 0, NULL, NULL, NULL);  \
@@ -312,6 +341,8 @@ static inline tg_sol_fr_ptr CUT_prune_tg_solution_frames(tg_sol_fr_ptr, int);
           SgFr_next(SG_FR) = LOCAL_top_sg_fr;   \
           LOCAL_top_sg_fr = SG_FR;              \
 	}
+
+#endif /*!LINEAR_TABLING */
 
 #define new_dependency_frame(DEP_FR, DEP_ON_STACK, TOP_OR_FR, LEADER_CP, CONS_CP, SG_FR, NEXT)         \
         ALLOC_DEPENDENCY_FRAME(DEP_FR);                                                                \
@@ -478,6 +509,10 @@ static inline void adjust_freeze_registers(void) {
 static inline void mark_as_completed(sg_fr_ptr sg_fr) {
   LOCK(SgFr_lock(sg_fr));
   SgFr_state(sg_fr) = complete;
+#ifdef LINEAR_TABLING
+  free_alternatives(sg_fr);
+  free_drs_answers(sg_fr);
+#endif /* LINEAR_TABLING */
   UNLOCK(SgFr_lock(sg_fr));
   return;
 }
@@ -635,6 +670,38 @@ static inline CELL *expand_auxiliary_stack(CELL *stack) {
 
 
 static inline void abolish_incomplete_subgoals(choiceptr prune_cp) {
+#ifdef LINEAR_TABLING
+  while (LOCAL_top_sg_fr && EQUAL_OR_YOUNGER_CP(SgFr_gen_cp(LOCAL_top_sg_fr), prune_cp)) {
+    sg_fr_ptr sg_fr;
+    sg_fr = LOCAL_top_sg_fr;
+    LOCAL_top_sg_fr = SgFr_next(sg_fr);
+    if(sg_fr==LOCAL_max_scc)
+      LOCAL_max_scc=SgFr_next_on_scc(LOCAL_max_scc);
+    if(sg_fr==LOCAL_top_sg_fr_on_branch)
+      LOCAL_top_sg_fr_on_branch=SgFr_next_on_branch(LOCAL_top_sg_fr_on_branch);
+    free_alternatives(sg_fr);
+    free_drs_answers(sg_fr);
+    if (SgFr_first_answer(sg_fr) == SgFr_answer_trie(sg_fr)) {
+      /* yes answer --> complete */
+      SgFr_state(sg_fr) = complete;
+      continue;
+    }
+    SgFr_state(sg_fr) = incomplete;
+    free_answer_hash_chain(SgFr_hash_chain(sg_fr));
+    SgFr_hash_chain(sg_fr) = NULL;
+    SgFr_first_answer(sg_fr) = NULL;
+    SgFr_last_answer(sg_fr) = NULL;
+    ans_node_ptr node;
+    node = TrNode_child(SgFr_answer_trie(sg_fr));
+    TrNode_child(SgFr_answer_trie(sg_fr)) = NULL;
+    UNLOCK(SgFr_lock(sg_fr));
+    free_answer_trie(node, TRAVERSE_MODE_NORMAL, TRAVERSE_POSITION_FIRST);
+  }
+  return;
+}
+
+#else /*!LINEAR_TABLING */
+
 #ifdef YAPOR
   if (EQUAL_OR_YOUNGER_CP(GetOrFr_node(LOCAL_top_susp_or_fr), prune_cp))
     pruning_over_tabling_data_structures();
@@ -695,9 +762,9 @@ static inline void abolish_incomplete_subgoals(choiceptr prune_cp) {
     insert_into_global_sg_fr_list(sg_fr);
 #endif /* LIMIT_TABLING */
   }
-
   return;
 }
+#endif /*LINEAR_TABLING */
 
 
 #ifdef YAPOR

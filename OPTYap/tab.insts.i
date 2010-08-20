@@ -15,6 +15,13 @@
 **               Tabling instructions: auxiliary macros                **
 ************************************************************************/
 
+#ifdef LINEAR_TABLING
+#include "linear.tab.insts.i"
+#endif /*LINEAR_TABLING */
+
+
+#ifndef LINEAR_TABLING
+
 #ifdef LOW_LEVEL_TRACER
 #define store_low_level_trace_info(CP, TAB_ENT)  \
         CP->cp_pred_entry = TabEnt_pe(TAB_ENT)
@@ -822,6 +829,7 @@
     GONext();
   ENDOp();
 
+#endif /*!LINEAR_TABLING*/
 
 
 /************************************************************************
@@ -1015,6 +1023,16 @@
       else
         TrNode_child(SgFr_last_answer(sg_fr)) = ans_node;
       SgFr_last_answer(sg_fr) = ans_node;
+#ifdef LINEAR_TABLING
+#ifdef LINEAR_TABLING_DRS
+      if (SgFr_new_answer_trie(sg_fr)==NULL){
+	SgFr_new_answer_trie(sg_fr)=ans_node;
+      }
+#endif /*LINEAR_TABLING_DRS*/
+      INFO_LINEAR_TABLING("nova resposta sg_fr=%p  ans_node=%p",sg_fr,ans_node);
+      TAG_NEW_ANSWERS(sg_fr);      
+#endif /* LINEAR_TABLING */
+
 #ifdef DEBUG_TABLING
       { 
         ans_node_ptr aux_ans_node = SgFr_first_answer(sg_fr);
@@ -1025,8 +1043,12 @@
       }
 #endif /* DEBUG_TABLING */
       UNLOCK(SgFr_lock(sg_fr));
+#ifdef LINEAR_TABLING
+      if(IS_BATCHED_SF(sg_fr)){
+#else
       if (IS_BATCHED_GEN_CP(gcp)) {
-#ifdef TABLING_EARLY_COMPLETION
+#endif /*LINEAR_TABLING */
+#if defined(TABLING_EARLY_COMPLETION) && !defined(LINEAR_TABLING) 
 	if (gcp == PROTECT_FROZEN_B(B) && (*subs_ptr == 0 || gcp->cp_ap == COMPLETION)) {
 	  /* if the current generator choice point is the topmost choice point and the current */
 	  /* call is deterministic (i.e., the number of substitution variables is zero or      */
@@ -1054,7 +1076,7 @@
 #endif /* DEPTH_LIMIT */
         GONext();
       } else {
-#ifdef TABLING_EARLY_COMPLETION
+#if defined(TABLING_EARLY_COMPLETION) && !defined(LINEAR_TABLING) 
 	if (*subs_ptr == 0) {
 	  /* if the number of substitution variables is zero, an answer is sufficient to perform */
           /* an early completion, but the current generator choice point cannot be removed       */
@@ -1080,6 +1102,7 @@
   ENDPBOp();
 
 
+#ifndef LINEAR_TABLING
 
 /************************************************************************
 **                      table_answer_resolution                        **
@@ -1660,3 +1683,5 @@
     }
     END_PREFETCH()
   ENDBOp();
+
+#endif /*!LINEAR_TABLING */

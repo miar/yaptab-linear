@@ -5,7 +5,7 @@
 **      yaptab suspend compatibility          **
 ** ------------------------------------------ */
 
-#define find_leader_node(LEADER_CP, DEP_ON_STACK)
+//#define find_leader_node(LEADER_CP, DEP_ON_STACK)
 
 
 /* -------------------- **

@@ -366,6 +366,39 @@ extern int Yap_page_size;
         }
 #endif /*****************************************************************************************/
 
+#ifdef LINEAR_TABLING
+#define ALLOC_ALTERNATIVES_BUCKET(PTR)                                     \
+  {    int i; void **t;                                                    \
+    ALLOC_BLOCK(t, (MAX_LOOP_ALT_BUCKET+1) * sizeof(yamop *),void *);		\
+       PTR=(yamop *) t;                                                    \
+       for(i=0;i<=MAX_LOOP_ALT_BUCKET;i++)                                 \
+         *t++=NULL;                                                        \
+       t--;							           \
+       *t=(yamop*)((unsigned long int)(*t)| 0x1);                          \
+  }                          
+
+#define FREE_ALTERNATIVES_BUCKET(PTR)  FREE_BLOCK(PTR)
+
+
+
+#define ALLOC_ANSWERS_BUCKET(PTR)                                                   \
+  {    int i; void **t;                                                            \
+    ALLOC_BLOCK(t, (MAX_LOOP_ANS_BUCKET+1) * sizeof(struct answer_trie_node *),void *); \
+       PTR=(struct answer_trie_node *) t;                                                            \
+       for(i=0;i<=MAX_LOOP_ANS_BUCKET;i++)                                         \
+         *t++=NULL;							\
+       t--;								\
+       *t=(struct answer_trie_node*)((unsigned long int)(*t)| 0x1);                                  \
+  }                          
+
+#define FREE_ANSWERS_BUCKET(PTR)  FREE_BLOCK(PTR)
+
+
+
+#endif /*LINEAR_TABLING */
+
+
+
 #define ALLOC_HASH_BUCKETS(BUCKET_PTR, NUM_BUCKETS)                                              \
         { int i; void **bucket_ptr;                                                              \
           ALLOC_BLOCK(bucket_ptr, NUM_BUCKETS * sizeof(void *), void *);	                 \
@@ -450,6 +483,15 @@ extern int Yap_page_size;
 /************************************************************************
 **                            Debug macros                             **
 ************************************************************************/
+
+#ifdef DEBUG_LINEAR_TABLING
+#define INFO_LINEAR_TABLING(MESG, ARGS...)  information_message(MESG, ##ARGS)
+#else
+#define INFO_LINEAR_TABLING(MESG, ARGS...)
+#endif /* DEBUG_LINEAR_TABLING */
+
+
+
 
 #define INFORMATION_MESSAGE(MESSAGE,ARGS...)                            \
         fprintf(stderr, "[ " MESSAGE " ]\n", ##ARGS)

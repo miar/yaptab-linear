@@ -1009,6 +1009,14 @@ sg_fr_ptr subgoal_search(yamop *preg, CELL **Yaddr) {
     TAG_AS_SUBGOAL_LEAF_NODE(current_sg_node);
   } else {
     sg_fr = UNTAG_SUBGOAL_LEAF_NODE(TrNode_sg_fr(current_sg_node));
+#ifdef LINEAR_TABLING
+    if (SgFr_state(sg_fr) == incomplete) { 
+      remove_from_global_sg_fr_list(sg_fr);
+      new_subgoal_frame(sg_fr, preg);
+      TrNode_sg_fr(current_sg_node) = (sg_node_ptr) sg_fr;
+    }
+#endif /*LINEAR_TABLING */
+
 #ifdef LIMIT_TABLING
     if (SgFr_state(sg_fr) <= ready) {  /* incomplete or ready */
       remove_from_global_sg_fr_list(sg_fr);
@@ -1061,6 +1069,14 @@ ans_node_ptr answer_search(sg_fr_ptr sg_fr, CELL *subs_ptr) {
 
 void load_answer(ans_node_ptr current_ans_node, CELL *subs_ptr) {
 #define subs_arity *subs_ptr
+
+#ifdef LINEAR_TABLING
+#if defined(DUMMY_PRINT) && !defined(LINEAR_TABLING_DRS)
+  if((LOAD_CP(B)->type_of_node)==1)
+     LOCAL_nr_consumed_answers++;  
+#endif /* DUMMY_PRINT && !LINEAR_TABLING_DRS */
+#endif /*LINEAR_TABLING */
+
   CELL *stack_terms;
   int i;
 
