@@ -682,9 +682,13 @@ static inline void abolish_incomplete_subgoals(choiceptr prune_cp) {
       SgFr_state(SgFr_pioneer_frame(sg_fr))= incomplete;
       while( SgFr_dfn(LOCAL_max_scc) > SgFr_dfn(SgFr_pioneer_frame(sg_fr))){
 	SgFr_state(LOCAL_max_scc) = incomplete;
+	free_alternatives(LOCAL_max_scc);
+	free_drs_answers(LOCAL_max_scc);
 	LOCAL_max_scc =SgFr_next_on_scc(LOCAL_max_scc);
       }
       while(SgFr_dfn(LOCAL_top_sg_fr_on_branch) > SgFr_dfn(SgFr_pioneer_frame(sg_fr))){
+	free_alternatives(LOCAL_top_sg_fr_on_branch);
+	free_drs_answers(LOCAL_top_sg_fr_on_branch);
 	SgFr_state(LOCAL_top_sg_fr_on_branch) = incomplete;
 	LOCAL_top_sg_fr_on_branch = SgFr_next_on_branch(LOCAL_top_sg_fr_on_branch);
       }
@@ -693,6 +697,8 @@ static inline void abolish_incomplete_subgoals(choiceptr prune_cp) {
       {    
 	while(SgFr_dfn(LOCAL_max_scc) > SgFr_dfn(sg_fr)){
 	  SgFr_state(LOCAL_max_scc) = incomplete;
+	  free_alternatives(LOCAL_max_scc);
+	  free_drs_answers(LOCAL_max_scc);
 	  LOCAL_max_scc =SgFr_next_on_scc(LOCAL_max_scc);
 	}
 	if (SgFr_dfn(LOCAL_max_scc) == SgFr_dfn(sg_fr))
@@ -700,6 +706,8 @@ static inline void abolish_incomplete_subgoals(choiceptr prune_cp) {
 
 	while(SgFr_dfn(LOCAL_top_sg_fr_on_branch) > SgFr_dfn(sg_fr)){
 	  SgFr_state(LOCAL_top_sg_fr_on_branch) = incomplete;
+	  free_alternatives(LOCAL_top_sg_fr_on_branch);
+	  free_drs_answers(LOCAL_top_sg_fr_on_branch);
 	  LOCAL_top_sg_fr_on_branch = SgFr_next_on_branch(LOCAL_top_sg_fr_on_branch);
 	}
 	if (SgFr_dfn(LOCAL_top_sg_fr_on_branch) == SgFr_dfn(sg_fr))
