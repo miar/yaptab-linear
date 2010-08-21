@@ -313,14 +313,11 @@ ENDPBOp();
        UNTAG_NEW_ANSWERS(sg_fr);
      }
 
- DRS_BATCHED_answer_resolution:
-     {
      /*backtrack */
      remove_next(sg_fr);
      B = B->cp_b;
      SET_BB(PROTECT_FROZEN_B(B));
      goto fail;               
-     }
 }
 #endif /* LINEAR_TABLING_DRS */
   answer_resolution:
@@ -513,19 +510,17 @@ BOp(table_completion, Otapl)
 	SgFr_new_answer_trie(sg_fr)=SgFr_first_answer(sg_fr);
       } 
       goto DRS_LOCAL_answer_resolution;
-    }else{
-      /*dre and batched and pioneer and not leader --> fail*/ 
-      goto DRS_BATCHED_answer_resolution;
     }
     
 #endif /*LINEAR_TABLING_DRS */
 
       if (HAS_NEW_ANSWERS(sg_fr)) {
-        /* bprolog test_cs_r (dra+dre+batched) leaves the system in a inconsistent state 
-           because it has a cut, which cuts several subgoals, but one is not on 
-           LOCAL_top_sg_fr chain and it is not reset and
-           gets here like a pioneer and non lider state and no subgoals on 
-           LOCAL_top_sg_fr_on_branch chain -- TO FIX */
+        /* bprolog test_cs_r (dra+dre+batched) leaves the system in a
+           inconsistent state because it has a cut, which cuts several
+           subgoals, but one is not on LOCAL_top_sg_fr chain (and not
+           on LOCAL_max_scc chain), so it is not reseted and gets here
+           like a pioneer and non lider state and no subgoals on
+           LOCAL_top_sg_fr_on_branch chain */
 	if (LOCAL_top_sg_fr_on_branch){
 	  UNTAG_NEW_ANSWERS(sg_fr);
 	  TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);

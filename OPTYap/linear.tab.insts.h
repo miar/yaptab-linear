@@ -234,7 +234,7 @@
     check_trail(TR);                                                          \
     tab_ent = PREG->u.Otapl.te;                                               \
     YENV2MEM;                                                                 \
-    sg_fr = subgoal_search(PREG, YENV_ADDRESS);                               \
+    sg_fr = subgoal_search(PREG, YENV_ADDRESS); /*incomplete subgoals*/       \
     INFO_LINEAR_TABLING("sg_fr= %p   state=%d",sg_fr,SgFr_state(sg_fr));      \
     MEM2YENV;                                                                 \
     LOCK(SgFr_lock(sg_fr))
@@ -417,13 +417,13 @@ inline void table_try_with_completed(sg_fr_ptr sg_fr,ans_node_ptr ans_node,tab_e
     if (IsMode_LoadAnswers(TabEnt_mode(tab_ent))) {
       /* load answers from the trie */
       UNLOCK(SgFr_lock(sg_fr));
-      if(TrNode_child(ans_node) != NULL) {
+      // if(TrNode_child(ans_node) != NULL) {
 #ifdef DUMMY_PRINT
 	store_loader_node(tab_ent, ans_node,0);
 #else /*!DUMMY_PRINT */
 	store_loader_node(tab_ent, ans_node);
 #endif /*DUMMY_PRINT */
-      }
+	//}
       PREG = (yamop *) CPREG;
       PREFETCH_OP(PREG);
       load_answer(ans_node, YENV);

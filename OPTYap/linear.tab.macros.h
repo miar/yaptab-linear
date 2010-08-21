@@ -74,6 +74,7 @@
 	SgFr_current_batched_answer(sgfr_aux)=NULL;		   \
         SgFr_next_alt(sgfr_aux) = NULL; 			   \
 	SgFr_pioneer(sgfr_aux)=NULL;                               \
+	SgFr_pioneer_frame(sgfr_aux)=SG_FR; /*support for cuts*/   \
         SgFr_gen_cp(sgfr_aux)=SgFr_gen_cp(SG_FR);                  \
         SgFr_next(sgfr_aux) = LOCAL_top_sg_fr;   		   \
         LOCAL_top_sg_fr = sgfr_aux;				   \
@@ -83,6 +84,7 @@
 {                                        			 \
         SgFr_next_alt(SG_FR) = NULL; 			         \
         SgFr_pioneer(SG_FR) = NULL;                              \
+        SgFr_pioneer_frame(SG_FR) = NULL;                        \
 }
 
 #else

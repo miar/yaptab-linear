@@ -448,12 +448,6 @@ Int p_print_drs_opt(void) {
 
 
 
-
-
-
-
-
-
 static Int p_show_all_tables(void) {
   tab_ent_ptr tab_ent;
 

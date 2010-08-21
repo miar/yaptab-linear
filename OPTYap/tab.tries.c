@@ -1008,12 +1008,13 @@ sg_fr_ptr subgoal_search(yamop *preg, CELL **Yaddr) {
     TrNode_sg_fr(current_sg_node) = (sg_node_ptr) sg_fr;
     TAG_AS_SUBGOAL_LEAF_NODE(current_sg_node);
   } else {
-    sg_fr = UNTAG_SUBGOAL_LEAF_NODE(TrNode_sg_fr(current_sg_node));
+      sg_fr = UNTAG_SUBGOAL_LEAF_NODE(TrNode_sg_fr(current_sg_node));
 #ifdef LINEAR_TABLING
     if (SgFr_state(sg_fr) == incomplete) { 
       remove_from_global_sg_fr_list(sg_fr);
       new_subgoal_frame(sg_fr, preg);
       TrNode_sg_fr(current_sg_node) = (sg_node_ptr) sg_fr;
+      TAG_AS_SUBGOAL_LEAF_NODE(current_sg_node);
     }
 #endif /*LINEAR_TABLING */
 

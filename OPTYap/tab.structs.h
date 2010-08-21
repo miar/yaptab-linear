@@ -253,6 +253,7 @@ typedef struct subgoal_frame {
 #ifdef LINEAR_TABLING_DRE
   yamop *next_alt;
   struct choicept *pioneer;
+  struct subgoal_frame *pioneer_frame; /*support for cuts */
 #endif /* LINEAR_TABLING_DRE */
   yamop  *loop_alts;
   struct answer_trie_node *batched_answer;
@@ -279,7 +280,7 @@ typedef struct subgoal_frame {
 #define SgFr_next_on_branch(X)         ((X)->next_on_branch)
 #define SgFr_next_on_scc(X)            ((X)->next_on_scc)
 #define SgFr_pioneer(X)                ((X)->pioneer)
-
+#define SgFr_pioneer_frame(X)          ((X)->pioneer_frame)
 
 #endif /* LINEAR_TABLING */
 
