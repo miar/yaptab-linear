@@ -888,7 +888,6 @@
       /* check for potencial prunings */
       if (! BITMAP_empty(GLOBAL_bm_pruning_workers)) {
         int until_depth, depth;
-
         until_depth = OrFr_depth(SgFr_gen_top_or_fr(sg_fr));
         depth = OrFr_depth(LOCAL_top_or_fr);
         if (depth > until_depth) {
@@ -1068,12 +1067,13 @@
         /* deallocate and procceed */
         PREG = (yamop *) YENV[E_CP];
         PREFETCH_OP(PREG);
-        CPREG = PREG;
+	CPREG = PREG;
         SREG = YENV;
         ENV = YENV = (CELL *) YENV[E_E];
 #ifdef DEPTH_LIMIT
 	DEPTH = YENV[E_DEPTH];
-#endif /* DEPTH_LIMIT */
+#endif  /*DEPTH_LIMIT */
+	INFO_LINEAR_TABLING("deallocate and proceed");
         GONext();
       } else {
 #if defined(TABLING_EARLY_COMPLETION) && !defined(LINEAR_TABLING) 

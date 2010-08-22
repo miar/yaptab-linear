@@ -485,7 +485,8 @@ extern int Yap_page_size;
 ************************************************************************/
 
 #ifdef DEBUG_LINEAR_TABLING
-#define INFO_LINEAR_TABLING(MESG, ARGS...)  information_message(MESG, ##ARGS)
+//#define INFO_LINEAR_TABLING(MESG, ARGS...)  information_message(MESG, ##ARGS)
+#define INFO_LINEAR_TABLING(MESG, ARGS...)  INFORMATION_MESSAGE(MESG, ##ARGS)
 #else
 #define INFO_LINEAR_TABLING(MESG, ARGS...)
 #endif /* DEBUG_LINEAR_TABLING */

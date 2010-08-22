@@ -84,7 +84,7 @@
 /****************************************************
 **      support early completion ? (optional)      **
 ****************************************************/
-#define TABLING_EARLY_COMPLETION 1
+/*#define TABLING_EARLY_COMPLETION 1 */
 
 /******************************************************
 **      support trie compact pairs ? (optional)      **
@@ -114,7 +114,7 @@
 /*************************************************
 **      enable error checking ? (optional)      **
 *************************************************/
-/* #define DEBUG_TABLING 1 */
+/*#define DEBUG_TABLING 1 */
 
 
 
@@ -282,7 +282,7 @@
 #endif /* DEBUG_YAPOR && DEBUG_TABLING */
 
 #ifndef LINEAR_TABLING 
-#if defined(LINEAR_TABLING_DRA) || defined(LINEAR_TABLING_DRE) || defined(LINEAR_TABLING_DRS) || defined(DUMMY_PRINT) || defined(DEBUG_LINEAR_TABLING) 
+#if defined(LINEAR_TABLING_DRA) || defined(LINEAR_TABLING_DRE) || defined(LINEAR_TABLING_DRS) || defined(DUMMY_PRINT) /*|| defined(DEBUG_LINEAR_TABLING)  */
 #error Please define LINEAR_TABLING mode ...
 #endif
 #endif /*LINEAR_TABLING */
