@@ -1,5 +1,4 @@
 
-
 :- module(clpbn, [{}/1,
 		  clpbn_flag/2,
 		  set_clpbn_flag/2,
@@ -34,6 +33,14 @@
 	       init_vel_solver/4,
 	       run_vel_solver/3
 	      ]).
+
+:- use_module('clpbn/bp',
+	      [bp/3,
+               check_if_bp_done/1,
+	       init_bp_solver/4,
+	       run_bp_solver/3
+	      ]).
+
 
 :- use_module('clpbn/jt',
 	      [jt/3,
@@ -229,6 +236,9 @@ write_out(vel, GVars, AVars, DiffVars) :-
 	vel(GVars, AVars, DiffVars).
 write_out(jt, GVars, AVars, DiffVars) :-
 	jt(GVars, AVars, DiffVars).
+write_out(bp, GVars, AVars, DiffVars) :-
+	writeln(bp),
+	bp(GVars, AVars, DiffVars).
 write_out(gibbs, GVars, AVars, DiffVars) :-
 	gibbs(GVars, AVars, DiffVars).
 write_out(bnt, GVars, AVars, DiffVars) :-
@@ -315,8 +325,13 @@ bind_clpbn(_, Var, _, _, _, _, []) :-
 	use(bnt),
 	check_if_bnt_done(Var), !.
 bind_clpbn(_, Var, _, _, _, _, []) :-
+        writeln('use vel'),
 	use(vel),
 	check_if_vel_done(Var), !.
+bind_clpbn(_, Var, _, _, _, _, []) :-
+        writeln('use bp'),
+	use(bp),
+	check_if_bp_done(Var), !.
 bind_clpbn(_, Var, _, _, _, _, []) :-
 	use(jt),
 	check_if_vel_done(Var), !.
@@ -385,7 +400,11 @@ clpbn_init_solver(LVs, Vs0, VarsWithUnboundKeys, State) :-
 clpbn_init_solver(gibbs, LVs, Vs0, VarsWithUnboundKeys, State) :-
 	init_gibbs_solver(LVs, Vs0, VarsWithUnboundKeys, State).
 clpbn_init_solver(vel, LVs, Vs0, VarsWithUnboundKeys, State) :-
+        writeln('init vel solver'),
 	init_vel_solver(LVs, Vs0, VarsWithUnboundKeys, State).
+clpbn_init_solver(bp, LVs, Vs0, VarsWithUnboundKeys, State) :-
+        writeln('init bp solver'),
+	init_bp_solver(LVs, Vs0, VarsWithUnboundKeys, State).
 clpbn_init_solver(jt, LVs, Vs0, VarsWithUnboundKeys, State) :-
 	init_jt_solver(LVs, Vs0, VarsWithUnboundKeys, State).
 clpbn_init_solver(pcg, LVs, Vs0, VarsWithUnboundKeys, State) :-
@@ -403,10 +422,18 @@ clpbn_run_solver(LVs, LPs, State) :-
 
 clpbn_run_solver(gibbs, LVs, LPs, State) :-
 	run_gibbs_solver(LVs, LPs, State).
+
 clpbn_run_solver(vel, LVs, LPs, State) :-
+        writeln('run vel solver'),
 	run_vel_solver(LVs, LPs, State).
+
+clpbn_run_solver(bp, LVs, LPs, State) :-
+        writeln('run bp solver'),
+	run_bp_solver(LVs, LPs, State).
+
 clpbn_run_solver(jt, LVs, LPs, State) :-
 	run_jt_solver(LVs, LPs, State).
+
 clpbn_run_solver(pcg, LVs, LPs, State) :-
 	run_pcg_solver(LVs, LPs, State).
 
