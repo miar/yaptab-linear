@@ -19,15 +19,17 @@
 set(Parameter,Value) */
 setting(epsilon_parsing,0.00001).
 setting(save_dot,false).
-setting(ground_body,false). 
+setting(ground_body,true). 
 /* available values: true, false
 if true, both the head and the body of each clause will be grounded, otherwise
 only the head is grounded. In the case in which the body contains variables 
 not appearing in the head, the body represents an existential event */
 setting(min_error,0.01).
+setting(initial_depth_bound,4).
 setting(depth_bound,4).
 setting(prob_threshold,0.00001).
 setting(prob_bound,0.01).
+
 /* end of list of parameters */
 
 /* s(GoalsLIst,Prob) compute the probability of a list of goals 
@@ -110,7 +112,7 @@ for negative goals, if their derivation is cut, then they are
 added to the head of the list of goals to be resolved at the next depth bound*/
 si(GoalsList,ProbL,ProbU,CPUTime):-
         statistics(cputime,[_,_]),
-	setting(depth_bound,D),
+	setting(initial_depth_bound,D),
         solve_i([(GoalsList,[])],[],D,ProbL,ProbU),
 	statistics(cputime,[_,CT]),
 	CPUTime is CT/1000.
@@ -122,27 +124,22 @@ current depth, ProbL0 is the lower bound of the prob and ProbU0 is the upper
 bound 
 */
 solve_i(L0,Succ,D,ProbL0,ProbU0):-
-	(findall((G1,Deriv),(member((G0,C0),L0),solvei(G0,D,C0,Deriv,G1)),L)->
+	findall((G1,Deriv),(member((G0,C0),L0),solvei(G0,D,C0,Deriv,G1)),L),
 	%	print_mem,
-		separate_ulbi(L,[],LL0,[],LU,[],Incomplete),
-		append(Succ,LL0,LL),
-		compute_prob_deriv(LL,ProbL),
-		append(Succ,LU,LU1),
-		compute_prob_deriv(LU1,ProbU),
-		Err is ProbU-ProbL,
-		setting(min_error,ME),
-		(Err<ME->
-			ProbU0=ProbU,
-			ProbL0=ProbL
-		;
-			setting(depth_bound,DB),
-			D1 is D+DB,
-			solve_i(Incomplete,LL,D1,ProbL0,ProbU0)
-		)
+	separate_ulbi(L,[],LL0,[],LU,[],Incomplete),
+	append(Succ,LL0,LL),
+	compute_prob_deriv(LL,ProbL),
+	append(Succ,LU,LU1),
+	compute_prob_deriv(LU1,ProbU),
+	Err is ProbU-ProbL,
+	setting(min_error,ME),
+	(Err<ME->
+		ProbU0=ProbU,
+		ProbL0=ProbL
 	;
-	%	print_mem,
-		ProbL0=0.0,
-		ProbU0=0.0
+		setting(depth_bound,DB),
+		D1 is D+DB,
+		solve_i(Incomplete,LL,D1,ProbL0,ProbU0)
 	).
 
 /* iterative deepening, problog style: each time
