@@ -202,9 +202,8 @@ true :- true.
 % first, recover what we need from the saved state...
 %
 '$startup_saved_state' :-
-	get_value('$extend_file_search_path',P), P \= [],
-	set_value('$extend_file_search_path',[]),
-	'$extend_file_search_path'(P),
+	% -p option must be processed after initializing the system
+	'$init_path_extensions',
 	fail.
 % use if we come from a save_program and we have SWI's shlib
 '$startup_saved_state' :-
@@ -1074,6 +1073,8 @@ break :-
 	get_value('$lf_verbose',OldSilent),
 	set_value('$lf_verbose',silent),
 	bootstrap(F),
+	% -p option must be processed after initializing the system
+	'$init_path_extensions',
 	set_value('$lf_verbose', OldSilent).
 
 bootstrap(F) :-
@@ -1107,6 +1108,14 @@ bootstrap(F) :-
 
 
 
+
+'$init_path_extensions' :-
+	get_value('$extend_file_search_path',P), !,
+	P \= [],
+	set_value('$extend_file_search_path',[]),
+	'$extend_file_search_path'(P).
+'$init_path_extensions'.
+ 
 '$loop'(Stream,Status) :-
 	'$change_alias_to_stream'('$loop_stream',Stream),
 	repeat,
