@@ -53,36 +53,52 @@ check_if_bp_done(_Var).
 %
 % implementation of belief propagation
 %
+% A1=+QueryVars -> sets of independent marginalization variables
+% A2=*AllVars -> list
+% A3=-Output -> output probabilities
+%
+%
+% Other important variables:
+%
+% State0 initialized graph, is used to pass data from initialization 
+% to query solving (eg, State might be the JT and be used to run
+% different queries). 
+%
 % Process
 %
 bp([[]],_,_) :- !.
-bp([LVs],Vs0,AllDiffs) :-
-    init_bp_solver([LVs], Vs0, AllDiffs, State),
+bp([QueryVars],AllVars,Output) :-
+writeln(QueryVars:AllVars:Output),
+    init_bp_solver([QueryVars], AllVars, Output, State),
+writeln(State),
     % variable elimination proper
-    run_bp_solver([LVs], [LPs], State),
+    run_bp_solver([], [LPs], State),
     % bind Probs back to variables so that they can be output.
-    clpbn_bind_vals([LVs],[LPs],AllDiffs).
+    clpbn_bind_vals([QueryVars],[LPs],Output).
 
 % initialise necessary data for query solver
-init_bp_solver(Qs, Vs0, _, LVis) :-
+init_bp_solver(Qs, AllVars, _, graph(LVis)) :-
     % replace average, max, min and friends
     % by binary nodes.
-    check_for_agg_vars(Vs0, Vs1),
+    check_for_agg_vars(AllVars, UnFoldedVars),
+writeln(AllVars:UnFoldedVars),
     % replace the variables reachable from G
     % Tables0 will have the full data on each variable
-    init_influences(Vs1, G, RG),
+    init_influences(UnfoldedVars, G, RG),
+writeln(G:RG),
     init_bp_solver_for_questions(Qs, G, RG, _, LVis).
 
 init_bp_solver_for_questions([], _, _, [], []).
 init_bp_solver_for_questions([Vs|MVs], G, RG, [NVs|MNVs0], [NVs|LVis]) :-
     % find variables connectd to Vs
-    influences(Vs, _, NVs0, G, RG),
+%    influences(Vs, _, NVs0, G, RG),
+     G = RG,
     sort(NVs0, NVs),
 %clpbn_gviz:clpbn2gviz(user_error, test, NVs, Vs),
     init_bp_solver_for_questions(MVs, G, RG, MNVs0, LVis).
 
 % use a findall to recover space without needing for GC
-run_bp_solver(LVs, LPs, LNVs) :-
+run_bp_solver(LVs, LPs, graph(LNVs)) :-
     findall(Ps, solve_bp(LVs, LNVs, Ps), LPs).
 
 solve_bp([LVs|_], [NVs0|_], Ps) :-
