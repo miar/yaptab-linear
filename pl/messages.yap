@@ -129,10 +129,10 @@ system_message(leash([A|B])) -->
 	[ 'Leashing set to ~w.' - [[A|B]] ].
 system_message(existence_error(prolog_flag,F)) -->
 	[ 'Prolog Flag ~w: new Prolog flags must be created using create_prolog_flag/3.' - [F] ].
-system_message(singletons([SV],P,CLN)) -->
-	[ 'Singleton variable ~s in ~q, clause ~d.' - [SV,P,CLN] ].
-system_message(singletons(SVs,P,CLN)) -->
-	[  'Singleton variables ~s in ~q, clause ~d.' - [SVsL, P, CLN] ],
+system_message(singletons([SV],P)) -->
+	[ 'Singleton variable ~s in ~q.' - [SV,P] ].
+system_message(singletons(SVs,P)) -->
+	[  'Singleton variables ~s in ~q.' - [SVsL, P] ],
 	{ svs(SVs,SVsL,[]) }.
 system_message(trace_command(-1)) -->
 	[ 'EOF is not a valid debugger command.'  ].
@@ -222,8 +222,8 @@ system_message(error(permission_error(modify,dynamic_procedure,_), Where)) -->
 	[ 'PERMISSION ERROR- ~w: modifying a dynamic procedure' - [Where] ].
 system_message(error(permission_error(modify,flag,W), _)) -->
 	[ 'PERMISSION ERROR- cannot modify flag ~w' - [W] ].
-system_message(error(permission_error(modify,operator,W), _)) -->
-	[ 'PERMISSION ERROR- T cannot declare ~w an operator' - [W] ].
+system_message(error(permission_error(modify,operator,W), Q)) -->
+	[ 'PERMISSION ERROR- ~w: cannot modify operator ~q' - [Q,W] ].
 system_message(error(permission_error(modify,dynamic_procedure,F), Where)) -->
 	[ 'PERMISSION ERROR- ~w: modifying dynamic procedure ~w' - [Where,F] ].
 system_message(error(permission_error(modify,static_procedure,F), Where)) -->
@@ -296,6 +296,8 @@ system_message(error(unknown, Where)) -->
 	[ 'EXISTENCE ERROR- procedure ~w undefined' - [Where] ].
 system_message(error(unhandled_exception,Throw)) -->
 	[ 'UNHANDLED EXCEPTION - message ~w unknown' - [Throw] ].
+system_message(error(uninstantiation_error(TE), Where)) -->
+	[ 'UNINSTANTIATION ERROR - expected unbound term, got ~q' - [TE] ].
 system_message(Messg) -->
 	[ '~q' - Messg ].
 
@@ -352,6 +354,8 @@ domain_error(stream, Opt) --> !,
 	[ '~w is not a stream' - [Opt] ].
 domain_error(stream_or_alias, Opt) --> !,
 	[ '~w is not a stream (or alias)' - [Opt] ].
+domain_error(stream_encoding, Opt) --> !,
+	[ '~w is not a supported stream encoding' - [Opt] ].
 domain_error(stream_position, Opt) --> !,
 	[ '~w is not a stream position' - [Opt] ].
 domain_error(stream_property, Opt) --> !,

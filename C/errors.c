@@ -455,6 +455,9 @@ Yap_Error(yap_error_number type, Term where, char *format,...)
     where = TermNil;
     Yap_PrologMode &= ~AbortMode;
     Yap_PrologMode |= InErrorMode;
+    /* make sure failure will be seen at next port */
+    if (Yap_PrologMode & AsyncIntMode)
+      Yap_signal(YAP_FAIL_SIGNAL);
     P = FAILCODE;
   } else {
     if (IsVarTerm(where)) {
@@ -790,6 +793,21 @@ Yap_Error(yap_error_number type, Term where, char *format,...)
 
       i = strlen(tmpbuf);
       ti[0] = MkAtomTerm(AtomStreamOrAlias);
+      ti[1] = where;
+      nt[0] = Yap_MkApplTerm(FunctorDomainError, 2, ti);
+      tp = tmpbuf+i;
+      psize -= i;
+      fun = FunctorError;
+      serious = TRUE;
+    }
+    break;
+  case DOMAIN_ERROR_STREAM_ENCODING:
+    {
+      int i;
+      Term ti[2];
+
+      i = strlen(tmpbuf);
+      ti[0] = MkAtomTerm(AtomEncoding);
       ti[1] = where;
       nt[0] = Yap_MkApplTerm(FunctorDomainError, 2, ti);
       tp = tmpbuf+i;
@@ -1859,7 +1877,6 @@ Yap_Error(yap_error_number type, Term where, char *format,...)
     } else {
       if (type == PURE_ABORT) {
 	Yap_JumpToEnv(MkAtomTerm(AtomDAbort));
-	CreepFlag = LCL0-ASP;
       } else
 	Yap_JumpToEnv(Yap_MkApplTerm(fun, 2, nt));
       P = (yamop *)FAILCODE;

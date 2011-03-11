@@ -78,8 +78,8 @@ STATIC_PROTO(void wrputs, (char *, wrf));
 STATIC_PROTO(void wrputf, (Float, wrf));
 STATIC_PROTO(void wrputref, (CODEADDR, int, wrf));
 STATIC_PROTO(int legalAtom, (unsigned char *));
-STATIC_PROTO(int LeftOpToProtect, (Atom, int));
-STATIC_PROTO(int RightOpToProtect, (Atom, int));
+/*STATIC_PROTO(int LeftOpToProtect, (Atom, int));
+  STATIC_PROTO(int RightOpToProtect, (Atom, int));*/
 STATIC_PROTO(wtype AtomIsSymbols, (unsigned char *));
 STATIC_PROTO(void putAtom, (Atom, int, wrf));
 STATIC_PROTO(void writeTerm, (Term, int, int, int, struct write_globs *, struct rewind_term *));
@@ -212,6 +212,7 @@ wrputf(Float f, wrf writewch)		/* writes a float	 */
 	                  
 {
   char            s[256], *pt = s, ch;
+  int found_dot = FALSE, found_exp = FALSE;
 
 #if HAVE_ISNAN || defined(__WIN32)
   if (isnan(f)) {
@@ -246,14 +247,31 @@ wrputf(Float f, wrf writewch)		/* writes a float	 */
   sprintf(s, RepAtom(AtomFloatFormat)->StrOfAE, f);
   while (*pt == ' ')
     pt++;
-  wrputs(pt, writewch);
-  if (*pt == '-') pt++;
-  while ((ch = *pt) != '\0') {
-    if (ch < '0' || ch > '9')
-      return;
+  if (*pt == '-') {
+    wrputc('-', writewch);
     pt++;
   }
-  wrputs(".0", writewch);    
+  while ((ch = *pt) != '\0') {
+    switch (ch) {
+    case '.':
+      found_dot = TRUE;
+      wrputc('.', writewch);    
+      break;
+    case 'e':
+    case 'E':
+      if (!found_dot) {
+	found_dot = TRUE;
+	wrputs(".0", writewch);
+      }
+      found_exp = TRUE;
+    default:
+      wrputc(ch, writewch);
+    }
+    pt++;
+  }
+  if (!found_dot) {
+    wrputs(".0", writewch);    
+  }
 }
 
 static void 
@@ -274,43 +292,36 @@ wrputref(CODEADDR ref, int Quote_illegal, wrf writewch)			/* writes a data base 
 
 static int 
 legalAtom(unsigned char *s)			/* Is this a legal atom ? */
-	                  
 {
   wchar_t ch = *s;
 
   if (ch == '\0')
-    return(FALSE);
+    return FALSE;
   if (Yap_chtype[ch] != LC) {
-    if (ch == '[')
-      return (*++s == ']' && !(*++s));
-    else if (ch == '{')
-      return (*++s == '}' && !(*++s));
-    else if (Yap_chtype[ch] == SL)
-      return (!*++s);
-    else if ((ch == ',' || ch == '.') && !s[1])
+    if (ch == '[') {
+      return (s[1] == ']' && !s[2]);
+    } else if (ch == '{') {
+	return (s[1] == '}' && !s[2]);
+//    else if (ch == '/')
+//      return (*++s != '*');
+    } else if (Yap_chtype[ch] == SL) {
+      return (!s[1]);
+    } else if ((ch == ',' || ch == '.') && !s[1]) {
       return FALSE;
-    else
+    } else {
       while (ch) {
-	if (Yap_chtype[ch] != SY)
+	if (Yap_chtype[ch] != SY) {
 	  return FALSE;
+	}
 	ch = *++s;
       }
+    }
     return TRUE;
   } else
     while ((ch = *++s) != 0)
       if (Yap_chtype[ch] > NU)
 	return FALSE;
   return (TRUE);
-}
-
-static int LeftOpToProtect(Atom at, int p)
-{
-  return Yap_IsOpMaxPrio(at) > p;
-}
-
-static int RightOpToProtect(Atom at, int p)
-{
-  return Yap_IsOpMaxPrio(at) > p;
 }
 
 static wtype 
@@ -788,7 +799,7 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
       Term  tright = ArgOfTerm(1, t);
       int            bracket_right =
 	!IsVarTerm(tright) && IsAtomTerm(tright) &&
-	RightOpToProtect(AtomOfTerm(tright), rp);
+	Yap_IsOp(AtomOfTerm(tright));
       if (op > p) {
 	/* avoid stuff such as \+ (a,b) being written as \+(a,b) */
 	if (lastw != separator && !rinfixarg)
@@ -818,7 +829,7 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
       Int sl = 0;
       int            bracket_left =
 	!IsVarTerm(tleft) && IsAtomTerm(tleft) &&
-	LeftOpToProtect(AtomOfTerm(tleft), lp); 
+	Yap_IsOp(AtomOfTerm(tleft)); 
       if (op > p) {
 	/* avoid stuff such as \+ (a,b) being written as \+(a,b) */
 	if (lastw != separator && !rinfixarg)
@@ -858,10 +869,10 @@ writeTerm(Term t, int p, int depth, int rinfixarg, struct write_globs *wglb, str
       Int sl = 0;
       int   bracket_left =
 	!IsVarTerm(tleft) && IsAtomTerm(tleft) &&
-	LeftOpToProtect(AtomOfTerm(tleft), lp);
+	Yap_IsOp(AtomOfTerm(tleft));
       int   bracket_right =
 	!IsVarTerm(tright) && IsAtomTerm(tright) &&
-	RightOpToProtect(AtomOfTerm(tright), rp);
+	Yap_IsOp(AtomOfTerm(tright));
 
       if (op > p) {
 	/* avoid stuff such as \+ (a,b) being written as \+(a,b) */

@@ -22,6 +22,7 @@
 #if HAVE_STRING_H
 #include <string.h>
 #endif
+#include <wchar.h>
 
 #if USE_GMP
 
@@ -220,7 +221,7 @@ Yap_gmp_div_int_big(Int i, Term t)
   }
 }
 
-/* div i / b using temporary bigint new */
+/* div b / i using temporary bigint new */
 Term 
 Yap_gmp_div_big_int(Term t, Int i)
 {
@@ -250,6 +251,37 @@ Yap_gmp_div_big_int(Term t, Int i)
 	mpz_fdiv_q_ui(&new, &new, -i);
 	mpz_neg(&new, &new);
       }
+    }
+    return MkBigAndClose(&new);
+  } else {
+    MP_RAT new;
+    MP_RAT *b = Yap_BigRatOfTerm(t);
+
+    mpq_init(&new);
+    mpq_set_si(&new, i, 1L);
+    mpq_div(&new, b, &new);
+    return MkRatAndClose(&new);    
+  }
+}
+
+/* div b / i using temporary bigint new */
+Term 
+Yap_gmp_div2_big_int(Term t, Int i)
+{
+  CELL *pt = RepAppl(t);
+  if (pt[1] == BIG_INT) {
+    MP_INT new;
+    MP_INT *b = Yap_BigIntOfTerm(t);
+
+    mpz_init_set(&new, b);
+    if (i > 0) {
+      mpz_fdiv_q_ui(&new, &new, i);
+    } else if (i == 0) {
+      return Yap_ArithError(EVALUATION_ERROR_ZERO_DIVISOR, MkIntTerm(0), "// /2");
+    } else {
+      /* we do not handle MIN_INT */
+      mpz_fdiv_q_ui(&new, &new, -i);
+      mpz_neg(&new, &new);
     }
     return MkBigAndClose(&new);
   } else {
@@ -508,6 +540,44 @@ Yap_gmp_div_big_big(Term t1, Term t2)
     } else {
       mpz_fdiv_q(&new, &new, b2);
     }
+    return MkBigAndClose(&new);
+  } else {
+    MP_RAT new;
+    MP_RAT *b1, bb1;
+    MP_RAT *b2, bb2;
+    if (pt1[1] == BIG_INT) {
+      b1 = &bb1;
+      mpq_init(b1);
+      mpq_set_z(b1, Yap_BigIntOfTerm(t1));
+    } else {
+      b1 = Yap_BigRatOfTerm(t1);
+    }
+    if (pt2[1] == BIG_INT) {
+      b2 = &bb2;
+      mpq_init(b2);
+      mpq_set_z(b2, Yap_BigIntOfTerm(t2));
+    } else {
+      b2 = Yap_BigRatOfTerm(t2);
+    }
+    mpq_init(&new);
+    mpq_div(&new, b1, b2);
+    return MkRatAndClose(&new);
+  }
+}
+
+/* div i div b using temporary bigint new */
+Term 
+Yap_gmp_div2_big_big(Term t1, Term t2)
+{
+  CELL *pt1 = RepAppl(t1);
+  CELL *pt2 = RepAppl(t2);
+  if (pt1[1] == BIG_INT && pt2[1] == BIG_INT) {
+    MP_INT new;
+    MP_INT *b1 = Yap_BigIntOfTerm(t1);
+    MP_INT *b2 = Yap_BigIntOfTerm(t2);
+
+    mpz_init_set(&new, b1);
+    mpz_fdiv_q(&new, &new, b2);
     return MkBigAndClose(&new);
   } else {
     MP_RAT new;
@@ -1220,6 +1290,7 @@ Yap_gmp_tcmp_big_big(Term t1, Term t2)
 {
   CELL *pt1 = RepAppl(t1);
   CELL *pt2 = RepAppl(t2);
+
   if (pt1[1] == BIG_INT && pt2[1] == BIG_INT) {
     MP_INT *b1 = Yap_BigIntOfTerm(t1);
     MP_INT *b2 = Yap_BigIntOfTerm(t2);
@@ -1230,13 +1301,62 @@ Yap_gmp_tcmp_big_big(Term t1, Term t2)
 
     if (pt1[1] == BIG_INT) {
       return 1;
-    } else {
+    } else if (pt1[1] == BIG_RATIONAL) {
       b1 = Yap_BigRatOfTerm(t1);
+    } else if (pt1[1] == BLOB_STRING) {
+      char *s1 = Yap_BlobStringOfTerm(t1);
+      if (pt2[1] == BLOB_STRING) {
+	char *s2 = Yap_BlobStringOfTerm(t2);
+	return strcmp(s1,s2);
+      } else if (pt2[1] == BLOB_WIDE_STRING) {
+	wchar_t *wcs2 = Yap_BlobWideStringOfTerm(t2), *wcs1, *tmp1;
+	int out;
+	size_t n = strlen(s1);
+	if (!(wcs1 = (wchar_t *)malloc((n+1)*sizeof(wchar_t)))) {
+	  Yap_Error(OUT_OF_HEAP_ERROR, t1, "compare/3");	  
+	  return 0;
+	}
+	tmp1 = wcs1;
+	while (*s1) {
+	  *tmp1++ = *s1++;
+	}
+	out = wcscmp(wcs1, wcs2);
+	free(wcs1);
+	return out;
+      }
+      b1 = Yap_BigRatOfTerm(t1);
+    } else if (pt1[1] == BLOB_WIDE_STRING) {
+      wchar_t *wcs1 = Yap_BlobWideStringOfTerm(t1);
+      if (pt2[1] == BLOB_STRING) {
+	char *s2 = Yap_BlobStringOfTerm(t2);
+	wchar_t *wcs2, *tmp2;
+	int out;
+	size_t n = strlen(s2);
+	if (!(wcs2 = (wchar_t *)malloc((n+1)*sizeof(wchar_t)))) {
+	  Yap_Error(OUT_OF_HEAP_ERROR, t2, "compare/3");	  
+	  return 0;
+	}
+	tmp2 = wcs2;
+	while (*s2) {
+	  *tmp2++ = *s2++;
+	}
+	out = wcscmp(wcs1, wcs2);
+	free(wcs2);
+	return out;
+      } else if (pt2[1] == BLOB_WIDE_STRING) {
+	wchar_t *wcs2 = Yap_BlobWideStringOfTerm(t2);
+	return wcscmp(wcs1,wcs2);
+      }
+      b1 = Yap_BigRatOfTerm(t1);
+    } else {
+      return pt1-pt2;
     }
     if (pt2[1] == BIG_INT) {
       return -1;
-    } else {
+    } else if (pt2[1] == BIG_RATIONAL) {
       b2 = Yap_BigRatOfTerm(t2);
+    } else {
+      return pt1-pt2;
     }
     return mpq_cmp(b1, b2);
   }

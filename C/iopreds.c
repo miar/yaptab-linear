@@ -827,12 +827,16 @@ IOSWIPutc(int sno, int ch)
 static int
 IOSWIGetc(int sno)
 {
-  int i;
+  int ch;
   Yap_StartSlots();
-  i = (SWIGetc)(Stream[sno].u.swi_stream.swi_ptr);
+  ch = (SWIGetc)(Stream[sno].u.swi_stream.swi_ptr);
+  if (ch == EOF) {
+    return post_process_eof(Stream+sno);    
+  }
+  return post_process_read_char(ch, Stream+sno);
   Yap_CloseSlots();
   YENV = ENV;
-  return i;
+  return ch;
 }
 
 /* static */
@@ -851,12 +855,16 @@ IOSWIWidePutc(int sno, int ch)
 static int
 IOSWIWideGetc(int sno)
 {
-  int i;
+  int ch;
   Yap_StartSlots();
-  i = (SWIWideGetc)(Stream[sno].u.swi_stream.swi_ptr);
+  ch = (SWIWideGetc)(Stream[sno].u.swi_stream.swi_ptr);
+  if (ch == EOF) {
+    return post_process_eof(Stream+sno);    
+  }
+  return post_process_read_char(ch, Stream+sno);
   Yap_CloseSlots();
   YENV = ENV;
-  return i;
+  return ch;
 }
 
 #if USE_SOCKET
@@ -1736,6 +1744,21 @@ PlUnGetc376 (int sno)
   return ch;
 }
 
+/* give back 0376+ch  */
+static int
+PlUnGetc00 (int sno)
+{
+  register StreamDesc *s = &Stream[sno];
+  Int ch;
+
+  if (s->stream_getc != PlUnGetc00)
+    return(s->stream_getc(sno));
+  s->stream_getc = PlUnGetc;
+  ch = s->och;
+  s->och = 0x00;
+  return ch;
+}
+
 /* give back 0377+ch  */
 static int
 PlUnGetc377 (int sno)
@@ -1778,6 +1801,66 @@ PlUnGetc357273 (int sno)
   s->stream_getc = PlUnGetc357;
   ch = s->och;
   s->och = 0xBB;
+  return ch;
+}
+
+/* give back 000+000+ch  */
+static int
+PlUnGetc0000 (int sno)
+{
+  register StreamDesc *s = &Stream[sno];
+  Int ch;
+
+  if (s->stream_getc != PlUnGetc0000)
+    return(s->stream_getc(sno));
+  s->stream_getc = PlUnGetc00;
+  ch = s->och;
+  s->och = 0x00;
+  return ch;
+}
+
+/* give back 000+000+ch  */
+static int
+PlUnGetc0000fe (int sno)
+{
+  register StreamDesc *s = &Stream[sno];
+  Int ch;
+
+  if (s->stream_getc != PlUnGetc0000fe)
+    return(s->stream_getc(sno));
+  s->stream_getc = PlUnGetc0000;
+  ch = s->och;
+  s->och = 0xfe;
+  return ch;
+}
+
+/* give back 0377+0376+ch  */
+static int
+PlUnGetc377376 (int sno)
+{
+  register StreamDesc *s = &Stream[sno];
+  Int ch;
+
+  if (s->stream_getc != PlUnGetc377376)
+    return(s->stream_getc(sno));
+  s->stream_getc = PlUnGetc377;
+  ch = s->och;
+  s->och = 0xFE;
+  return ch;
+}
+
+/* give back 0377+0376+000+ch  */
+static int
+PlUnGetc37737600 (int sno)
+{
+  register StreamDesc *s = &Stream[sno];
+  Int ch;
+
+  if (s->stream_getc != PlUnGetc37737600)
+    return(s->stream_getc(sno));
+  s->stream_getc = PlUnGetc377376;
+  ch = s->och;
+  s->och = 0x00;
   return ch;
 }
 
@@ -1886,6 +1969,26 @@ get_wchar(int sno)
       how_many=1;
       wch = ch;
       break;
+    case ENC_ISO_UTF32_LE:
+      if (!how_many) {
+	how_many = 4;
+	wch = 0;
+      }
+      how_many--;
+      wch += ((unsigned char) (ch & 0xff)) << (how_many*8);
+      if (how_many == 0)
+	return wch;
+      break;
+    case ENC_ISO_UTF32_BE:
+      if (!how_many) {
+	how_many = 4;
+	wch = 0;
+      }
+      how_many--;
+      wch += ((unsigned char) (ch & 0xff)) << ((3-how_many)*8);
+      if (how_many == 0)
+	return wch;
+      break;
     }
   }
   return EOF;
@@ -1992,6 +2095,16 @@ put_wchar(int sno, wchar_t ch)
     case ENC_UNICODE_LE:
       Stream[sno].stream_putc(sno, (ch&0xff));
       return Stream[sno].stream_putc(sno, (ch>>8));
+    case ENC_ISO_UTF32_BE:
+      Stream[sno].stream_putc(sno, (ch>>24) & 0xff);
+      Stream[sno].stream_putc(sno, (ch>>16) &0xff);
+      Stream[sno].stream_putc(sno, (ch>>8) & 0xff);
+      return Stream[sno].stream_putc(sno, ch&0xff);
+    case ENC_ISO_UTF32_LE:
+      Stream[sno].stream_putc(sno, ch&0xff);
+      Stream[sno].stream_putc(sno, (ch>>8) & 0xff);
+      Stream[sno].stream_putc(sno, (ch>>16) &0xff);
+      return Stream[sno].stream_putc(sno, (ch>>24) & 0xff);
     }
   }
   return -1;
@@ -2219,6 +2332,24 @@ write_bom(int sno, StreamDesc *st)
       return FALSE;
     if (st->stream_putc(sno,0xFE)<0)
       return FALSE;
+  case ENC_ISO_UTF32_BE:
+    if (st->stream_putc(sno,0x00)<0)
+      return FALSE;
+    if (st->stream_putc(sno,0x00)<0)
+      return FALSE;
+    if (st->stream_putc(sno,0xFE)<0)
+      return FALSE;
+    if (st->stream_putc(sno,0xFF)<0)
+      return FALSE;
+  case ENC_ISO_UTF32_LE:
+    if (st->stream_putc(sno,0xFF)<0)
+      return FALSE;
+    if (st->stream_putc(sno,0xFE)<0)
+      return FALSE;
+    if (st->stream_putc(sno,0x00)<0)
+      return FALSE;
+    if (st->stream_putc(sno,0x00)<0)
+      return FALSE;
   default:
     return TRUE;
   }
@@ -2240,34 +2371,86 @@ check_bom(int sno, StreamDesc *st)
     return TRUE;
   }
   switch(ch) {
+  case 0x00:
+    {
+      ch = st->stream_getc(sno);
+      if (ch == EOFCHAR || ch != 0x00) {
+	      st->och = ch;
+	      st->stream_getc = PlUnGetc00;
+	      st->stream_wgetc = get_wchar;
+	      st->stream_gets = DefaultGets;
+	      return TRUE;
+      } else {
+        ch = st->stream_getc(sno);
+        if (ch == EOFCHAR || ch != 0xFE) {
+    	    st->och = ch;
+    	    st->stream_getc = PlUnGetc0000;
+    	    st->stream_wgetc = get_wchar;
+    	    st->stream_gets = DefaultGets;
+	        return TRUE;
+	      } else {
+          ch = st->stream_getc(sno);
+          if (ch == EOFCHAR || ch != 0xFF) {
+    	      st->och = ch;
+    	      st->stream_getc = PlUnGetc0000fe;
+    	      st->stream_wgetc = get_wchar;
+    	      st->stream_gets = DefaultGets;
+	          return TRUE;
+	        } else {
+	          st->status  |= HAS_BOM_f;
+	          st->encoding = ENC_ISO_UTF32_BE;
+	          return TRUE;
+          }
+        }
+      }
+    }
   case 0xFE:
     {
       ch = st->stream_getc(sno);
       if (ch != 0xFF) {
-	st->och = ch;
-	st->stream_getc = PlUnGetc376;
-	st->stream_wgetc = get_wchar;
-	st->stream_gets = DefaultGets;
-	return TRUE;
+	      st->och = ch;
+	      st->stream_getc = PlUnGetc376;
+	      st->stream_wgetc = get_wchar;
+	      st->stream_gets = DefaultGets;
+	      return TRUE;
       } else {
-	st->status  |= HAS_BOM_f;
-	st->encoding = ENC_UNICODE_BE;
-	return TRUE;
+	      st->status  |= HAS_BOM_f;
+	      st->encoding = ENC_UNICODE_BE;
+	      return TRUE;
       }
     }
   case 0xFF:
     {
       ch = st->stream_getc(sno);
       if (ch != 0xFE) {
-	st->och = ch;
-	st->stream_getc = PlUnGetc377;
-	st->stream_wgetc = get_wchar;
-	st->stream_gets = DefaultGets;
-	return TRUE;
+	      st->och = ch;
+	      st->stream_getc = PlUnGetc377;
+	      st->stream_wgetc = get_wchar;
+	      st->stream_gets = DefaultGets;
+	      return TRUE;
       } else {
-	st->status  |= HAS_BOM_f;
-	st->encoding  = ENC_UNICODE_LE;
-	return TRUE;
+        ch = st->stream_getc(sno);
+        if (ch == EOFCHAR || ch != 0x00) {
+    	    st->och = ch;
+    	    st->stream_getc = PlUnGetc377376;
+    	    st->stream_wgetc = get_wchar;
+    	    st->stream_gets = DefaultGets;
+	      } else {
+          ch = st->stream_getc(sno);
+          if (ch == EOFCHAR || ch != 0x00) {
+    	      st->och = ch;
+    	      st->stream_getc = PlUnGetc37737600;
+    	      st->stream_wgetc = get_wchar;
+    	      st->stream_gets = DefaultGets;
+	        } else {
+		        st->status  |= HAS_BOM_f;
+		        st->encoding = ENC_ISO_UTF32_LE;
+		        return TRUE;
+	        }
+	      }
+	    st->status  |= HAS_BOM_f;
+	    st->encoding  = ENC_UNICODE_LE;
+	    return TRUE;
       }
     }
   case 0xEF:
@@ -2281,15 +2464,15 @@ check_bom(int sno, StreamDesc *st)
     } else {
       ch = st->stream_getc(sno);
       if (ch != 0xBF) {
-	st->och = ch;
-	st->stream_getc = PlUnGetc357273;
-	st->stream_wgetc = get_wchar;
-	st->stream_gets = DefaultGets;
-	return TRUE;
+	      st->och = ch;
+	      st->stream_getc = PlUnGetc357273;
+	      st->stream_wgetc = get_wchar;
+	      st->stream_gets = DefaultGets;
+	      return TRUE;
       } else {
-	st->status  |= HAS_BOM_f;
-	st->encoding  = ENC_ISO_UTF8;
-	return TRUE;
+	      st->status  |= HAS_BOM_f;
+	      st->encoding  = ENC_ISO_UTF8;
+	      return TRUE;
       }
     }
   default:
@@ -2628,6 +2811,13 @@ p_open (void)
 	     (needs_bom || (st->status & Seekable_Stream_f))) {
     if (!check_bom(sno, st))
       return FALSE;
+    if (st->encoding == ENC_ISO_UTF32_BE) {
+	    Yap_Error(DOMAIN_ERROR_STREAM_ENCODING, ARG1, "UTF-32 (BE) stream encoding unsupported");
+	    return FALSE;
+    } else if (st->encoding == ENC_ISO_UTF32_LE) {
+	    Yap_Error(DOMAIN_ERROR_STREAM_ENCODING, ARG1, "UTF-32 (LE) stream encoding unsupported");
+	    return FALSE;
+    }
   }
   st->status &= ~(Free_Stream_f);
   return (Yap_unify (ARG3, t));
@@ -3305,9 +3495,17 @@ CheckStream (Term arg, int kind, char *msg)
 	sname = AtomUserOut;
       }
     }
+    if (kind & SWI_Stream_f) {
+      struct io_stream *swi_stream;
+
+      if (Yap_get_stream_handle(arg, kind & Input_Stream_f, kind & Output_Stream_f, &swi_stream)) {
+	sno = LookupSWIStream(swi_stream);
+	return sno;
+      }       
+    }
     if ((sno = CheckAlias(sname)) == -1) {
       Yap_Error(EXISTENCE_ERROR_STREAM, arg, msg);
-      return(-1);
+      return -1;
     }
   } else if (IsApplTerm (arg) && FunctorOfTerm (arg) == FunctorStream) {
     arg = ArgOfTerm (1, arg);
@@ -3500,9 +3698,11 @@ Yap_CloseStreams (int loud)
       } else {
 	free(Stream[sno].u.mem_string.buf);
       }
-    } else if (!(Stream[sno].status & Null_Stream_f))
+    } else if (Stream[sno].status & (SWI_Stream_f)) {
+      SWIClose(Stream[sno].u.swi_stream.swi_ptr);
+    } else if (!(Stream[sno].status & Null_Stream_f)) {
       YP_fclose (Stream[sno].u.file.file);
-    else {
+    } else {
       if (loud)
 	fprintf (Yap_stderr, "%% YAP Error: while closing stream: %s\n", RepAtom (Stream[sno].u.file.name)->StrOfAE);
     }
@@ -3905,7 +4105,15 @@ static Int
 p_write2_prio (void)
 {				/* '$write'(+Stream,+Flags,?Term) */
   int old_output_stream = Yap_c_output_stream;
-  Yap_c_output_stream = CheckStream (ARG1, Output_Stream_f, "write/2");
+  Int flags = IntegerOfTerm(Deref(ARG2));
+  int stream_f;
+
+  if (flags & Use_SWI_Stream_f) {
+    stream_f = Output_Stream_f|SWI_Stream_f;
+  } else {
+    stream_f = Output_Stream_f;
+  }
+  Yap_c_output_stream = CheckStream (ARG1, stream_f, "write/2");
   if (Yap_c_output_stream == -1) {
     Yap_c_output_stream = old_output_stream;
     return(FALSE);
@@ -3914,7 +4122,7 @@ p_write2_prio (void)
   /* notice: we must have ASP well set when using portray, otherwise
      we cannot make recursive Prolog calls */
   Yap_StartSlots();
-  Yap_plwrite (ARG4, Stream[Yap_c_output_stream].stream_wputc, (int) IntOfTerm (Deref (ARG2)), (int) IntOfTerm (Deref (ARG3)));
+  Yap_plwrite (ARG4, Stream[Yap_c_output_stream].stream_wputc, (int) flags, (int) IntOfTerm (Deref (ARG3)));
   Yap_CloseSlots();
   Yap_c_output_stream = old_output_stream;
   if (EX != 0L) {
@@ -4557,6 +4765,9 @@ StreamPosition(int sno)
   Term sargs[5];
   Int cpos;
   cpos = Stream[sno].charcount;
+  if (Stream[sno].status & SWI_Stream_f) {
+    return Yap_get_stream_position(Stream[sno].u.swi_stream.swi_ptr);
+  }
   if (Stream[sno].stream_getc == PlUnGetc) {
     cpos--;
   }
@@ -5753,10 +5964,9 @@ p_format(void)
   return res;
 }
 
-
 static Int
-p_format2(void)
-{				/* 'format'(Stream,Control,Args)          */
+format2(UInt  stream_flag)
+{
   int old_c_stream = Yap_c_output_stream;
   int mem_stream = FALSE, codes_stream = FALSE;
   Int out;
@@ -5775,7 +5985,7 @@ p_format2(void)
     mem_stream = TRUE;
   } else {
     /* needs to change Yap_c_output_stream for write */
-    Yap_c_output_stream = CheckStream (ARG1, Output_Stream_f, "format/3");
+    Yap_c_output_stream = CheckStream (ARG1, Output_Stream_f|stream_flag, "format/3");
   }
   UNLOCK(Stream[Yap_c_output_stream].streamlock);
   if (Yap_c_output_stream == -1) {
@@ -5805,6 +6015,18 @@ p_format2(void)
     Yap_c_output_stream = old_c_stream;  
   }
   return out;
+}
+
+static Int
+p_format2(void)
+{				/* 'format'(Stream,Control,Args)          */
+  return format2(0);
+}
+
+static Int
+p_swi_format(void)
+{				/* 'format'(Stream,Control,Args)          */
+  return format2(SWI_Stream_f);
 }
 
 
@@ -6462,6 +6684,9 @@ p_file_base_name (void)
       char *c = RepAtom(at)->StrOfAE;
       Int i = strlen(c);
       while (i && !Yap_dir_separator((int)c[--i]));
+      if (Yap_dir_separator((int)c[i])) {
+	i++;
+      }
       return Yap_unify(ARG2, MkAtomTerm(Yap_LookupAtom(c+i)));
   }
 }
@@ -6600,6 +6825,10 @@ Yap_InitIOPreds(void)
   Yap_InitCPred ("$toupper", 2, p_toupper, SafePredFlag|HiddenPredFlag);
   Yap_InitCPred ("$tolower", 2, p_tolower, SafePredFlag|HiddenPredFlag);
   Yap_InitCPred ("file_base_name", 2, p_file_base_name, SafePredFlag|HiddenPredFlag);
+
+  CurrentModule = SYSTEM_MODULE;
+  Yap_InitCPred ("swi_format", 3, p_swi_format, SyncPredFlag);
+  CurrentModule = cm;
 
   Yap_InitReadUtil ();
 #if USE_SOCKET

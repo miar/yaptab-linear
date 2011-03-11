@@ -65,7 +65,7 @@ static char SccsId[] = "%W% %G%";
 /* weak backtraking mechanism based on long_jump */
 
 typedef struct jmp_buff_struct {
-	jmp_buf JmpBuff;
+	sigjmp_buf JmpBuff;
 } JMPBUFF;
 
 STATIC_PROTO(void GNextToken, (void));
@@ -81,7 +81,7 @@ STATIC_PROTO(Term ParseTerm, (int, JMPBUFF *));
         Volatile CELL *saveH=H;                \
         Volatile int savecurprio=curprio;      \
         saveenv=FailBuff;                      \
-        if(!setjmp(newenv.JmpBuff)) {          \
+        if(!sigsetjmp(newenv.JmpBuff, 0)) {      \
                 FailBuff = &newenv;            \
 		S;                             \
 		FailBuff=saveenv;              \
@@ -99,7 +99,7 @@ STATIC_PROTO(Term ParseTerm, (int, JMPBUFF *));
 	Volatile TokEntry *saveT=Yap_tokptr;   \
         Volatile CELL *saveH=H;                \
         saveenv=FailBuff;                      \
-        if(!setjmp(newenv.JmpBuff)) {          \
+        if(!sigsetjmp(newenv.JmpBuff, 0)) {      \
                 FailBuff = &newenv;            \
 		S;                             \
 		FailBuff=saveenv;              \
@@ -113,7 +113,7 @@ STATIC_PROTO(Term ParseTerm, (int, JMPBUFF *));
    }
 
 
-#define FAIL  longjmp(FailBuff->JmpBuff,1)
+#define FAIL  siglongjmp(FailBuff->JmpBuff,1)
 
 VarEntry *
 Yap_LookupVar(char *var)	/* lookup variable in variables table   */
@@ -181,7 +181,7 @@ VarNames(VarEntry *p,Term l)
 				   VarNames(p->VarLeft,l)));
       if (H > ASP-4096) {
 	save_machine_regs();
-	longjmp(Yap_IOBotch,1);
+	siglongjmp(Yap_IOBotch,1);
       }  
       return(o);
     } else {
@@ -456,10 +456,6 @@ ParseTerm(int prio, JMPBUFF *FailBuff)
 	    t = MkLongIntTerm(-LongIntOfTerm(t));
 	  NextToken;
 	  break;
-	} else if ((Atom)t == AtomPlus) {
-	  t = Yap_tokptr->TokInfo;
-	  NextToken;
-	  break;
 	}
       } else if (Yap_tokptr->Tok == Name_tok) {
 	Atom at = (Atom)Yap_tokptr->TokInfo;
@@ -710,7 +706,7 @@ Yap_Parse(void)
   Volatile Term t;
   JMPBUFF FailBuff;
 
-  if (!setjmp(FailBuff.JmpBuff)) {
+  if (!sigsetjmp(FailBuff.JmpBuff, 0)) {
     t = ParseTerm(1200, &FailBuff);
     if (Yap_tokptr->Tok != Ord(eot_tok))
       return (0L);

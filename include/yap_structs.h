@@ -176,6 +176,8 @@ typedef struct {
 
 typedef int  (*YAP_agc_hook)(void *_Atom);
 
+typedef void  (*YAP_halt_hook)(int exit_code, void *closure);
+
 /********* execution mode ***********************/
 
 typedef enum
@@ -186,4 +188,12 @@ typedef enum
     YAPC_COMPILE_USER,          /* compile all user predicates*/
     YAPC_COMPILE_ALL          /* compile all predicates */
   } yapc_exec_mode;
+
+/********* YAP C-Flags ***********************/
+
+typedef enum
+  {
+    YAPC_ENABLE_GC,                 /* enable or disable garbage collection */
+    YAPC_ENABLE_AGC                 /* enable or disable atom garbage collection */
+  } yap_flag_t;
 

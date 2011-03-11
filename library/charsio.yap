@@ -28,8 +28,13 @@
 	open_chars_stream/2,
 	with_output_to_chars/2,
 	with_output_to_chars/3,
-	with_output_to_chars/4
+	with_output_to_chars/4,
+ term_to_atom/2 
     ]).
+
+:- meta_predicate(with_output_to_chars(0,?)).
+:- meta_predicate(with_output_to_chars(0,-,?)).
+:- meta_predicate(with_output_to_chars(0,-,?,?)).
 
 format_to_chars(Form, Args, OUT) :-
 	format_to_chars(Form, Args, OUT, []).
@@ -43,13 +48,6 @@ format_to_chars(Form, Args, OUT, L0) :-
 
 write_to_chars(Term, OUT) :-
 	write_to_chars(Term, [], OUT).
-
-write_to_chars(Term, L0, OUT) :-
-	open_mem_write_stream(Stream),
-	write(Stream, Term),
-	peek_mem_write_stream(Stream, L0, O),
-	close(Stream),
-	O = OUT.
 
 atom_to_chars(Atom, OUT) :-
 	atom_to_chars(Atom, [], OUT).
@@ -82,12 +80,6 @@ number_to_chars(Number, L0, OUT) :-
 	O = OUT.
 number_to_chars(Number, L0, OUT) :-
 	throw(error(type_error(number,Number),number_to_chars(Number, L0, OUT))).
-
-read_from_chars(Chars, Term) :-
-	open_mem_read_stream(Chars, Stream),
-	read(Stream, T),
-	close(Stream),
-	T = Term.
 
 open_chars_stream(Chars, Stream) :-
 	open_mem_read_stream(Chars, Stream).

@@ -28,6 +28,8 @@ typedef int (*SWI_PutWideFunction)(int, void *);
 typedef int (*SWI_GetWideFunction)(void *);
 typedef int (*SWI_CloseFunction)(void *);
 typedef int (*SWI_FlushFunction)(void *);
+typedef int (*SWI_PLGetStreamFunction)(void *);
+typedef int (*SWI_PLGetStreamPositionFunction)(void *);
 
 #include "../include/dswiatoms.h"
 
@@ -62,6 +64,16 @@ typedef struct gc_ma_hash_entry_struct {
   struct gc_ma_hash_entry_struct *next;
 } gc_ma_hash_entry;
 
+typedef void (*HaltHookFunc)(int, void *);
+
+typedef struct halt_hook {
+  void * environment;
+  HaltHookFunc hook;
+  struct halt_hook *next;
+} halt_hook_entry;
+
+int	STD_PROTO(Yap_HaltRegisterHook,(HaltHookFunc, void *));
+
 typedef struct atom_hash_entry {
 #if defined(YAPOR) || defined(THREADS)
   rwlock_t AERWLock;
@@ -82,6 +94,12 @@ typedef struct scratch_block_struct {
   char *ptr;
   UInt sz, msz;
 } scratch_block;
+
+typedef struct record_list {
+  /* a list of dbterms associated with a clause */
+  struct DB_TERM *dbrecord;
+  struct record_list *next_rec, *prev_rec;
+} DBRecordList;
 
 typedef struct restore_info {
   Int base_diff;
@@ -161,11 +179,19 @@ typedef struct various_codes {
 
 #include "hglobals.h"
 
+#if defined(YAPOR) && !defined(THREADS)
+extern struct worker_shared *Yap_global;
+#else
 extern struct worker_shared Yap_Global;
 #define Yap_global (&Yap_Global)
+#endif
 
 #if defined(YAPOR) || defined(THREADS)
-extern struct worker_local	Yap_WLocal[MAX_WORKERS];
+#if defined(THREADS)
+extern struct worker_local	Yap_WLocal[MAX_AGENTS];
+#else
+extern struct worker_local	*Yap_WLocal;
+#endif
 #define WL (Yap_WLocal+worker_id)
 #define FOREIGN_WL(wid) (Yap_WLocal+(wid))
 #else

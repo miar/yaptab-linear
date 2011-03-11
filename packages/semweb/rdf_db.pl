@@ -127,6 +127,10 @@
 	    (rdf_meta)/1,		% +Heads
 	    op(1150, fx, (rdf_meta))
 	  ]).
+
+:- expects_dialect(swi).
+:- assert(system:swi_io).
+
 :- use_module(library(rdf)).
 :- use_module(library(lists)).
 :- use_module(library(shlib)).
@@ -152,6 +156,16 @@
 	rdf_source/5.
 :- discontiguous
 	term_expansion/2.
+
+:- meta_predicate
+	rdf_transaction(0),
+	rdf_transaction(0, +),
+	rdf_monitor(1, +),
+	rdf_save(+, :),
+	rdf_load(+, :).
+
+:- thread_local
+	named_anon/2.			% +Resource, -Id
 
 /** <module> Core RDF database
 
@@ -1201,8 +1215,8 @@ rdf_load_stream(triples, Stream, Options) :- !,
 %%	report_loaded(+Action, +Source, +DB, +Triples, +StartCPU, +Options)
 
 report_loaded(none, _, _, _, _, _) :- !.
-report_loaded(Action, Source, DB, Triples, T0, Options) :-
-	statistics(cputime, T1),
+report_loaded(Action, Source, DB, Triples, T0._, Options) :-
+	statistics(cputime, T1._),
 	Time is T1 - T0,
 	(   option(silent(true), Options)
 	->  Level = silent
@@ -1288,7 +1302,7 @@ modified_graph(SourceURL, Graph) :-
 %	Save triples belonging to DB in the file Cache.
 
 save_cache(DB, Cache) :-
-	catch(open(Cache, write, CacheStream, [type(binary)]), _, fail), !,
+	catch(system:swi_open(Cache, write, CacheStream, [type(binary)]), _, fail), !,
 	call_cleanup(rdf_save_db_(CacheStream, DB),
 		     close(CacheStream)).
 
@@ -1368,16 +1382,6 @@ rdf_reset_db :-
 %	@param Out	Location to save the data.  This can also be a
 %			file-url (=|file://path|=) or a stream wrapped
 %			in a term stream(Out).
-
-:- meta_predicate
-	rdf_transaction(0),
-	rdf_transaction(0, +),
-	rdf_monitor(1, +),
-	rdf_save(+, :),
-	rdf_load(+, :).
-
-:- thread_local
-	named_anon/2.			% +Resource, -Id
 
 rdf_save(File) :-
 	rdf_save2(File, []).
@@ -2183,3 +2187,7 @@ into(_, _) --> [].			% TBD
 in_time(Triples, ParseTime) -->
 	[ ' in ~2f sec; ~D triples'-[ParseTime, Triples]
 	].
+
+:- retract(system:swi_io).
+
+

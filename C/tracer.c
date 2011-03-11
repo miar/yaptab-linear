@@ -172,6 +172,8 @@ low_level_trace(yap_low_level_port port, PredEntry *pred, CELL *args)
   LOCK(Yap_heap_regs->low_level_trace_lock);
   sc = Yap_heap_regs;
   vsc_count++;
+  if (vsc_count==29)
+    jmp_deb(1);
 #ifdef THREADS
   MY_ThreadHandle.thread_inst_count++;
 #endif  
@@ -370,6 +372,16 @@ static Int p_start_low_level_trace(void)
   return(TRUE);
 }
 
+static Int p_total_choicepoints(void)
+{
+  return Yap_unify(MkIntegerTerm(Yap_total_choicepoints),ARG1);
+}
+
+static Int p_reset_total_choicepoints(void)
+{
+  Yap_total_choicepoints = 0;
+}
+
 static Int p_show_low_level_trace(void)
 {
   fprintf(stderr,"Call counter=%lld\n",vsc_count);
@@ -391,7 +403,6 @@ static Int p_stop_low_level_trace(void)
 {
   Yap_do_low_level_trace = FALSE;
   do_trace_primitives = TRUE;
-  fprintf(stderr,"vsc_count = %I64d\n",vsc_count);
   return(TRUE);
 }
 
@@ -413,6 +424,8 @@ Yap_InitLowLevelTrace(void)
 #endif
   Yap_InitCPred("stop_low_level_trace", 0, p_stop_low_level_trace, SafePredFlag);
   Yap_InitCPred("show_low_level_trace", 0, p_show_low_level_trace, SafePredFlag);
+  Yap_InitCPred("total_choicepoints", 1, p_total_choicepoints, SafePredFlag);
+  Yap_InitCPred("reset_total_choicepoints", 0, p_reset_total_choicepoints, SafePredFlag);
   Yap_InitCPred("vsc_wait", 0, p_vsc_wait, SafePredFlag);
 }
 

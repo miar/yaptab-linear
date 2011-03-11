@@ -72,6 +72,7 @@ otherwise.
 	 'profile.yap',
 	 'callcount.yap',
 	 'load_foreign.yap',
+	 'save.yap',
 	 'sockets.yap',
 	 'sort.yap',
 	 'setof.yap',
@@ -205,5 +206,5 @@ file_search_path(system, Dir) :-
 	prolog_flag(host_type, Dir).
 file_search_path(foreign, yap('lib/Yap')).
 
-%:- yap_flag(unknown,error). 
+:- yap_flag(unknown,error). 
 

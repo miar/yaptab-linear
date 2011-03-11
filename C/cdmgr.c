@@ -200,7 +200,7 @@
 * Revision 1.174  2005/12/23 00:20:13  vsc
 * updates to gprof
 * support for __POWER__
-* Try to saveregs before longjmp.
+* Try to saveregs before _longjmp.
 *
 * Revision 1.173  2005/12/17 03:25:39  vsc
 * major changes to support online event-based profiling
@@ -507,8 +507,6 @@ STATIC_PROTO(Int  p_new_multifile, (void));
 STATIC_PROTO(Int  p_is_multifile, (void));
 STATIC_PROTO(Int  p_optimizer_on, (void));
 STATIC_PROTO(Int  p_optimizer_off, (void));
-STATIC_PROTO(Int  p_in_this_f_before, (void));
-STATIC_PROTO(Int  p_first_cl_in_f, (void));
 STATIC_PROTO(Int  p_is_dynamic, (void));
 STATIC_PROTO(Int  p_kill_dynamic, (void));
 STATIC_PROTO(Int  p_compile_mode, (void));
@@ -773,8 +771,10 @@ get_pred(Term t,  Term tmod, char *pname)
 #define ModuleAdjust(X) (X)
 #define ExternalFunctionAdjust(X) (X)
 #define AdjustSwitchTable(X,Y,Z) 
+#define DBGroundTermAdjust(X)  (X)
 #define rehash(A,B,C)
-static Term BlobTermAdjust(Term t)
+
+static Term BlobTermInCodeAdjust(Term t)
 {
 #if TAGS_FAST_OPS
   return t-ClDiff;
@@ -783,20 +783,12 @@ static Term BlobTermAdjust(Term t)
 #endif
 }
 
-static Term ConstantTermAdjust (Term);
-
 static Term
 ConstantTermAdjust (Term t)
 {
   if (IsAtomTerm(t))
     return AtomTermAdjust(t);
-  else if (IsIntTerm(t))
-    return t;
-  else if (IsApplTerm(t))
-    return BlobTermAdjust(t);
-  else if (IsPairTerm(t))
-    return CodeComposedTermAdjust(t);
-  else return t;
+  return t;
 }
 
 
@@ -926,6 +918,7 @@ split_megaclause(PredEntry *ap)
 	}
 	return;
       }
+      break;
     }
     Yap_ClauseSpace += sizeof(StaticClause)+mcl->ClItemSize+(UInt)NEXTOP((yamop *)NULL,p);
     new->ClFlags = StaticMask|FactMask;
@@ -1265,6 +1258,8 @@ cleanup_dangling_indices(yamop *ipc, yamop *beg, yamop *end, yamop *suspend_code
     case _switch_on_cons:
     case _if_cons:
     case _go_on_cons:
+      /* make sure we don't leave dangling references to memory that is going to be removed */
+      ipc->u.sssl.l = NULL;
       ipc = NEXTOP(ipc,sssl);
       break;
     case _op_fail:
@@ -1277,12 +1272,6 @@ cleanup_dangling_indices(yamop *ipc, yamop *beg, yamop *end, yamop *suspend_code
     ipc = (yamop *)((CELL)ipc & ~1);
 #endif    
   }
-}
-
-void
-Yap_cleanup_dangling_indices(yamop *ipc, yamop *beg, yamop *end, yamop *sc)
-{
-  cleanup_dangling_indices(ipc, beg, end, sc);
 }
 
 static void
@@ -2427,80 +2416,6 @@ Yap_add_logupd_clause(PredEntry *pe, LogUpdClause *cl, int mode) {
   } else {
     assertz_stat_clause(pe, cp, FALSE);
   }
-}
-
-static Int 
-p_in_this_f_before(void)
-{				/* '$in_this_file_before'(N,A,M) */
-  unsigned int    arity;
-  Atom            at;
-  Term            t;
-  register consult_obj  *fp;
-  Prop            p0;
-  Term            mod;
-
-  if (IsVarTerm(t = Deref(ARG1)) || !IsAtomTerm(t))
-    return (FALSE);
-  else
-    at = AtomOfTerm(t);
-  if (IsVarTerm(t = Deref(ARG2)) || !IsIntTerm(t))
-    return (FALSE);
-  else
-    arity = IntOfTerm(t);
-  if (IsVarTerm(mod = Deref(ARG3)) || !IsAtomTerm(mod))
-    return FALSE;
-  if (arity)
-    p0 = PredPropByFunc(Yap_MkFunctor(at, arity), mod);
-  else
-    p0 = PredPropByAtom(at, mod);
-  if (!ConsultSp || ConsultSp == ConsultBase || LastAssertedPred == RepPredProp(p0) || (fp = ConsultSp)->p == p0)
-    return FALSE;
-  else
-    fp++;
-  for (; fp < ConsultBase; ++fp)
-    if (fp->p == p0)
-      break;
-  if (fp != ConsultBase)
-    return TRUE;
-  else
-    return FALSE;
-}
-
-static Int 
-p_first_cl_in_f(void)
-{				/* '$first_cl_in_file'(+N,+Ar,+Mod) */
-  unsigned int    arity;
-  Atom            at;
-  Term            t;
-  register consult_obj  *fp;
-  Prop            p0;
-  Term	          mod;
-  
-
-  if (IsVarTerm(t = Deref(ARG1)) || !IsAtomTerm(t))
-    return (FALSE);
-  else
-    at = AtomOfTerm(t);
-  if (IsVarTerm(t = Deref(ARG2)) || !IsIntTerm(t))
-    return (FALSE);
-  else
-    arity = IntOfTerm(t);
-  if (IsVarTerm(mod = Deref(ARG3)) || !IsAtomTerm(mod))
-    return (FALSE);
-  if (arity)
-    p0 = PredPropByFunc(Yap_MkFunctor(at, arity),mod);
-  else
-    p0 = PredPropByAtom(at, mod);
-  if (LastAssertedPred == RepPredProp(p0))
-    return FALSE;
-  if (!ConsultSp)
-    return FALSE;
-  for (fp = ConsultSp; fp < ConsultBase; ++fp)
-    if (fp->p == p0)
-      break;
-  if (fp != ConsultBase)
-    return FALSE;
-  return TRUE;
 }
 
 #if EMACS
@@ -5170,6 +5085,31 @@ p_continue_static_clause(void)
 #if LOW_PROF
 
 static void
+add_code_in_lu_index(LogUpdIndex *cl, PredEntry *pp)
+{
+  char *code_end = (char *)cl + cl->ClSize;
+  Yap_inform_profiler_of_clause(cl->ClCode, (yamop *)code_end, pp,0);
+  cl = cl->ChildIndex;
+  while (cl != NULL) {
+    add_code_in_lu_index(cl, pp);
+    cl = cl->SiblingIndex;
+  }
+}
+
+static void
+add_code_in_static_index(StaticIndex *cl, PredEntry *pp)
+{
+  char *code_end = (char *)cl + cl->ClSize;
+  Yap_inform_profiler_of_clause(cl->ClCode, (yamop *)code_end, pp,0);
+  cl = cl->ChildIndex;
+  while (cl != NULL) {
+    add_code_in_static_index(cl, pp);
+    cl = cl->SiblingIndex;
+  }
+}
+
+
+static void
 add_code_in_pred(PredEntry *pp) {
   yamop *clcode;
 
@@ -5192,15 +5132,13 @@ add_code_in_pred(PredEntry *pp) {
   Yap_inform_profiler_of_clause((yamop *)&(pp->cs.p_code.ExpandCode), (yamop *)(&(pp->cs.p_code.ExpandCode)+1), pp, 1);
   clcode = pp->cs.p_code.TrueCodeOfPred;
   if (pp->PredFlags & IndexedPredFlag) {
-    char *code_end;
     if (pp->PredFlags & LogUpdatePredFlag) {
       LogUpdIndex *cl = ClauseCodeToLogUpdIndex(clcode);
-      code_end = (char *)cl + cl->ClSize;
+      add_code_in_lu_index(cl, pp);
     } else {
       StaticIndex *cl = ClauseCodeToStaticIndex(clcode);
-      code_end = (char *)cl + cl->ClSize;
+      add_code_in_static_index(cl, pp);
     }
-    Yap_inform_profiler_of_clause(clcode, (yamop *)code_end, pp,0);
   }	      
   clcode = pp->cs.p_code.FirstClause;
   if (clcode != NULL) {
@@ -5232,7 +5170,7 @@ add_code_in_pred(PredEntry *pp) {
 
 	code_end = (char *)cl + cl->ClSize;
 	Yap_inform_profiler_of_clause(cl->ClCode, (yamop *)code_end, pp,0);
-	if (cl->ClCode == pp->cs.p_code.FirstClause)
+	if (cl->ClCode == pp->cs.p_code.LastClause)
 	  break;
 	cl = cl->ClNext;
       } while (TRUE);
@@ -5707,8 +5645,6 @@ Yap_InitCdMgr(void)
   Yap_InitCPred("$clean_up_dead_clauses", 0, p_clean_up_dead_clauses, SyncPredFlag|HiddenPredFlag);
   Yap_InitCPred("$optimizer_off", 0, p_optimizer_off, SafePredFlag|SyncPredFlag|HiddenPredFlag);
   Yap_InitCPred("$kill_dynamic", 2, p_kill_dynamic, SafePredFlag|SyncPredFlag|HiddenPredFlag);
-  Yap_InitCPred("$in_this_file_before", 3, p_in_this_f_before, SafePredFlag|HiddenPredFlag);
-  Yap_InitCPred("$first_clause_in_file", 3, p_first_cl_in_f, SafePredFlag|HiddenPredFlag);
   Yap_InitCPred("$new_multifile", 3, p_new_multifile, SafePredFlag|SyncPredFlag|HiddenPredFlag);
   Yap_InitCPred("$is_multifile", 2, p_is_multifile, TestPredFlag | SafePredFlag|HiddenPredFlag);
   Yap_InitCPred("$is_profiled", 1, p_is_profiled, SafePredFlag|SyncPredFlag|HiddenPredFlag);

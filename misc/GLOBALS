@@ -104,6 +104,10 @@ YAP_ULONG_LONG		tot_gc_recovered	TotGcRecovered	=0L
 Int			last_gc_time		LastGcTime	=0L
 Int			last_ss_time		LastSSTime	=0L
 
+#if LOW_LEVEL_TRACER
+Int			total_cps		Yap_total_choicepoints	=0
+#endif
+
 // global variables that cannot be global in a thread/or-p implementation
 #if defined(YAPOR) || defined(THREADS)
 lockvar				signal_lock	SignalLock	MkLock
@@ -144,7 +148,7 @@ struct RB_red_blk_node*		DB_nil		db_nil		=NULL
 #endif /* defined(YAPOR) || defined(THREADS) */
 
 
-jmp_buf				gc_restore		Yap_gc_restore	void
+sigjmp_buf			gc_restore		Yap_gc_restore	void
 struct array_entry*		dynamic_arrays		DynamicArrays	=NULL PtoArrayEAdjust
 struct static_array_entry*	static_arrays		StaticArrays	=NULL PtoArraySAdjust
 struct global_entry*		global_variables	GlobalVariables	=NULL PtoGlobalEAdjust
@@ -210,6 +214,8 @@ SWI_GetWideFunction	swi_wgetc		SWIWideGetc	=NULL
 SWI_PutWideFunction	swi_wputc		SWIWidePutc	=NULL
 SWI_CloseFunction	swi_close		SWIClose	=NULL
 SWI_FlushFunction	swi_flush		SWIFlush	=NULL
+SWI_PLGetStreamFunction	swi_get_stream_f	SWIGetStream	=NULL
+SWI_PLGetStreamPositionFunction swi_get_stream_position_f	SWIGetStreamPosition	=NULL
 
 // stack overflow expansion/gc control
 int		allow_local_expansion	Yap_AllowLocalExpansion =TRUE
@@ -244,6 +250,9 @@ int		initialised		Yap_Initialised		=FALSE
 int		initialised_from_pl	Yap_InitialisedFromPL	=FALSE
 int		pl_argc			Yap_PL_Argc		=0
 char	      **pl_argv			Yap_PL_Argv		=NULL
+
+// halt hooks
+struct halt_hook *yap_halt_hook		Yap_HaltHooks		=NULL
 
 END_WORKER_SHARED
 

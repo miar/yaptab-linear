@@ -1,21 +1,24 @@
+%%% -*- Mode: Prolog; -*-
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ProbLog program describing a probabilistic graph
 % (running example from ProbLog presentations)
+% $Id: graph.pl 4875 2010-10-05 15:28:35Z theo $
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 :- use_module(library(problog)).
 
 %%%%
 % background knowledge
-%%%% 
+%%%%
 % definition of acyclic path using list of visited nodes
 path(X,Y) :- path(X,Y,[X],_).
 
 path(X,X,A,A).
-path(X,Y,A,R) :- 
-	X\==Y, 
-	edge(X,Z), 
-	absent(Z,A), 
+path(X,Y,A,R) :-
+	X\==Y,
+	edge(X,Z),
+	absent(Z,A),
 	path(Z,Y,[Z|A],R).
 
 % using directed edges in both directions
@@ -42,7 +45,7 @@ absent(X,[Y|Z]):-X \= Y, absent(X,Z).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % example queries about path(1,4)
 %
-%%% explanation probability (and facts involved) 
+%%% explanation probability (and facts involved)
 %     ?- problog_max(path(1,4),Prob,FactsUsed).
 %  FactsUsed = [dir_edge(1,2),dir_edge(2,3),dir_edge(3,4)],
 %  Prob = 0.432 ?
@@ -63,7 +66,7 @@ absent(X,[Y|Z]):-X \= Y, absent(X,Z).
 %     ?- problog_montecarlo(path(1,4),0.01,Prob).
 %  Prob = 0.537525 ?
 %  yes
-%%% upper and lower bound using iterative deepening, final interval width 0.01 
+%%% upper and lower bound using iterative deepening, final interval width 0.01
 %    ?- problog_delta(path(1,4),0.01,Bound_low,Bound_up,Status).
 %  Bound_low = 0.5354096,
 %  Bound_up = 0.53864,
@@ -82,5 +85,5 @@ absent(X,[Y|Z]):-X \= Y, absent(X,Z).
 %  Bound_low = 0.432,
 %  Status = ok ?
 %  yes
-% 
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

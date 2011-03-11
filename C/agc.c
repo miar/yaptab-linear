@@ -74,6 +74,7 @@ CleanAtomMarkedBit(Atom a)
   return (Atom)c;
 }
 
+
 static inline Functor
 FuncAdjust(Functor f)
 {
@@ -111,6 +112,8 @@ AtomAdjust(Atom a)
   return(a);
 }
 
+static Term AdjustDBTerm(Term, Term *);
+
 #define IsOldCode(P) FALSE
 #define IsOldCodeCellPtr(P) FALSE
 #define IsOldDelay(P) FALSE
@@ -126,6 +129,7 @@ AtomAdjust(Atom a)
 
 #define REINIT_LOCK(P) 
 #define REINIT_RWLOCK(P) 
+#define NoAGCAtomAdjust(P) (P)
 #define OrArgAdjust(P) 
 #define TabEntryAdjust(P) 
 #define IntegerAdjust(D)  (D)
@@ -139,12 +143,12 @@ AtomAdjust(Atom a)
 #define OpcodeAdjust(P) (P)
 #define ModuleAdjust(P) (P)
 #define ExternalFunctionAdjust(P) (P)
+#define DBRecordAdjust(P) (P)
 #define PredEntryAdjust(P) (P)
 #define ModEntryPtrAdjust(P) (P)
 #define AtomEntryAdjust(P) (P)
 #define GlobalEntryAdjust(P) (P)
-#define BlobTermAdjust(P) (P)
-#define CodeComposedTermAdjust(P) (P)
+#define BlobTermInCodeAdjust(P) (P)
 #define CellPtoHeapAdjust(P) (P)
 #define PtoAtomHashEntryAdjust(P) (P)
 #define CellPtoHeapCellAdjust(P) (P)
@@ -187,6 +191,7 @@ AtomAdjust(Atom a)
 #define HoldEntryAdjust(P) (P)
 #define CodeCharPAdjust(P) (P)
 #define CodeVoidPAdjust(P) (P)
+#define HaltHookAdjust(P) (P)
 
 #define recompute_mask(dbr)
 
@@ -195,6 +200,8 @@ AtomAdjust(Atom a)
 #define RestoreSWIHash()
 
 #include "rheap.h"
+
+
 
 static void
 RestoreHashPreds(void)

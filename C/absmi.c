@@ -801,7 +801,6 @@ Yap_absmi(int inp)
     noheapleft:
       {
 	CELL cut_b = LCL0-(CELL *)(SREG[E_CB]);
-
 #ifdef SHADOW_S
 	S = SREG;
 #endif
@@ -1686,7 +1685,8 @@ Yap_absmi(int inp)
       /* ensure_space                   */
       BOp(ensure_space, Osbpi);
       {
-	Int sz =  PREG->u.Osbpi.i;   
+	Int sz =  PREG->u.Osbpi.i; 
+	UInt arity = PREG->u.Osbpi.p->ArityOfPE;
 	PREG = NEXTOP(PREG,Osbpi);
 	if (Unsigned(H) + sz > Unsigned(YREG)-CreepFlag) {
 	  YENV[E_CP] = (CELL) CPREG;
@@ -1698,7 +1698,7 @@ Yap_absmi(int inp)
 	  if (ASP > (CELL *)PROTECT_FROZEN_B(B))
 	    ASP = (CELL *)PROTECT_FROZEN_B(B);
 	  saveregs();
-	  if (!Yap_gcl(sz, 0, YENV, PREG)) {
+	  if (!Yap_gcl(sz, arity, YENV, PREG)) {
 	    Yap_Error(OUT_OF_STACK_ERROR,TermNil,Yap_ErrorMessage);
 	    setregs();
 	    FAIL();
@@ -2222,7 +2222,15 @@ Yap_absmi(int inp)
 
       /* cut                              */
       Op(cut, e);
-      PREG = NEXTOP(PREG, e);
+#ifdef COROUTINING
+      if (FALSE) {
+	CACHE_Y_AS_ENV(YREG);
+	check_stack(NoStackCut, H);
+	ENDCACHE_Y_AS_ENV();
+      }
+    do_cut:
+#endif
+      PREG = NEXTOP(NEXTOP(NEXTOP(PREG, e),Osbpp),l);
       {
 	choiceptr d0;
 	/* assume cut is always in stack */
@@ -2262,7 +2270,15 @@ Yap_absmi(int inp)
       /* cut_t                            */
       /* cut_t does the same as cut */
       Op(cut_t, e);
-      PREG = NEXTOP(PREG, e);
+#ifdef COROUTINING
+      if (FALSE) {
+	CACHE_Y_AS_ENV(YREG);
+	check_stack(NoStackCutT, H);
+	ENDCACHE_Y_AS_ENV();
+      }
+    do_cut_t:
+#endif
+      PREG = NEXTOP(NEXTOP(NEXTOP(PREG, e),Osbpp),l);
       {
 	choiceptr d0;
 
@@ -2317,7 +2333,15 @@ Yap_absmi(int inp)
 
       /* cut_e                            */
       Op(cut_e, e);
-      PREG = NEXTOP(PREG, e);
+#ifdef COROUTINING
+      if (FALSE) {
+	CACHE_Y_AS_ENV(YREG);
+	check_stack(NoStackCutE, H);
+	ENDCACHE_Y_AS_ENV();
+      }
+    do_cut_e:
+#endif
+      PREG = NEXTOP(NEXTOP(NEXTOP(PREG, e),Osbpp),l);
       {
 	choiceptr d0;
 	/* we assume dealloc leaves in S the previous env             */
@@ -2519,6 +2543,7 @@ Yap_absmi(int inp)
       PP = PREG->u.pp.p0;
       if (ActiveSignals & YAP_CDOVF_SIGNAL) {
 	ASP = YREG+E_CB;
+	SREG = YENV;
 	if (ASP > (CELL *)PROTECT_FROZEN_B(B))
 	  ASP = (CELL *)PROTECT_FROZEN_B(B);
 	goto noheapleft;
@@ -2660,6 +2685,12 @@ Yap_absmi(int inp)
     NoStackCall:
       PP = PREG->u.Osbpp.p0;
       /* on X86 machines S will not actually be holding the pointer to pred */
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	goto fail;
+      }
       if (ActiveSignals & YAP_CREEP_SIGNAL) {
 	PredEntry *ap = PREG->u.Osbpp.p;
 	SREG = (CELL *) ap;
@@ -2668,6 +2699,7 @@ Yap_absmi(int inp)
       SREG = (CELL *) PREG->u.Osbpp.p;
       if (ActiveSignals & YAP_CDOVF_SIGNAL) {
 	ASP = (CELL *) (((char *) YREG) + PREG->u.Osbpp.s);
+	SREG = YENV;
 	if (ASP > (CELL *)PROTECT_FROZEN_B(B))
 	  ASP = (CELL *)PROTECT_FROZEN_B(B);
 	goto noheapleft;
@@ -2695,14 +2727,22 @@ Yap_absmi(int inp)
       {
 	CELL cut_b = LCL0-(CELL *)(SREG[E_CB]);
 
+	if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	  ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	  if (!ActiveSignals)
+	    CreepFlag = CalculateStackGap();
+	  goto fail;
+	}
 	/* 
 	   don't do a creep here; also, if our instruction is followed by
 	   a execute_c, just wait a bit more */
-	if (ActiveSignals & YAP_CREEP_SIGNAL ||
+	if ( (ActiveSignals & YAP_CREEP_SIGNAL &&
+	      /* keep on going if there is something else */
+	      !(ActiveSignals & ~YAP_CREEP_SIGNAL))  ||
 	    (PREG->opc != Yap_opcode(_procceed) &&
 	     PREG->opc != Yap_opcode(_cut_e))) {
 	  GONext();
-	}
+	}  
 	PP = PREG->u.p.p;
 	ASP = YREG+E_CB;
 	/* cut_e */
@@ -2737,14 +2777,80 @@ Yap_absmi(int inp)
 #ifdef COROUTINING
 
      /* This is easier: I know there is an environment so I cannot do allocate */
+    NoStackCut:
+      /* find something to fool S */
+      if (!ActiveSignals || ActiveSignals & YAP_CDOVF_SIGNAL) {
+	goto do_cut;
+      }
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	FAIL();
+      }
+      if (!(ActiveSignals & YAP_CREEP_SIGNAL)) {
+	SREG = (CELL *)PredRestoreRegs;
+	XREGS[0] = MkIntegerTerm(LCL0-(CELL *)YREG[E_CB]);
+	PREG = NEXTOP(PREG,e);
+	goto creep_either;
+      }
+      /* don't do debugging and friends here */
+      goto do_cut;
+
+    NoStackCutT:
+      /* find something to fool S */
+      if (!ActiveSignals || ActiveSignals & YAP_CDOVF_SIGNAL) {
+	goto do_cut_t;
+      }
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	FAIL();
+      }
+      if (!(ActiveSignals & YAP_CREEP_SIGNAL)) {
+	SREG = (CELL *)PredRestoreRegs;
+	XREGS[0] = MkIntegerTerm(LCL0-(CELL *)SREG[E_CB]);
+	PREG = NEXTOP(PREG,e);
+	goto creep_either;
+      }
+      /* don't do debugging and friends here */
+      goto do_cut_t;
+
+    NoStackCutE:
+      if (!ActiveSignals || ActiveSignals & YAP_CDOVF_SIGNAL) {
+	goto do_cut_t;
+      }
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	FAIL();
+      }
+      if (!(ActiveSignals & YAP_CREEP_SIGNAL)) {
+	SREG = (CELL *)PredRestoreRegs;
+	XREGS[0] = MkIntegerTerm(LCL0-(CELL *)SREG[E_CB]);
+	PREG = NEXTOP(PREG,e);
+	goto creep_either;
+      }
+      /* don't do debugging and friends here */
+      goto do_cut_e;
+
+     /* This is easier: I know there is an environment so I cannot do allocate */
     NoStackCommitY:
       PP = PREG->u.yp.p0;
       /* find something to fool S */
       if (!ActiveSignals || ActiveSignals & YAP_CDOVF_SIGNAL) {
 	goto do_commit_b_y;
       }
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	FAIL();
+      }
       if (!(ActiveSignals & YAP_CREEP_SIGNAL)) {
-	SREG = (CELL *)RepPredProp(Yap_GetPredPropByFunc(FunctorRestoreRegs,0));
+	SREG = (CELL *)PredRestoreRegs;
 	XREGS[0] = YREG[PREG->u.yp.y];
 	PREG = NEXTOP(PREG,yp);
 	goto creep_either;
@@ -2759,8 +2865,14 @@ Yap_absmi(int inp)
       if (!ActiveSignals || ActiveSignals & YAP_CDOVF_SIGNAL) {
 	goto do_commit_b_x;
       }
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	FAIL();
+      }
       if (!(ActiveSignals & YAP_CREEP_SIGNAL)) {
-	SREG = (CELL *)RepPredProp(Yap_GetPredPropByFunc(FunctorRestoreRegs,0));
+	SREG = (CELL *)PredRestoreRegs;
 #if USE_THREADED_CODE
 	if (PREG->opc == (OPCODE)OpAddress[_fcall])
 #else
@@ -2785,8 +2897,15 @@ Yap_absmi(int inp)
 
       /* Problem: have I got an environment or not? */
     NoStackFail:
+      if (ActiveSignals && ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	/* we're happy */
+	goto fail;
+      }
       /* find something to fool S */
-      if (!ActiveSignals || ActiveSignals & YAP_CDOVF_SIGNAL) {
+      if (!ActiveSignals || ActiveSignals & (YAP_CDOVF_SIGNAL)) {
 	goto fail;
       }
       if (!(ActiveSignals & YAP_CREEP_SIGNAL)) {
@@ -2801,6 +2920,12 @@ Yap_absmi(int inp)
 
       /* don't forget I cannot creep at ; */
     NoStackEither:
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	goto fail;
+      }
       PP = PREG->u.Osblp.p0;
       if (ActiveSignals & YAP_CREEP_SIGNAL) {
 	goto either_notest;
@@ -2811,6 +2936,7 @@ Yap_absmi(int inp)
 	ASP = (CELL *) (((char *) YREG) + PREG->u.Osbpp.s);
 	if (ASP > (CELL *)PROTECT_FROZEN_B(B))
 	  ASP = (CELL *)PROTECT_FROZEN_B(B);
+	SREG = YENV;
 	goto noheapleft;
       }
       if (ActiveSignals) {
@@ -2878,6 +3004,12 @@ Yap_absmi(int inp)
       goto creep;
 
     NoStackDExecute:
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	goto fail;
+      }
       PP = PREG->u.pp.p0;
       if (ActiveSignals & YAP_CREEP_SIGNAL) {
 	PredEntry *ap = PREG->u.pp.p;
@@ -2928,6 +3060,7 @@ Yap_absmi(int inp)
 	ASP = YREG+E_CB;
 	if (ASP > (CELL *)PROTECT_FROZEN_B(B))
 	  ASP = (CELL *)PROTECT_FROZEN_B(B);
+	SREG = YENV;
 	goto noheapleft;
       }
       if (ActiveSignals)
@@ -2950,6 +3083,12 @@ Yap_absmi(int inp)
 
       /* try performing garbage collection */
 
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	goto fail;
+      }
       ASP = YREG+E_CB;
       if (ASP > (CELL *)PROTECT_FROZEN_B(B))
 	ASP = (CELL *)PROTECT_FROZEN_B(B);
@@ -2993,6 +3132,12 @@ Yap_absmi(int inp)
       /* and now CREEP */
 
     creep:
+      if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	if (!ActiveSignals)
+	  CreepFlag = CalculateStackGap();
+	goto fail;
+      }
 #if  defined(_MSC_VER) || defined(__MINGW32__)
 	/* I need this for Windows and other systems where SIGINT
 	   is not proceesed by same thread as absmi */
@@ -3125,6 +3270,7 @@ Yap_absmi(int inp)
 
       Op(deallocate, p);
       CACHE_Y_AS_ENV(YREG);
+      check_trail(TR);
       PREG = NEXTOP(PREG, p);
       /* other instructions do depend on S being set by deallocate
 	 :-( */
@@ -4218,17 +4364,17 @@ Yap_absmi(int inp)
       ENDD(d0);
       ENDOp();
 
-      Op(get_bigint, xc);
+      Op(get_bigint, xN);
 #ifdef USE_GMP
       BEGD(d0);
-      d0 = XREG(PREG->u.xc.x);
+      d0 = XREG(PREG->u.xN.x);
       deref_head(d0, gbigint_unk);
 
     gbigint_nonvar:
       if (!IsApplTerm(d0))
 	FAIL();
       /* we have met a preexisting bigint */
-      START_PREFETCH(xc);
+      START_PREFETCH(xN);
       BEGP(pt0);
       pt0 = RepAppl(d0);
       /* check functor */
@@ -4236,9 +4382,9 @@ Yap_absmi(int inp)
 	{
 	  FAIL();
 	}
-      if (Yap_gmp_tcmp_big_big(d0,PREG->u.xc.c))
+      if (Yap_gmp_tcmp_big_big(d0,PREG->u.xN.b))
 	FAIL();
-      PREG = NEXTOP(PREG, xc);      
+      PREG = NEXTOP(PREG, xN);      
       ENDP(pt0);
       /* enter read mode */
       GONext();
@@ -4248,10 +4394,10 @@ Yap_absmi(int inp)
       deref_body(d0, pt0, gbigint_unk, gbigint_nonvar);
       /* Enter Write mode */
       /* set d1 to be the new structure we are going to create */
-      START_PREFETCH(xc);
+      START_PREFETCH(xN);
       BEGD(d1);
-      d1 = PREG->u.xc.c;
-      PREG = NEXTOP(PREG, xc);
+      d1 = PREG->u.xN.b;
+      PREG = NEXTOP(PREG, xN);
       BIND(pt0, d1, bind_gbigint);
 #ifdef COROUTINING
       DO_TRAIL(pt0, d1);
@@ -4270,16 +4416,16 @@ Yap_absmi(int inp)
       ENDOp();
 
 
-      Op(get_dbterm, xc);
+      Op(get_dbterm, xD);
       BEGD(d0);
-      d0 = XREG(PREG->u.xc.x);
+      d0 = XREG(PREG->u.xD.x);
       deref_head(d0, gdbterm_unk);
 
     gdbterm_nonvar:
       BEGD(d1);
       /* we have met a preexisting dbterm */
-      d1 = PREG->u.xc.c;
-      PREG = NEXTOP(PREG, xc);      
+      d1 = PREG->u.xD.D;
+      PREG = NEXTOP(PREG, xD);      
       UnifyBound(d0,d1);
       ENDD(d1);
 
@@ -4287,10 +4433,10 @@ Yap_absmi(int inp)
       deref_body(d0, pt0, gdbterm_unk, gdbterm_nonvar);
       /* Enter Write mode */
       /* set d1 to be the new structure we are going to create */
-      START_PREFETCH(xc);
+      START_PREFETCH(xD);
       BEGD(d1);
-      d1 = PREG->u.xc.c;
-      PREG = NEXTOP(PREG, xc);
+      d1 = PREG->u.xD.D;
+      PREG = NEXTOP(PREG, xD);
       BIND(pt0, d1, bind_gdbterm);
 #ifdef COROUTINING
       DO_TRAIL(pt0, d1);
@@ -6304,7 +6450,7 @@ Yap_absmi(int inp)
       GONext();
       ENDOp();
 
-      Op(unify_bigint, oc);
+      Op(unify_bigint, oN);
 #ifdef USE_GMP
       BEGD(d0);
       BEGP(pt0);
@@ -6325,16 +6471,16 @@ Yap_absmi(int inp)
 	FAIL();
       }
       ENDD(d1);
-      if (Yap_gmp_tcmp_big_big(d0,PREG->u.oc.c))
+      if (Yap_gmp_tcmp_big_big(d0,PREG->u.oN.b))
 	FAIL();
-      PREG = NEXTOP(PREG, oc);
+      PREG = NEXTOP(PREG, oN);
       ENDP(pt0);
       GONext();
 
       derefa_body(d0, pt0, ubigint_unk, ubigint_nonvar);
       BEGD(d1);
-      d1 = PREG->u.oc.c;
-      PREG = NEXTOP(PREG, oc);
+      d1 = PREG->u.oN.b;
+      PREG = NEXTOP(PREG, oN);
       BIND_GLOBAL(pt0, d1, bind_ubigint);
 #ifdef COROUTINING
       DO_TRAIL(pt0, d1);
@@ -6350,7 +6496,7 @@ Yap_absmi(int inp)
 #endif
       ENDOp();
 
-      Op(unify_l_bigint, oc);
+      Op(unify_l_bigint, oN);
 #ifdef USE_GMP
       BEGD(d0);
       CACHE_S();
@@ -6370,16 +6516,16 @@ Yap_absmi(int inp)
 	FAIL();
       }
       ENDD(d0);
-      if (Yap_gmp_tcmp_big_big(d0,PREG->u.oc.c))
+      if (Yap_gmp_tcmp_big_big(d0,PREG->u.oN.b))
 	FAIL();
-      PREG = NEXTOP(PREG, oc);
+      PREG = NEXTOP(PREG, oN);
       ENDP(pt0);
       GONext();
 
       derefa_body(d0, S_SREG, ulbigint_unk, ulbigint_nonvar);
       BEGD(d1);
-      d1 = PREG->u.oc.c;
-      PREG = NEXTOP(PREG, oc);
+      d1 = PREG->u.oN.b;
+      PREG = NEXTOP(PREG, oN);
       BIND_GLOBAL(S_SREG, d1, bind_ulbigint);
 #ifdef COROUTINING
       DO_TRAIL(S_SREG, d1);
@@ -6395,7 +6541,7 @@ Yap_absmi(int inp)
 #endif
       ENDOp();
 
-      Op(unify_dbterm, oc);
+      Op(unify_dbterm, oD);
       BEGD(d0);
       BEGP(pt0);
       pt0 = SREG++;
@@ -6404,15 +6550,15 @@ Yap_absmi(int inp)
     udbterm_nonvar:
       BEGD(d1);
       /* we have met a preexisting dbterm */
-      d1 = PREG->u.oc.c;
-      PREG = NEXTOP(PREG, oc);
+      d1 = PREG->u.oD.D;
+      PREG = NEXTOP(PREG, oD);
       UnifyBound(d0,d1);
       ENDD(d1);
 
       derefa_body(d0, pt0, udbterm_unk, udbterm_nonvar);
       BEGD(d1);
-      d1 = PREG->u.oc.c;
-      PREG = NEXTOP(PREG, oc);
+      d1 = PREG->u.oD.D;
+      PREG = NEXTOP(PREG, oD);
       BIND_GLOBAL(pt0, d1, bind_udbterm);
 #ifdef COROUTINING
       DO_TRAIL(pt0, d1);
@@ -6425,7 +6571,7 @@ Yap_absmi(int inp)
       ENDD(d0);
       ENDOp();
 
-      Op(unify_l_dbterm, oc);
+      Op(unify_l_dbterm, oD);
       BEGD(d0);
       CACHE_S();
       READ_IN_S();
@@ -6434,15 +6580,15 @@ Yap_absmi(int inp)
     uldbterm_nonvar:
       BEGD(d1);
       /* we have met a preexisting dbterm */
-      d1 = PREG->u.oc.c;
-      PREG = NEXTOP(PREG, oc);
+      d1 = PREG->u.oD.D;
+      PREG = NEXTOP(PREG, oD);
       UnifyBound(d0,d1);
       ENDD(d1);
 
       derefa_body(d0, S_SREG, uldbterm_unk, uldbterm_nonvar);
       BEGD(d1);
-      d1 = PREG->u.oc.c;
-      PREG = NEXTOP(PREG, oc);
+      d1 = PREG->u.oD.D;
+      PREG = NEXTOP(PREG, oD);
       BIND_GLOBAL(S_SREG, d1, bind_uldbterm);
 #ifdef COROUTINING
       DO_TRAIL(S_SREG, d1);
@@ -6864,8 +7010,26 @@ Yap_absmi(int inp)
       GONext();
       ENDD(d0);
       ENDOp();
+ 
+      Op(put_dbterm, xD);
+      BEGD(d0);
+      d0 = PREG->u.xD.D;
+      XREG(PREG->u.xD.x) = d0;
+      PREG = NEXTOP(PREG, xD);
+      GONext();
+      ENDD(d0);
+      ENDOp();
 
-      Op(put_float, xd);
+      Op(put_bigint, xN);
+      BEGD(d0);
+      d0 = PREG->u.xN.b;
+      XREG(PREG->u.xN.x) = d0;
+      PREG = NEXTOP(PREG, xN);
+      GONext();
+      ENDD(d0);
+      ENDOp();
+
+     Op(put_float, xd);
       BEGD(d0);
       d0 = AbsAppl(PREG->u.xd.d);
       XREG(PREG->u.xd.x) = d0;
@@ -7055,6 +7219,24 @@ Yap_absmi(int inp)
       *SREG++ = d0;
       ENDD(d0);
       PREG = NEXTOP(PREG, c);
+      GONext();
+      ENDOp();
+
+      Op(write_bigint, N);
+      BEGD(d0);
+      d0 = PREG->u.N.b;
+      *SREG++ = d0;
+      ENDD(d0);
+      PREG = NEXTOP(PREG, N);
+      GONext();
+      ENDOp();
+
+      Op(write_dbterm, D);
+      BEGD(d0);
+      d0 = PREG->u.D.D;
+      *SREG++ = d0;
+      ENDD(d0);
+      PREG = NEXTOP(PREG, D);
       GONext();
       ENDOp();
 
@@ -13775,7 +13957,7 @@ Yap_absmi(int inp)
 	      ENDP(pt1);
 	      ENDD(d1);
 	    } else if (mod != CurrentModule) {
-		goto execute2_metacall;
+	      goto execute2_metacall;
 	    }
 	  }
 	  if (PRED_GOAL_EXPANSION_ALL) {
@@ -13860,6 +14042,12 @@ Yap_absmi(int inp)
 
 	ENDD(d0);
       NoStackPExecute2:
+	if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	  ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	  if (!ActiveSignals)
+	    CreepFlag = CalculateStackGap();
+	  goto fail;
+	}
 	PP = PredMetaCall;
 	SREG = (CELL *) pen;
 	ASP = ENV_YREG;
@@ -14059,6 +14247,12 @@ Yap_absmi(int inp)
 
 	ENDD(d0);
       NoStackPExecute:
+	if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	  ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	  if (!ActiveSignals)
+	    CreepFlag = CalculateStackGap();
+	  goto fail;
+	}
 	PP = PredMetaCall;
 	SREG = (CELL *) pen;
 	ASP = ENV_YREG;
@@ -14329,6 +14523,12 @@ Yap_absmi(int inp)
 	ENDD(d0);
 	ENDP(pt0);
       NoStackPTExecute:
+	if (ActiveSignals & YAP_FAIL_SIGNAL) {
+	  ActiveSignals &= ~YAP_FAIL_SIGNAL;
+	  if (!ActiveSignals)
+	    CreepFlag = CalculateStackGap();
+	  goto fail;
+	}
 	PP = NULL;
 	WRITEBACK_Y_AS_ENV();
 	SREG = (CELL *) pen;
@@ -14375,6 +14575,7 @@ Yap_absmi(int inp)
 	if (ActiveSignals) {
 	  if (ActiveSignals & YAP_CDOVF_SIGNAL) {
 	    UNLOCK(SignalLock);
+	    SREG = YENV;
 	    goto noheapleft;
 	  }
 	  UNLOCK(SignalLock);

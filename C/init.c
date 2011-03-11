@@ -23,6 +23,7 @@ static char     SccsId[] = "%W% %G%";
  *
  */
 
+#include <stdlib.h>
 #include "Yap.h"
 #include "yapio.h"
 #include "alloc.h"
@@ -406,8 +407,8 @@ static Opdef    Ops[] = {
   {"\\/", yfx, 500},
   {"><", yfx, 500},
   {"#", yfx, 500},
-  {"xor", yfx, 400},
   {"rdiv", yfx, 400},
+  {"div", yfx, 400},
   {"*", yfx, 400},
   {"/", yfx, 400},
   {"//", yfx, 400},
@@ -415,7 +416,7 @@ static Opdef    Ops[] = {
   {">>", yfx, 400},
   {"mod", yfx, 400},
   {"rem", yfx, 400},
-  {"+", fx, 200},
+  {"+", fy, 200},
   {"-", fy, 200},
   {"\\", fy, 200},
   {"//", yfx, 400},
@@ -483,6 +484,24 @@ InitDebug(void)
   Yap_PutValue(At, MkIntTerm(15));
 }
 
+static UInt 
+update_flags_from_prolog(UInt flags, PredEntry *pe)
+{
+  if (pe->PredFlags & MetaPredFlag)
+    flags |= MetaPredFlag;
+  if (pe->PredFlags & SourcePredFlag)
+    flags |= SourcePredFlag;
+  if (pe->PredFlags & SequentialPredFlag)
+    flags |= SequentialPredFlag;
+  if (pe->PredFlags & MyddasPredFlag)
+    flags |= MyddasPredFlag;
+  if (pe->PredFlags & UDIPredFlag)
+    flags |= UDIPredFlag;
+  if (pe->PredFlags & ModuleTransparentPredFlag)
+    flags |= ModuleTransparentPredFlag;
+  return flags;
+}
+
 void 
 Yap_InitCPred(char *Name, unsigned long int Arity, CPredicate code, UInt flags)
 {
@@ -520,8 +539,9 @@ Yap_InitCPred(char *Name, unsigned long int Arity, CPredicate code, UInt flags)
   } 
   if (pe->PredFlags & CPredFlag) {
     /* already exists */
+    flags = update_flags_from_prolog(flags, pe);
     cl = ClauseCodeToStaticClause(pe->CodeOfPred);
-    if ((flags | StandardPredFlag | CPredFlag) != pe->PredFlags) {
+    if ((flags | StandardPredFlag | CPredFlag ) != pe->PredFlags) {
       Yap_ClauseSpace -= cl->ClSize;
       Yap_FreeCodeSpace((ADDR)cl);
       cl = NULL;
@@ -617,6 +637,7 @@ Yap_InitCmpPred(char *Name, unsigned long int Arity, CmpPredicate cmp_code, UInt
     }
   } 
   if (pe->PredFlags & CPredFlag) {
+    flags = update_flags_from_prolog(flags, pe);
     p_code = pe->CodeOfPred;
     /* already exists */
   } else {
@@ -690,7 +711,12 @@ Yap_InitAsmPred(char *Name,  unsigned long int Arity, int code, CPredicate def, 
       return;
     }
   } 
-  pe->PredFlags = flags | AsmPredFlag | StandardPredFlag | (code);
+  flags |= AsmPredFlag | StandardPredFlag | (code);
+  if (pe->PredFlags & AsmPredFlag) {
+    flags = update_flags_from_prolog(flags, pe);
+    /* already exists */
+  }
+  pe->PredFlags = flags;
   pe->cs.f_code =  def;
   pe->ModuleOfPred = CurrentModule;
   if (def != NULL) {
@@ -858,6 +884,7 @@ Yap_InitCPredBack(char *Name, unsigned long int Arity,
   } 
   if (pe->cs.p_code.FirstClause != NIL)
     {
+      flags = update_flags_from_prolog(flags, pe);      
 #ifdef CUT_C
       CleanBack(pe, Start, Cont, Cut);
 #else
@@ -1145,6 +1172,9 @@ InitThreadHandle(int wid)
     FOREIGN_ThreadHandle(wid).thread_inst_count = 0LL;
 #endif
     pthread_mutex_init(&(FOREIGN_ThreadHandle(wid).tlock), NULL);  
+    pthread_mutex_init(&(FOREIGN_ThreadHandle(wid).tlock_status), NULL);  
+    FOREIGN_ThreadHandle(wid).tdetach = (CELL)0;
+    FOREIGN_ThreadHandle(wid).cmod = (CELL)0;
 }
 #endif
 
@@ -1196,15 +1226,21 @@ Yap_CloseScratchPad(void)
 #include "iglobals.h"
 
 #if defined(YAPOR) || defined(THREADS)
-#define MAX_INITS MAX_WORKERS
+#define MAX_INITS MAX_AGENTS
 #else
 #define MAX_INITS 1
 #endif
 
+#if defined(YAPOR) &&  !defined(THREADS)
+struct worker_shared *Yap_global;
+#else
 struct worker_shared Yap_Global;
+#endif
 
-#if defined(YAPOR) || defined(THREADS)
-struct worker_local	Yap_WLocal[MAX_WORKERS];
+#if defined(YAPOR) &&  !defined(THREADS)
+struct worker_local	*Yap_WLocal;
+#elif defined(YAPOR) || defined(THREADS)
+struct worker_local	Yap_WLocal[MAX_AGENTS];
 #else
 struct worker_local	Yap_WLocal;
 #endif
@@ -1215,8 +1251,9 @@ InitCodes(void)
   int wid;
 #include "ihstruct.h"
   InitGlobal();
-  for (wid = 0; wid < MAX_INITS; wid++)
+  for (wid = 0; wid < MAX_INITS; wid++) {
     InitWorker(wid);
+  }
   InitFirstWorkerThreadHandle();
   /* make sure no one else can use these two atoms */
   CurrentModule = 0;
@@ -1254,7 +1291,6 @@ Yap_InitWorkspace(UInt Heap, UInt Stack, UInt Trail, UInt Atts, UInt max_table_s
   int             i;
 
   /* initialise system stuff */
-
 #if PUSH_REGS
 #ifdef THREADS
   pthread_key_create(&Yap_yaamregs_key, NULL);
@@ -1332,6 +1368,33 @@ Yap_InitWorkspace(UInt Heap, UInt Stack, UInt Trail, UInt Atts, UInt max_table_s
   }
 }
 
+int
+Yap_HaltRegisterHook (HaltHookFunc f, void * env)
+{
+  struct halt_hook *h;
+
+  if (!(h = (struct halt_hook *)Yap_AllocCodeSpace(sizeof(struct halt_hook))))
+    return FALSE;
+  h->environment = env;
+  h->hook = f;
+  LOCK(BGL);
+  h->next = Yap_HaltHooks;
+  Yap_HaltHooks = h;
+  UNLOCK(BGL);
+  return TRUE;
+}
+
+static void
+run_halt_hooks(int code)
+{
+  struct halt_hook *hooke = Yap_HaltHooks;
+
+  while (hooke) {
+    hooke->hook(code, hooke->environment);
+    hooke = hooke->next;
+  }
+}
+
 void
 Yap_exit (int value)
 {
@@ -1339,15 +1402,17 @@ Yap_exit (int value)
   unmap_memory();
 #endif /* YAPOR */
 
+  if (! (Yap_PrologMode & BootMode) ) {
 #ifdef LOW_PROF
-  remove("PROFPREDS");
-  remove("PROFILING");
+    remove("PROFPREDS");
+    remove("PROFILING");
 #endif
 #if defined MYDDAS_MYSQL || defined MYDDAS_ODBC
-  Yap_MYDDAS_delete_all_myddas_structs();
+    Yap_MYDDAS_delete_all_myddas_structs();
 #endif
-  if (! (Yap_PrologMode & BootMode) )
+    run_halt_hooks(value);
     Yap_ShutdownLoadForeign();
+  }
   exit(value);
 }
 

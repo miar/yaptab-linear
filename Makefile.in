@@ -28,9 +28,9 @@ INCLUDEDIR=$(ROOTDIR)/include/Yap
 #
 INFODIR=$(SHAREDIR)/info
 #
-# where to store documentaion files
+# where to store documentation files
 #
-DOCSDIR=$(SHAREDIR)/docs/Yap
+DOCSDIR=$(SHAREDIR)/doc/Yap
 
 #
 # Add this flag to YAP_EXTRAS if you need the extension:
@@ -96,11 +96,12 @@ TEXI2DVI=texi2dvi
 TEXI2HTML=texi2html
 TEXI2PDF=texi2pdf
 YAPLIB=@YAPLIB@
+SONAMEFLAG=@SONAMEFLAG@
 
 #4.1VPATH=@srcdir@:@srcdir@/OPTYap
 CWD=$(PWD)
 #
-VERSION=6.0.7
+VERSION=6.2.0
 MYDDAS_VERSION=MYDDAS-0.9.1
 #
 
@@ -171,6 +172,7 @@ HEADERS = \
 	$(srcdir)/OPTYap/locks_pthread.h \
 	$(srcdir)/H/cut_c.h \
 	$(srcdir)/H/iatoms.h $(srcdir)/H/ratoms.h $(srcdir)/H/tatoms.h \
+	$(srcdir)/library/dialect/swi/fli/swi.h \
 	$(srcdir)/MYDDAS/myddas.h $(srcdir)/MYDDAS/myddas_structs.h \
 	$(srcdir)/MYDDAS/myddas_statistics.h \
 	$(srcdir)/MYDDAS/myddas_statistics_structs.h \
@@ -223,7 +225,8 @@ C_SOURCES= \
 	$(srcdir)/library/mpi/mpi.c $(srcdir)/library/mpi/mpe.c \
 	$(srcdir)/library/lammpi/yap_mpi.c $(srcdir)/library/lammpi/hash.c $(srcdir)/library/lammpi/prologterms2c.c  \
 	$(srcdir)/C/cut_c.c \
-	$(srcdir)/library/yap2swi/yap2swi.c \
+	$(srcdir)/library/dialect/swi/fli/swi.c \
+	$(srcdir)/library/dialect/swi/fli/blobs.c \
 	$(srcdir)/MYDDAS/myddas_mysql.c \
 	$(srcdir)/MYDDAS/myddas_odbc.c \
 	$(srcdir)/MYDDAS/myddas_util.c \
@@ -260,7 +263,9 @@ PL_SOURCES= \
 	$(srcdir)/pl/load_foreign.yap \
 	$(srcdir)/pl/modules.yap $(srcdir)/pl/preds.yap \
 	$(srcdir)/pl/profile.yap \
-	$(srcdir)/pl/protect.yap $(srcdir)/pl/setof.yap \
+	$(srcdir)/pl/protect.yap \
+	$(srcdir)/pl/save.yap \
+	$(srcdir)/pl/setof.yap \
 	$(srcdir)/pl/signals.yap \
 	$(srcdir)/pl/sockets.yap $(srcdir)/pl/sort.yap \
 	$(srcdir)/pl/statistics.yap \
@@ -290,7 +295,7 @@ ENGINE_OBJECTS = \
 	udi.o rtree.o rtree_udi.o\
 	unify.o userpreds.o utilpreds.o \
 	write.o \
-	yap2swi.o ypsocks.o ypstdio.o @MPI_OBJS@
+	blobs.o swi.o ypsocks.o ypstdio.o @MPI_OBJS@
 
 C_INTERFACE_OBJECTS = \
 	load_foreign.o load_dl.o load_dld.o load_dyld.o \
@@ -454,8 +459,11 @@ eamindex.o:  $(srcdir)/BEAM/eamindex.c config.h
 sys.o: $(srcdir)/library/system/sys.c config.h
 	$(CC) -c $(CFLAGS) -I$(srcdir)/include $(srcdir)/library/system/sys.c  -o $@
 
-yap2swi.o: $(srcdir)/library/yap2swi/yap2swi.c config.h
-	$(CC) -c $(CFLAGS) -I$(srcdir)/include  $(srcdir)/library/yap2swi/yap2swi.c  -o $@
+swi.o: $(srcdir)/library/dialect/swi/fli/swi.c  $(srcdir)/library/dialect/swi/fli/swi.h $(srcdir)/include/SWI-Prolog.h $(srcdir)/include/SWI-Stream.h config.h
+	$(CC) -c $(CFLAGS) -I$(srcdir)/include  -I$(srcdir)/library/dialect/swi/fli  $(srcdir)/library/dialect/swi/fli/swi.c  -o $@
+
+blobs.o: $(srcdir)/library/dialect/swi/fli/blobs.c  $(srcdir)/library/dialect/swi/fli/swi.h  $(srcdir)/include/SWI-Prolog.h config.h
+	$(CC) -c $(CFLAGS) -I$(srcdir)/include  -I$(srcdir)/library/dialect/swi/fli  $(srcdir)/library/dialect/swi/fli/blobs.c  -o $@
 
 yap_random.o: $(srcdir)/library/random/yap_random.c config.h
 	$(CC) -c $(CFLAGS) -I$(srcdir)/include  $(srcdir)/library/random/yap_random.c  -o $@
@@ -517,6 +525,7 @@ all: startup.yss
 	@ENABLE_CPLINT@ (cd packages/cplint/approx/simplecuddLPADs; $(MAKE))
 	@ENABLE_CPLINT@ (cd packages/cplint; $(MAKE))
 	@USE_CUDD@ (cd packages/ProbLog/simplecudd; $(MAKE))
+	@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/jpl; $(MAKE))
 
 startup.yss: yap@EXEC_SUFFIX@ $(PL_SOURCES)
 	-rm -f startup.yss
@@ -531,7 +540,7 @@ libYap.a: $(LIB_OBJECTS)
 	$(RANLIB) libYap.a
 
 @DYNYAPLIB@: $(LIB_OBJECTS)
-	@YAPLIB_LD@ -o @YAPLIB@ $(LIB_OBJECTS) $(LIBS) $(LDFLAGS)
+	@YAPLIB_LD@ -o @YAPLIB@ $(LIB_OBJECTS) $(LIBS) $(LDFLAGS) $(SONAMEFLAG)
 
 install: install_bin install_data
 
@@ -568,7 +577,6 @@ install_unix: startup.yss libYap.a
 	@INSTALL_DLLS@ (cd packages/zlib; $(MAKE) @ZLIB_INSTALL@)
 	@USE_MINISAT@ (cd packages/swi-minisat2/C; $(MAKE) install)
 	@INSTALL_MATLAB@ (cd library/matlab; $(MAKE) install)
-	@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/jpl; $(MAKE))
 	@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/jpl; $(MAKE) install)
 	#@ENABLE_JPL@ @INSTALL_DLLS@ (cd packages/pyswip; $(MAKE) install)
 	mkdir -p $(DESTDIR)$(INCLUDEDIR)
@@ -577,7 +585,7 @@ install_unix: startup.yss libYap.a
 	$(INSTALL) config.h $(DESTDIR)$(INCLUDEDIR)/config.h
 	$(INSTALL) parms.h $(DESTDIR)$(INCLUDEDIR)/parms.h
 	@ENABLE_CPLINT@ (cd packages/cplint; $(MAKE) install)
-	@ENABLE_CPLINT@ (cd packages/cplint/simplecuddLPADs; $(MAKE) install)
+	@ENABLE_CPLINT@ (cd packages/cplint/approx/simplecuddLPADs; $(MAKE) install)
 	@USE_CUDD@ (cd packages/ProbLog/simplecudd; $(MAKE) install)
 
 
@@ -619,6 +627,7 @@ install_win32: startup.yss
 	(cd packages/sgml; $(MAKE) install)
 	(cd packages/semweb; $(MAKE) install)
 	(cd packages/zlib; $(MAKE) @ZLIB_INSTALL@)
+	@ENABLE_JPL@ (cd packages/jpl ; $(MAKE) install)
 	@USE_MINISAT@ (cd packages/swi-minisat2/C; $(MAKE) install)
 	@ENABLE_CPLINT@ (cd packages/cplint; $(MAKE) install)
 	@USE_CUDD@ (cd packages/ProbLog/simplecudd; $(MAKE) install)
@@ -627,20 +636,20 @@ install_library: @YAPLIB@
 	mkdir -p $(DESTDIR)$(INCLUDEDIR)
 	for h in $(HEADERS); do $(INSTALL) $$h $(DESTDIR)$(INCLUDEDIR); done
 
-install_data:
+install_data: install_copied_files install_bin
+	@ENABLE_CHR@ (cd packages/chr ; $(MAKE) install)
+	@ENABLE_CHR@ (cd packages/clpqr ; $(MAKE) install)
+
+install_copied_files:
 	(cd library ; $(MAKE) install)
 	(cd packages/swi-minisat2; $(MAKE) install)
 	(cd LGPL ; $(MAKE) install)
 	(cd GPL ; $(MAKE) install)
-	@ENABLE_JPL@ (cd packages/jpl ; $(MAKE) install)
 	$(INSTALL_DATA) $(srcdir)/LGPL/pillow/icon_address.pl $(DESTDIR)$(SHAREDIR)/Yap/
 	$(INSTALL_DATA) $(srcdir)/LGPL/pillow/pillow.pl $(DESTDIR)$(SHAREDIR)/Yap/
 	@INSTALLCLP@(cd LGPL/clp ; $(MAKE) install)
 	(cd packages/CLPBN ; $(MAKE) install)
 	(cd  packages/ProbLog ; $(MAKE) install)
-	@ENABLE_CHR@ (cd packages/chr ; $(MAKE) install)
-	@ENABLE_CHR@ (cd packages/clpqr ; $(MAKE) install)
-
 
 ##########
 TAGS: $(C_SOURCES) $(PL_SOURCES) $(HEADERS)
@@ -730,6 +739,13 @@ install_docs:
 	$(INSTALL_DATA) yap.html* $(DESTDIR)$(DOCSDIR)
 	$(INSTALL_DATA) yap.pdf $(DESTDIR)$(DOCSDIR)
 	$(INSTALL_DATA) $(srcdir)/README $(DESTDIR)$(DOCSDIR)
+	$(INSTALL_DATA) $(srcdir)/Artistic $(DESTDIR)$(DOCSDIR)
+	$(INSTALL_DATA) $(srcdir)/COPYING $(DESTDIR)$(DOCSDIR)
+	$(INSTALL_DATA) $(srcdir)/changes4.3.html $(DESTDIR)$(DOCSDIR)
+	$(INSTALL_DATA) $(srcdir)/changes-5.0.html $(DESTDIR)$(DOCSDIR)
+	$(INSTALL_DATA) $(srcdir)/changes-5.1.html $(DESTDIR)$(DOCSDIR)
+	$(INSTALL_DATA) $(srcdir)/changes-6.0.html $(DESTDIR)$(DOCSDIR)
+
 
 info: yap.info
 

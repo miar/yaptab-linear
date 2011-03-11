@@ -1,94 +1,116 @@
-/*************************************************************************
-*									 *
-*	 YAP Prolog 							 *
-*									 *
-*	Yap Prolog was developed at NCCUP - Universidade do Porto	 *
-*									 *
-* Copyright L.Damas, V.S.Costa and Universidade do Porto 1985-1997	 *
-*									 *
-**************************************************************************
-*									 *
-* File:		utils.yap						 *
-* Last rev:	8/2/88							 *
-* mods:									 *
-* comments:	Some utility predicates available in yap		 *
-*									 *
-*************************************************************************/
+ /*************************************************************************
+ *									 *
+ *	 YAP Prolog 							 *
+ *									 *
+ *	Yap Prolog was developed at NCCUP - Universidade do Porto	 *
+ *									 *
+ * Copyright L.Damas, V.S.Costa and Universidade do Porto 1985-1997	 *
+ *									 *
+ **************************************************************************
+ *									 *
+ * File:		utils.yap						 *
+ * Last rev:	8/2/88							 *
+ * mods:									 *
+ * comments:	Some utility predicates available in yap		 *
+ *									 *
+ *************************************************************************/
 
-op(P,T,V) :-
-	'$check_op'(P,T,V,op(P,T,V)),
-	'$op'(P, T, V).
+ op(P,T,V) :-
+	 '$check_op'(P,T,V,op(P,T,V)),
+	 '$op'(P, T, V).
 
+% just check the operator declarations for correctness.
+'$check_op'(P,T,Op,G) :-
+	( var(P) ; var(T); var(Op)), !,
+	'$do_error'(instantiation_error,G).
+'$check_op'(P,_,_,G) :-
+	\+ integer(P), !,
+	'$do_error'(type_error(integer,P),G).
+'$check_op'(P,_,_,G) :-
+	P < 0, !,
+	'$do_error'(domain_error(operator_priority,P),G).
+'$check_op'(P,_,_,G) :-
+	P > 1200, !,
+	'$do_error'(domain_error(operator_priority,P),G).
+'$check_op'(_,T,_,G) :-
+	\+ atom(T), !,
+	'$do_error'(type_error(atom,P),G).
+'$check_op'(_,T,_,G) :-
+	\+  '$associativity'(T), !,
+	'$do_error'(domain_error(operator_specifier,T),G).
 '$check_op'(P,T,V,G) :-
+	'$check_module_for_op'(V, G, NV),
+	'$check_top_op'(P, T, NV, G).
+
+'$check_top_op'(_, _, [], _).
+'$check_top_op'(P, T, Op.NV, G) :- !,
+	'$check_ops'(P, T, Op.NV, G).
+'$check_top_op'(P, T, V, G) :-
+	atom(V), !,
+	'$check_op_name'(P, T, V, G).
+'$check_top_op'(P, T, V, G) :-
+	'$do_error'(type_error(atom,V),G).
+
+ '$associativity'(xfx).
+ '$associativity'(xfy).
+ '$associativity'(yfx).
+ '$associativity'(yfy).
+ '$associativity'(xf).
+ '$associativity'(yf).
+ '$associativity'(fx).
+ '$associativity'(fy).
+
+'$check_module_for_op'(MOp, G, _) :-
+	var(MOp), !,
+	'$do_error'(instantiation_error,G).
+'$check_module_for_op'(M:V, G, _) :-
+	var(M), !,
+	'$do_error'(instantiation_error,G).
+'$check_module_for_op'(M:V, G, NV) :-
+	atom(M), !,
+	'$check_module_for_op'(V, G, NV).
+'$check_module_for_op'(M:V, G, _) :- !,
+	'$do_error'(type_error(atom,P),G).
+'$check_module_for_op'(V, G, V).
+
+'$check_ops'(P, T, [], G) :- !.
+'$check_ops'(P, T, Op.NV, G) :- !,
 	(
-	 var(P) ->
+	 var(NV)
+	->
 	 '$do_error'(instantiation_error,G)
 	;
-	 var(T) ->
-	 '$do_error'(instantiation_error,G)
-	;
-	 var(V) ->
-	 '$do_error'(instantiation_error,G)
-	;
-	 \+ integer(P) ->
-	 '$do_error'(type_error(integer,P),G)
-	;
-	 \+ atom(T) ->
-	 '$do_error'(type_error(atom,T),G)
-	;
-	 P < 0 ->
-	 '$do_error'(domain_error(operator_priority,P),G)
-	;
-	 P > 1200 ->
-	 '$do_error'(domain_error(operator_priority,P),G)
-	;
-	 \+ '$associativity'(T) ->
-	 '$do_error'(domain_error(operator_specifier,T),G)
-	;
-	 '$check_op_name'(V,G)
-	).
+	 '$check_module_for_op'(Op, G, NOp),
+	 '$check_op_name'(P, T, NOp, G),
+	 '$check_ops'(P, T, NV, G)
+	).	
+'$check_ops'(P, T, Ops, G) :-
+	'$do_error'(type_error(list,Ops),G).
 
-'$associativity'(xfx).
-'$associativity'(xfy).
-'$associativity'(yfx).
-'$associativity'(yfy).
-'$associativity'(xf).
-'$associativity'(yf).
-'$associativity'(fx).
-'$associativity'(fy).
-
-'$check_op_name'(V,G) :-
-	 var(V), !,
-	 '$do_error'(instantiation_error,G).
-'$check_op_name'(V,_) :-
-	 atom(V), !.
-'$check_op_name'(M:A, G) :-
+'$check_op_name'(_,_,V,G) :-
+	  var(V), !,
+	  '$do_error'(instantiation_error,G).
+ '$check_op_name'(_,_,',',G) :- !,
+	  '$do_error'(permission_error(modify,operator,','),G).
+ '$check_op_name'(_,_,'[]',G) :- !,
+	  '$do_error'(permispsion_error(create,operator,'[]'),G).
+ '$check_op_name'(_,_,'{}',G) :- !,
+	  '$do_error'(permission_error(create,operator,'{}'),G).
+ '$check_op_name'(P,T,'|',G) :-
 	 (
-	  var(M) ->
-	 '$do_error'(instantiation_error,G)
+	  integer(P),
+	  P < 1001
 	 ;
-	  var(A) ->
-	 '$do_error'(instantiation_error,G)
-	 ;
-	  atom(M) ->
-	  '$check_op_name'(A, G)
-	 ;
-	 '$do_error'(instantiation_error,G)
-	 ).
- '$check_op_name'([A|As], G) :-
-	  '$check_op_name'(A, G),
-	  '$check_op_names'(As, G).
+	  atom_codes(T,[_,_])
+	 ), !,
+	 '$do_error'(permission_error(create,operator,'|'),G).
+'$check_op_name'(_,_,V,_) :-
+	 atom(V), !.
+'$check_op_name'(_,_,A,G) :-
+	 '$do_error'(type_error(atom,A),G).
 
-'$check_op_names'([], _).
-'$check_op_names'([A|As], G) :-
-	'$check_op_name'(A, G),
-	'$check_op_names'(As, G).
-
-	  
-'$op'(P, T, M:[A|As]) :- !,
-	'$current_module'(M),
-	'$opl'(P, T, M, [A|As]).
-'$op'(P, T, [A|As]) :- !,
+'$op'(P, T, ML) :-
+	strip_module(ML, M, [A|As]), !,
 	'$opl'(P, T, M, [A|As]).
 '$op'(P, T, A) :-
 	'$op2'(P,T,A).
@@ -193,6 +215,38 @@ current_op(X,Y,Z) :-
 
 %%% Operating System utilities
 
+cd :-
+	cd('~').
+
+ls :-
+	getcwd(X),
+	'$load_system_ls'(X,L),
+	'$do_print_files'(L).
+
+'$load_system_ls'(X,L) :-
+	'$undefined'(directory_files(X, L), operating_system_support),
+	load_files(library(system),[silent(true)]),
+	fail.
+'$load_system_ls'(X,L) :-
+	operating_system_support:directory_files(X, L).
+	
+
+'$do_print_files'([]) :-
+	nl.
+'$do_print_files'([F| Fs]) :-
+	'$do_print_file'(F),
+	'$do_print_files'(Fs).
+
+'$do_print_file'('.') :- !.
+'$do_print_file'('..') :- !.
+'$do_print_file'(F) :- atom_concat('.', _, F), !.
+'$do_print_file'(F) :-
+	write(F), write('  ').
+
+pwd :-
+	getcwd(X),
+	write(X), nl.
+
 unix(V) :- var(V), !,
 	'$do_error'(instantiation_error,unix(V)).
 unix(argv(L)) :- '$is_list_of_atoms'(L,L), !, '$argv'(L).
@@ -253,34 +307,64 @@ getenv(Na,Val) :-
 
 %%% Saving and restoring a computation
 
-save(A) :- var(A), !,
-	'$do_error'(instantiation_error,save(A)).
-save(A) :- atom(A), !, name(A,S), '$save'(S).
-save(S) :- '$save'(S).
+save(A) :- save(A,_).
 
 save(A,_) :- var(A), !,
 	'$do_error'(instantiation_error,save(A)).
-save(A,OUT) :- atom(A), !, name(A,S), '$save'(S,OUT).
+save(A,OUT) :- atom(A), !, atom_codes(A,S), '$save'(S,OUT).
 save(S,OUT) :- '$save'(S,OUT).
 
 save_program(A) :- var(A), !,
 	'$do_error'(instantiation_error,save_program(A)).
-save_program(A) :- atom(A), !, name(A,S), '$save_program'(S).
-save_program(S) :- '$save_program'(S).
+save_program(A) :- atom(A), !, 
+	atom_codes(A,S),
+	'$save_program2'(S, true).
+save_program(S) :- '$save_program2'(S, true).
 
 save_program(A, G) :- var(A), !,
-	'$do_error'(instantiation_error,save_program(A,G)).
+	'$do_error'(instantiation_error, save_program(A,G)).
 save_program(A, G) :- var(G), !,
-	'$do_error'(instantiation_error,save_program(A,G)).
+	'$do_error'(instantiation_error, save_program(A,G)).
 save_program(A, G) :- \+ callable(G), !,
-	'$do_error'(type_error(callable,G),save_program(A,G)).
+	'$do_error'(type_error(callable,G), save_program(A,G)).
 save_program(A, G) :-
-	( atom(A) -> name(A,S) ; A = S),
-	recorda('$restore_goal',G,R),
-	'$save_program'(S),
-	erase(R),
+	( atom(A) -> atom_codes(A,S) ; A = S),
+	'$save_program2'(S, G),
 	fail.
 save_program(_,_).
+
+'$save_program2'(S,G) :-
+	(
+	    G == true
+        ->
+	     true
+	 ;
+	     recorda('$restore_goal', G ,R)
+	),
+	(
+	    '$undefined'(reload_foreign_libraries, shlib)
+        ->
+	     true
+	 ;
+	     recorda('$reload_foreign_libraries', true, R1)
+	),
+	'$save_program'(S),
+	(
+	    var(R1)
+        ->
+	     true
+	 ;
+	     erase(R1)
+	),
+	(
+	    var(R)
+        ->
+	     true
+	 ;
+	     erase(R)
+	),
+	fail.
+'$save_program2'(_,_).
 
 restore(A) :- var(A), !,
 	'$do_error'(instantiation_error,restore(A)).
@@ -580,13 +664,17 @@ sub_atom(At, Bef, Size, After, SubAt) :-
 	'$subtract_lists_of_variables'(VL1,VL2,VL).
 '$subtract_lists_of_variables'([V1|VL1],[V2|VL2],[V2|VL]) :-
 	'$subtract_lists_of_variables'([V1|VL1],VL2,VL).
-	
+
 atom_to_term(Atom, Term, Bindings) :-
 	atom_codes(Atom, Chars),
 	charsio:open_mem_read_stream(Chars, Stream),
-	read_term(Stream, T, [variable_names(Bindings)]),
+	catch(read_term(Stream, T, [variable_names(Bindings)]),Error,'$handle_atom_to_term_error'(Stream, Error)),
 	close(Stream),
 	T = Term.
+
+'$handle_atom_to_term_error'(Stream, Error) :-
+	close(Stream),
+	throw(Error).
 
 term_to_atom(Term,Atom) :-
 	nonvar(Atom), !,
@@ -595,6 +683,23 @@ term_to_atom(Term,Atom) :-
 term_to_atom(Term,Atom) :-
 	charsio:write_to_chars(Term,S),
 	atom_codes(Atom,S).
+
+%
+% hack this here.
+%
+charsio:write_to_chars(Term, L0, OUT) :-
+	charsio:open_mem_write_stream(Stream),
+	prolog:write(Stream, Term),
+	charsio:peek_mem_write_stream(Stream, L0, O),
+	prolog:close(Stream),
+	O = OUT.
+
+charsio:read_from_chars(Chars, Term) :-
+	charsio:open_mem_read_stream(Chars, Stream),
+	prolog:read(Stream, T),
+	prolog:close(Stream),
+	T = Term.
+
 
 simple(V) :- var(V), !.
 simple(A) :- atom(A), !.

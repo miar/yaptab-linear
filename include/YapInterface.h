@@ -435,6 +435,9 @@ extern X_API void PROTO(YAP_SlotsToArgs,(int, YAP_Int));
 /*  void  YAP_Throw()  */
 extern X_API void PROTO(YAP_Throw,(YAP_Term));
 
+/*  void  YAP_AsyncThrow()  */
+extern X_API void PROTO(YAP_AsyncThrow,(YAP_Term));
+
 /*  int  YAP_LookupModule()  */
 #define YAP_LookupModule(T)  (T)
 
@@ -469,6 +472,9 @@ extern X_API int  PROTO(YAP_AtomReleaseHold,(YAP_Atom));
 
 /*  void  YAP_AtomReleaseHold(YAP_Atom)  */
 extern X_API YAP_agc_hook  PROTO(YAP_AGCRegisterHook,(YAP_agc_hook));
+
+/*  void  YAP_AtomReleaseHold(YAP_Atom)  */
+extern X_API int  PROTO(YAP_HaltRegisterHook,(YAP_halt_hook, void *));
 
 /*  char *YAP_cwd(void)  */
 extern X_API char *  PROTO(YAP_cwd,(void));
@@ -509,6 +515,9 @@ extern X_API int        PROTO(YAP_Erase,(void *));
 extern X_API int        PROTO(YAP_Variant,(YAP_Term,YAP_Term));
 extern X_API int        PROTO(YAP_ExactlyEqual,(YAP_Term,YAP_Term));
 extern X_API YAP_Int    PROTO(YAP_TermHash,(YAP_Term, YAP_Int, YAP_Int, int));
+
+/*  stack expansion control */
+extern X_API int        PROTO(YAP_SetYAPFlag,(yap_flag_t,int));
 
 #define YAP_InitCPred(N,A,F)  YAP_UserCPredicate(N,F,A)
 

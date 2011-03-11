@@ -309,6 +309,16 @@ HoldEntryAdjust (HoldEntry * ptr)
   return (HoldEntry *) (((HoldEntry *) (CharP (ptr) + HDiff)));
 }
 
+inline EXTERN struct record_list *DBRecordAdjust (struct record_list *);
+
+inline EXTERN struct record_list *
+DBRecordAdjust (struct record_list * ptr)
+{
+  if (!ptr)
+    return ptr;
+  return (struct record_list *) (CharP (ptr) + HDiff);
+}
+
 
 #if	USE_OFFSETS
 
@@ -316,6 +326,14 @@ inline EXTERN Atom AtomAdjust (Atom);
 
 inline EXTERN Atom
 AtomAdjust (Atom at)
+{
+  return (Atom) ((at));
+}
+
+inline EXTERN Atom NoAGCAtomAdjust (Atom);
+
+inline EXTERN Atom
+NoAGCAtomAdjust (Atom at)
 {
   return (Atom) ((at));
 }
@@ -337,6 +355,14 @@ inline EXTERN Atom AtomAdjust (Atom);
 
 inline EXTERN Atom
 AtomAdjust (Atom at)
+{
+  return (Atom) ((at == NULL ? (at) : (Atom) (CharP (at) + HDiff)));
+}
+
+inline EXTERN Atom NoAGCAtomAdjust (Atom);
+
+inline EXTERN Atom
+NoAGCAtomAdjust (Atom at)
 {
   return (Atom) ((at == NULL ? (at) : (Atom) (CharP (at) + HDiff)));
 }
@@ -433,10 +459,10 @@ CodeVarAdjust (Term var)
 
 #if TAGS_FAST_OPS
 
-inline EXTERN Term BlobTermAdjust (Term);
+inline EXTERN Term BlobTermInCodeAdjust (Term);
 
 inline EXTERN Term
-BlobTermAdjust (Term t)
+BlobTermInCodeAdjust (Term t)
 {
   return (Term) (CharP(t) - HDiff);
 }
@@ -453,10 +479,10 @@ CodeComposedTermAdjust (Term t)
 
 #else
 
-inline EXTERN Term BlobTermAdjust (Term);
+inline EXTERN Term BlobTermInCodeAdjust (Term);
 
 inline EXTERN Term
-BlobTermAdjust (Term t)
+BlobTermInCodeAdjust (Term t)
 {
   return (Term) (CharP(t) + HDiff);
 }
@@ -610,7 +636,15 @@ CodeVoidPAdjust (void * addr)
   return addr + HDiff;
 }
 
+inline EXTERN struct halt_hook *HaltHookAdjust (struct halt_hook *);
 
+inline EXTERN struct halt_hook *
+HaltHookAdjust (struct halt_hook * addr)
+{
+  if (!addr)
+    return NULL;
+  return  (struct halt_hook *) (CharP (addr) + HDiff);
+}
 
 inline EXTERN BlockHeader *BlockAdjust (BlockHeader *);
 
@@ -620,14 +654,13 @@ BlockAdjust (BlockHeader * addr)
   return (BlockHeader *) ((BlockHeader *) (CharP (addr) + HDiff));
 }
 
-
-
 inline EXTERN yamop *PtoOpAdjust (yamop *);
 
 inline EXTERN yamop *
 PtoOpAdjust (yamop * ptr)
 {
-  return (yamop *) (CharP (ptr) + HDiff);
+  if (ptr)
+    return (yamop *) (CharP (ptr) + HDiff);
 }
 
 inline EXTERN struct operator_entry *OpListAdjust (struct operator_entry *);

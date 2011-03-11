@@ -56,6 +56,7 @@ PROGRAMS= \
 	$(srcdir)/prandom.yap \
 	$(srcdir)/queues.yap \
 	$(srcdir)/random.yap \
+	$(srcdir)/r_session.yap \
 	$(srcdir)/rbtrees.yap \
 	$(srcdir)/readutil.yap \
 	$(srcdir)/regexp.yap \
@@ -75,7 +76,10 @@ PROGRAMS= \
 	$(srcdir)/wgraphs.yap \
 	$(srcdir)/wundgraphs.yap \
 	$(srcdir)/lam_mpi.yap \
-	$(srcdir)/ypp.yap 
+	$(srcdir)/ypp.yap \
+	$(srcdir)/c_alarms.yap \
+	$(srcdir)/flags.yap \
+	$(srcdir)/block_diagram.yap
 
 MYDDAS_PROGRAMS= $(srcdir)/MYDDAS/myddas.ypp \
 	$(srcdir)/MYDDAS/myddas_assert_predicates.ypp \
@@ -114,7 +118,7 @@ install_myddas: $(MYDDAS_PROGRAMS)
 	done; \
 	for p in $(DESTDIR)$(SHAREDIR)/Yap/myddas*.ypp; \
 	do name=`basename $$p .ypp`; \
-	cpp $(YAP_EXTRAS) -P -E -w $$p -o $(DESTDIR)$(SHAREDIR)/Yap/$$name.yap; \
+	cpp $(YAP_EXTRAS) -P -E -w $$p > $(DESTDIR)$(SHAREDIR)/Yap/$$name.yap; \
 	rm -fr $$p; \
 	done; \
 	fi

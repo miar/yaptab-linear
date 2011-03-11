@@ -1,4 +1,4 @@
-´a\input texinfo @c -*- mode: texinfo; coding: latin-1; -*-
+\input texinfo @c -*- mode: texinfo; coding: latin-1; -*-
 
 @c %**start of header
 @setfilename yap.info
@@ -8,7 +8,7 @@
 @c @setchapternewpage odd
 @c %**end of header
 
-@set VERSION 6.0.7
+@set VERSION 6.2.0
 @set EDITION 4.2.8
 @set UPDATED Aug 2010
 
@@ -99,6 +99,7 @@ us to include his text in this document.
 * CLPR:: The CLP(R) System
 * CHR:: The CHR System
 * Logtalk:: The Logtalk Object-Oriented System
+* MYDDAS:: The YAP Database Interface
 * Threads:: Thread Library
 * Parallelism:: Running in Or-Parallel
 * Tabling:: Storing Intermediate Solutions of programs 
@@ -225,6 +226,7 @@ Subnodes of Library
 * DGraphs:: Directed Graphs Implemented With Red-Black Trees
 * UnDGraphs:: Undirected Graphs Using DGraphs
 * LAM:: LAM MPI
+* Block Diagram:: Block Diagrams of Prolog code
 
 
 Subnodes of Debugging
@@ -300,6 +302,7 @@ Subnodes of C-Interface
 * Utility Functions:: From character arrays to Lists of codes and back
 * Calling YAP From C:: From C to YAP to C to YAP 
 * Module Manipulation in C:: Create and Test Modules from within C
+* Miscellaneous C-Functions:: Other Helpful Interface Functions
 * Writing C:: Writing Predicates in C
 * Loading Objects:: Loading Object Files
 * Save&Rest:: Saving and Restoring
@@ -1382,7 +1385,7 @@ anonymous variables.
 
 Punctuation tokens consist of one of the following characters:
 @example
-@center ( ) , [ ] @{ @} |
+( ) , [ ] @{ @} |
 @end example
 
 These characters are used to group terms.
@@ -1699,7 +1702,7 @@ if they have not been loaded before, does nothing otherwise.
 
 @var{F} must be a list containing the names of the files to load.
 
-@item make [ISO]
+@item make
 @findex make/0
 @snindex make/0
 @cnindex make/0
@@ -1978,6 +1981,46 @@ directories are the places where files specified in the form
 @cnindex prolog_file_name/2
 Unify @var{FullPath} with the absolute path YAP would use to consult
 file @var{Name}.
+
+@item prolog_to_os_filename(+@var{PrologPath},-@var{OsPath})
+@findex prolog_to_os_filename/2
+@snindex prolog_to_os_filename/2
+@cnindex prolog_to_os_filename/2
+
+This is an SWI-Prolog built-in. Converts between the internal Prolog
+pathname conventions and the operating-system pathname conventions. The
+internal conventions are Unix and this predicates is equivalent to =/2
+(unify) on Unix systems. On DOS systems it will change the
+directory-separator, limit the filename length map dots, except for the
+last one, onto underscores.
+
+@item expand_file_name(+@var{WildCard},-@var{List})
+@findex expand_file_name/2
+@snindex expand_file_name/2
+@cnindex expand_file_name/2
+
+This is an SWI-Prolog built-in. Unify @var{List} with a sorted list of
+files or directories matching @var{WildCard}. The normal Unix wildcard
+constructs @t{?}, @t{*}, @t{[ ... ]} and @t{@{...@}} are recognised. The
+interpretation of @t{@{...@}} is interpreted slightly different from the
+C shell (csh(1)). The comma separated argument can be arbitrary
+patterns, including @t{@{...@}} patterns. The empty pattern is legal as
+well: @t{@{.pl,@}} matches either @t{.pl} or the empty string.
+
+If the pattern contains wildcard characters, only existing files and
+directories are returned. Expanding a @emph{pattern'} without wildcard
+characters returns the argument, regardless on whether or not it exists.
+
+Before expanding wildcards, the construct $var is expanded to the value
+of the environment variable var and a possible leading ~ character is
+expanded to the user's home directory. In Windows, the home directory is
+determined as follows: if the environment variable @code{HOME} exists,
+this is used. If the variables @code{HOMEDRIVE} and @code{HOMEPATH}
+exist (Windows-NT), these are used. At initialisation, the system will
+set the environment variable @code{HOME} to point to the YAP home
+directory if neither @code{HOME} nor @code{HOMEPATH} and
+@code{HOMEDRIVE} are defined.
+
 
 @item public @var{P} [ISO extension]
 @findex public/1 (directive)
@@ -2337,14 +2380,16 @@ with the current source module:
 @cnindex meta_predicate/1 (directive)
 Each @var{Gi} is a mode specification.
 
-If the argument is @code{:} or an integer, the argument is a call and
-must be expanded. Otherwise, the argument is not expanded. Note
-that the system already includes declarations for all built-ins.
+If the argument is @code{:}, it does not refer directly to a predicate
+but must be module expanded. If the argument is an integer, the argument
+is a goal or a closure and must be expanded. Otherwise, the argument is 
+not expanded. Note that the system already includes declarations for all 
+built-ins.
 
 For example, the declaration for @code{call/1} and @code{setof/3} are:
 
 @example
-:- meta_predicate call(:), setof(?,:,?).
+:- meta_predicate call(0), setof(?,0,?).
 @end example
 
 @end table
@@ -2649,7 +2694,7 @@ Note also that you can use chains of commit operators like:
 Note that @code{(->)/2} does not affect the scope of cuts in its
 arguments.
 
-@item  +@var{Conditon} *-> +@var{Action} ; +@var{Else}
+@item  +@var{Condition} *-> +@var{Action} ; +@var{Else}
 @findex ->*/2
 @snindex ->*/2
 @cnindex ->*/2
@@ -2717,7 +2762,7 @@ between 0 and 10.
 @cnindex call_with_args/n
 Meta-call where @var{Name} is the name of the procedure to be called and
 the @var{Ai} are the arguments. The number of arguments varies between 0
-and 10.
+and 10. New code should use @code{call/N} for better portability.
 
 If @var{Name} is a complex term, then @code{call_with_args/n} behaves as
 @code{call/n}:
@@ -3177,7 +3222,7 @@ Checks whether @var{T} is a database reference.
 @cnindex float/1
 Checks whether @var{T} is a floating point number.
 
-@item rational(@var{T}) [ISO]
+@item rational(@var{T})
 @findex rational/1
 @syindex rational/1
 @cyindex rational/1
@@ -3344,7 +3389,7 @@ Also refer to @code{copy_term/2}.
 True when @var{List} is a proper list. That is, @var{List}
 is bound to the empty list (nil) or a term with functor '.' and arity 2.
 
-@item ?@var{Term1} =@= ?@var{Term2}
+@item ?@var{Term1} =@@= ?@var{Term2}
 @findex  =@=/2
 @syindex =@=/2
 @cnindex =@=/2
@@ -3410,15 +3455,7 @@ will return:
 The predicate holds when at least one of the arguments is ground
 (otherwise, an error message will be displayed). The argument @var{A} must
 be unifiable with an atom, and the argument @var{L} with the list of the
-ASCII codes for the characters of the external representation of @var{A}.
-
-The ISO-Prolog standard dictates that @code{atom_chars/2} should unify
-the second argument with a list of one-char atoms, and not the character
-codes. For compatibility with previous versions of YAP, and
-with other Prolog implementations, YAP unifies the second
-argument with the character codes, as in @code{atom_codes/2}. Use the
-@code{set_prolog_flag(to_chars_mode,iso)} to obtain ISO standard
-compatibility.
+characters of @var{A}.
 
 @item atom_codes(?@var{A},?@var{L}) [ISO]
 @findex atom_codes/2
@@ -3496,7 +3533,7 @@ concatenated are the representation for @var{A12}.
 If @var{A1} and @var{A2} are unbound, the built-in will find all the atoms
 that concatenated give @var{A12}.
 
-@item number_chars(?@var{I},?@var{L})
+@item number_chars(?@var{I},?@var{L}) [ISO]
 @findex number_chars/2
 @saindex number_chars/2
 @cnindex number_chars/2
@@ -3504,15 +3541,7 @@ that concatenated give @var{A12}.
 The predicate holds when at least one of the arguments is ground
 (otherwise, an error message will be displayed). The argument @var{I} must
 be unifiable with a number, and the argument @var{L} with the list of the
-ASCII codes for the characters of the external representation of @var{I}.
-
-The ISO-Prolog standard dictates that @code{number_chars/2} should unify
-the second argument with a list of one-char atoms, and not the character
-codes. For compatibility with previous versions of YAP, and
-with other Prolog implementations, YAP unifies the second
-argument with the character codes, as in @code{number_codes/2}. Use the
-@code{set_prolog_flag(to_chars_mode,iso)} to obtain ISO standard
-compatibility.
+characters of the external representation of @var{I}.
 
 @item number_codes(?@var{A},?@var{L}) [ISO]
 @findex number_codes/2
@@ -3607,13 +3636,13 @@ the call.
 @item    digit
         @var{Char} is a digit.
 
-@item    digit(@var{Weigth})
+@item    digit(@var{Weight})
         @var{Char} is a digit with value
-        @var{Weigth}. I.e. @code{char_type(X, digit(6))} yields @code{X =
+        @var{Weight}. I.e. @code{char_type(X, digit(6))} yields @code{X =
         '6'}. Useful for parsing numbers.
 
-@item    xdigit(@var{Weigth})
-        @var{Char} is a hexa-decimal digit with value @var{Weigth}. I.e. char_type(a, xdigit(X) yields X = '10'. Useful for parsing numbers.
+@item    xdigit(@var{Weight})
+        @var{Char} is a hexa-decimal digit with value @var{Weight}. I.e. char_type(a, xdigit(X) yields X = '10'. Useful for parsing numbers.
 
 @item    graph
         @var{Char} produces a visible mark on a page when printed. Note that the space is not included!
@@ -3830,7 +3859,7 @@ of length @var{S}.
 @node Arithmetic, I/O, Comparing Terms, Top
 @section Arithmetic
 
-YAP now supposets several different numeric types:
+YAP now supports several different numeric types:
 
 @table @code
 @item integers
@@ -3898,10 +3927,15 @@ Quotient.
 Integer quotient.
 
 @item @var{X} mod @var{Y} [ISO]
-Integer remainder.
+Integer module operator, always positive.
 
 @item @var{X} rem @var{Y} [ISO]
-Integer remainder, the same as @code{mod}.
+Integer remainder, similar to @code{mod} but always has the same sign
+@code{X}.
+
+@item @var{X} div @var{Y} [ISO]
+Integer division, as if defined by @code{(@var{X} - @var{X} mod @var{Y})
+// @var{Y}}.
 
 @item exp(@var{X}) [ISO]
 Natural exponential.
@@ -3933,8 +3967,8 @@ Arc cosine.
 @item atan(@var{X}) [ISO]
 Arc tangent.
 
-@item atan2(@var{X},@var{Y})
-Four-quadrant arc tangent.
+@item atan(@var{X},@var{Y})
+Four-quadrant arc tangent. Also available as @code{atan2/2}.
 
 @item sinh(@var{X})
 Hyperbolic sine.
@@ -4079,6 +4113,8 @@ Integer bitwise conjunction.
 Integer bitwise disjunction.
 
 @item @var{X} # @var{Y}
+@item @var{X} >< @var{Y}
+@item xor(@var{X} , @var{Y})
 Integer bitwise exclusive disjunction.
 
 @item @var{X} << @var{Y}
@@ -4343,23 +4379,23 @@ these options:
 
 @table @code
 
-@item type(+@var{T})
+@item type(+@var{T}) [ISO]
 Specify whether the stream is a @code{text} stream (default), or a
 @code{binary} stream.
 
-@item reposition(+@var{Bool})
+@item reposition(+@var{Bool}) [ISO]
 Specify whether it is possible to reposition the stream (@code{true}), or
 not (@code{false}). By default, YAP enables repositioning for all
 files, except terminal files and sockets.
 
-@item eof_action(+@var{Action})
+@item eof_action(+@var{Action}) [ISO]
 Specify the action to take if attempting to input characters from a
 stream where we have previously found an @code{end_of_file}. The possible
 actions are @code{error}, that raises an error, @code{reset}, that tries to
 reset the stream and is used for @code{tty} type files, and @code{eof_code},
 which generates a new @code{end_of_file} (default for non-tty files).
 
-@item alias(+@var{Name})
+@item alias(+@var{Name}) [ISO]
 Specify an alias to the stream. The alias @t{Name} must be an atom. The
 alias can be used instead of the stream descriptor for every operation
 concerning the stream.
@@ -4462,7 +4498,9 @@ Defines extensions. Current mapping: @code{txt} implies @code{['']},
 @code{['.so', '']}, @code{qlf} implies @code{['.qlf', '']} and
 @code{directory} implies @code{['']}.  The file-type @code{source}
 is an alias for @code{prolog} for compatibility to SICStus Prolog.
-See also @code{prolog_file_type/2}.
+See also @code{prolog_file_type/2}. Notice also that this predicate only
+returns non-directories, unless the option @code{file_type(directory)} is
+specified, or unless @code{access(none)}.
 
     @item file_errors(@code{fail}/@code{error})
 If @code{error} (default), throw and @code{existence_error} exception
@@ -4542,14 +4580,14 @@ Send out all data in the output buffer of the current output stream.
 @cnindex flush_output/1
 Send all data in the output buffer for stream @var{S}.
 
-@item set_input(+@var{S})
+@item set_input(+@var{S}) [ISO]
 @findex set_input/1
 @syindex set_input/1
 @cnindex set_input/1
 Set stream @var{S} as the current input stream. Predicates like @code{read/1}
 and @code{get/1} will start using stream @var{S}.
 
-@item set_output(+@var{S})
+@item set_output(+@var{S}) [ISO]
 @findex set_output/1
 @syindex set_output/1
 @cnindex set_output/1
@@ -4717,9 +4755,9 @@ Unify @var{LinePosition} with the position on current text stream
 @cnindex stream_position/2
 Unify @var{StreamPosition} with the packaged information of position on
 current stream @var{Stream}. Use @code{stream_position_data/3} to
-retrieve information on charater or line count.
+retrieve information on character or line count.
 
-@item stream_position_data(+@var{Field},+@var{StreamPsition},-@var{Info})
+@item stream_position_data(+@var{Field},+@var{StreamPosition},-@var{Info})
 @findex stream_position_data/3
 @syindex stream_position_data/3
 @cnindex stream_position_data/3
@@ -4912,16 +4950,16 @@ Displays term @var{T} on the current output stream, according to the
 following options:
 
 @table @code
-@item quoted(+@var{Bool})
+@item quoted(+@var{Bool}) [ISO]
 If @code{true}, quote atoms if this would be necessary for the atom to
 be recognized as an atom by YAP's parser. The default value is
 @code{false}.
 
-@item ignore_ops(+@var{Bool})
+@item ignore_ops(+@var{Bool}) [ISO]
 If @code{true}, ignore operator declarations when writing the term. The
 default value is @code{false}.
 
-@item numbervars(+@var{Bool})
+@item numbervars(+@var{Bool}) [ISO]
 If @code{true}, output terms of the form
 @code{'$VAR'(N)}, where @var{N} is an integer, as a sequence of capital
 letters. The default value is @code{false}.
@@ -5531,7 +5569,7 @@ input stream.
 @cnindex tab/2
 The same as @code{tab/1}, but using stream @var{S}.
 
-@item nl(+@var{S})
+@item nl(+@var{S}) [ISO]
 @findex nl/1
 @syindex nl/1
 @cnindex nl/1
@@ -5905,8 +5943,8 @@ predicates:
 @findex assert/1
 @saindex assert/1
 @caindex assert/1
- Adds clause @var{C} to the program. If the predicate is undefined,
-declare it as dynamic.
+ Same as @code{assertz/1}. Adds clause @var{C} to the program. If the predicate is undefined,
+declare it as dynamic. New code should use @code{assertz/1} for better portability.
 
  Most Prolog systems only allow asserting clauses for dynamic
 predicates. This is also as specified in the ISO standard. YAP allows
@@ -6096,7 +6134,7 @@ name is the atom @var{A}.
 Defines the relation:  @var{P} is a built-in predicate whose name
 is the atom @var{A}.
 
-@item predicate_property(@var{P},@var{Prop})
+@item predicate_property(@var{P},@var{Prop}) [ISO]
 @findex predicate_property/2
 @saindex predicate_property/2
 @cnindex predicate_property/2
@@ -6129,6 +6167,22 @@ true if source for the predicate is available.
 Number of clauses in the predicate definition. Always one if external
 or built-in.
 @end table
+
+@item predicate_statistics(@var{P},@var{NCls},@var{Sz},@var{IndexSz}) 
+@findex predicate_statistics/4
+
+Given predicate @var{P}, @var{NCls} is the number of clauses for
+@var{P}, @var{Sz} is the amount of space taken to store those clauses
+(in bytes), and @var{IndexSz} is the amount of space required to store
+indices to those clauses (in bytes).
+
+@item predicate_erased_statistics(@var{P},@var{NCls},@var{Sz},@var{IndexSz}) 
+@findex predicate_statistics/4
+
+Given predicate @var{P}, @var{NCls} is the number of erased clauses for
+@var{P} that could not be discarded yet, @var{Sz} is the amount of space
+taken to store those clauses (in bytes), and @var{IndexSz} is the amount
+of space required to store indices to those clauses (in bytes).
 
 @end table
 
@@ -6720,6 +6774,12 @@ Operating System functionality:
 @cnindex cd/1
 Changes the current directory (on UNIX environments).
 
+@item cd
+@findex cd/0
+@snindex cd/0
+@cnindex cd/0
+Changes the current directory (on UNIX environments) to the user's home directory.
+
 @item environ(+@var{E},-@var{S})
 @findex environ/2
 @syindex environ/2
@@ -6735,6 +6795,18 @@ Changes the current directory (on UNIX environments).
 @cnindex getcwd/1
 Unify the current directory, represented as an atom, with the argument
 @var{D}.
+
+@item pwd
+@findex pwd/0
+@snindex pwd/0
+@cnindex pwd/0
+Prints the current directory.
+
+@item ls
+@findex ls/0
+@snindex ls/0
+@cnindex ls/0
+Prints a list of all files in the current directory.
 
 @item putenv(+@var{E},+@var{S})
 @findex putenv/2
@@ -7303,6 +7375,7 @@ Show profiling info for the top-most @var{N} predicates.
 
 @end table
 
+The @code{showprofres/0} and @code{showprofres/1} predicates call a user-defined multifile hook predicate, @code{user:prolog_predicate_name/2}, that can be used for converting a possibly explicitly-qualified callable term into an atom that will used when printing the profiling information.
 
 @node Call Counting, Arrays, Profiling, Top
 @section Counting Calls
@@ -8041,7 +8114,7 @@ profiling information. Profiling data can be read through the
 
 @item  prompt_alternatives_on(atom, changeable)
 @findex  prompt_alternatives_on  (yap_flag/2 option)
-SWI-Compatible opttion, determines prompting for alternatives in the Prolog toplevel. Default is @t{groundness}, YAP prompts for alternatives if and only if the query contains variables. The alternative, default in SWI-Prolog is @t{determinism} which implies the system prompts for alternatives if the goal succeeded while leaving choicepoints.
+SWI-Compatible option, determines prompting for alternatives in the Prolog toplevel. Default is @t{groundness}, YAP prompts for alternatives if and only if the query contains variables. The alternative, default in SWI-Prolog is @t{determinism} which implies the system prompts for alternatives if the goal succeeded while leaving choicepoints.
 
 
 @item redefine_warnings
@@ -8169,7 +8242,8 @@ this version of YAP either defines @code{__unix__} or @code{unix}.
 @item unknown [ISO]
 @findex unknown (yap_flag/2 option)
 @*
-Corresponds to calling the @code{unknown/2} built-in.
+Corresponds to calling the @code{unknown/2} built-in. Possible values 
+are @code{error}, @code{fail}, and @code{warning}.
 
 @item update_semantics
 @findex update_semantics (yap_flag/2 option)
@@ -8461,6 +8535,7 @@ Library, Extensions, Built-ins, Top
 * Apply:: SWI-Compatible Apply library.
 * Association Lists:: Binary Tree Implementation of Association Lists.
 * AVL Trees:: Predicates to add and lookup balanced binary  trees.
+* Block Diagram:: Block Diagrams of Prolog code
 * Cleanup:: Call With registered Cleanup Calls
 * DGraphs:: Directed Graphs Implemented With Red-Black Trees
 * Heaps:: Labelled binary tree where the key of each node is less
@@ -8624,7 +8699,7 @@ The predicates are:
     No
 @end example
 
-    Notice that @var{Goal} is copied repeatetly, which may cause
+    Notice that @var{Goal} is copied repeatedly, which may cause
     problems if attributed variables are involved.
 
 @item [det]free_variables(:Generator, +@var{Template}, +VarList0, -VarList)
@@ -9167,13 +9242,25 @@ Succeeds if @var{Set3} unifies with the intersection of @var{Set1} and
 need not be ordered.
 @end table
 
+@item subtract(+@var{Set}, +@var{Delete}, ?@var{Result})
+@findex subtract/3
+@syindex subtract/3
+@cnindex subtract/3
+Delete all elements from @var{Set} that   occur  in @var{Delete} (a set)
+and unify the  result  with  @var{Result}.   Deletion  is  based  on
+unification using @code{memberchk/2}. The complexity is
+@code{|Delete|*|Set|}.
+
+See @code{ord_subtract/3}.
+@end table
+
 @node LineUtilities, MapList, Lists, Library
 @section Line Manipulation Utilities
 @cindex Line Utilities Library
 
 This package provides a set of useful predicates to manipulate
 sequences of characters codes, usually first read in as a line. It is
-avalailable by loading the library @code{library(lineutils)}.
+available by loading the library @code{library(lineutils)}.
 
 @table @code
 
@@ -9478,10 +9565,9 @@ plus_if_pos(X,Y,Z) :- Y > 0, Z is X + Y.
 vars(X, Y, [X|Y]) :- var(X), !.
 vars(_, Y, Y).
 trans(TermIn, TermOut) :-
-  (compound(TermIn) ; atom(TermIn)),
+  nonvar(TermIn),
   TermIn =.. [p|Args],
-  TermOut =..[q|Args],
-  !.
+  TermOut =..[q|Args], !.
 trans(X,X).
 
 %success
@@ -9492,8 +9578,8 @@ selectlist(<(0), [-1,0,1], [1]).
 convlist(plus_if_pos(1), [-1,0,1], [2]).
 sumlist(plus, [1,2,3,4], 1, 11).
 mapargs(number_atom,s(1,2,3), s('1','2','3')).
-sumargs(vars, s(1,X,2,Y), [], [Y,X]).
-mapnodes(trans, p(a,p(b,a),c), q(a,q(b,a),c)).
+sumargs(vars, s(1,X,2,Y), [], [Y,X]).m
+apnodes(trans, p(a,p(b,a),c), q(a,q(b,a),c)).
 checknodes(\==(T), p(X,p(Y,X),Z)).
 sumnodes(vars, [c(X), p(X,Y), q(Y)], [], [Y,Y,X,X]).
 % another one
@@ -9509,16 +9595,6 @@ matrices of integers and floats. In contrast to dynamic arrays, these
 matrices are multi-dimensional and compact. In contrast to static
 arrays. these arrays are allocated in the stack. Matrices are available
 by loading the library @code{library(matrix)}.
-
-Accessing the matlab dynamic libraries can be complicated. In Linux
-machines, to use this interface, you may have to set the environment
-variable @t{LD_LIBRARY_PATH}. Next, follows an example using bash in a
-64-bit Linux PC:
-@example
-export LD_LIBRARY_PATH=''$MATLAB_HOME"/sys/os/glnxa64:''$MATLAB_HOME"/bin/glnxa64:''$LD_LIBRARY_PATH"
-@end example
-where @code{MATLAB_HOME} is the directory where matlab is installed
-at. Please replace @code{ax64} for @code{x86} on a 32-bit PC.
 
 Notice that the functionality in this library is only partial. Please
 contact the YAP maintainers if you require extra functionality.
@@ -9823,6 +9899,16 @@ processing. YAP now includes a straightforward interface to MATLAB. To
 actually use it, you need to install YAP calling @code{configure} with
 the @code{--with-matlab=DIR} option, and you need to call
 @code{use_module(library(lists))} command.
+
+Accessing the matlab dynamic libraries can be complicated. In Linux
+machines, to use this interface, you may have to set the environment
+variable @t{LD_LIBRARY_PATH}. Next, follows an example using bash in a
+64-bit Linux PC:
+@example
+export LD_LIBRARY_PATH=''$MATLAB_HOME"/sys/os/glnxa64:''$MATLAB_HOME"/bin/glnxa64:''$LD_LIBRARY_PATH"
+@end example
+where @code{MATLAB_HOME} is the directory where matlab is installed
+at. Please replace @code{ax64} for @code{x86} on a 32-bit PC.
 
 @table @code
 
@@ -10448,14 +10534,14 @@ integers then @var{NUMBER} will also be an integer, otherwise
 @syindex randseq/3
 @cnindex randseq/3
 Unify @var{Numbers} with a list of @var{LENGTH} unique random integers
-in the range @code{[1 ...@var{MAX})}.
+in the range @code{[1ï¿½...@var{MAX})}.
 
 @item randset(+@var{LENGTH}, +@var{MAX}, -@var{Numbers})
 @findex randset/3
 @syindex randset/3
 @cnindex randset/3
 Unify @var{Numbers} with an ordered list of @var{LENGTH} unique random
-integers in the range @code{[1 ...@var{MAX})}.
+integers in the range @code{[1ï¿½...@var{MAX})}.
 
 @item setrand(+@var{Key})
 @findex setrand/1
@@ -11617,15 +11703,6 @@ is considered. Otherwise, the term is considered only up to depth
 @code{1}, where the constants and the principal functor have depth
 @code{1}, and an argument of a term with depth @var{I} has depth @var{I+1}. 
 
-@item term_variables(?@var{Term}, -@var{Variables})
-@findex  term_variables/2
-@syindex term_variables/2
-@cnindex term_variables/2
-
-Unify @var{Variables} with the list of all variables of term
-@var{Term}.  The variables occur in the order of their first
-appearance when traversing the term depth-first, left-to-right.
-
 @item variables_within_term(+@var{Variables},?@var{Term}, -@var{OutputVariables})
 @findex  variables_within_term/3
 @snindex variables_within_term/3 
@@ -12677,7 +12754,7 @@ Further discussions
 at @url{http://www.complang.tuwien.ac.at/ulrich/Prolog-inedit/ISO-Hiord}.
 
 
-@node LAM, , Lambda, Library
+@node LAM, Block Diagram, Lambda, Library
 @section LAM
 @cindex lam
 
@@ -12856,6 +12933,31 @@ are released.
 
 @end table
 
+@node Block Diagram, , LAM, Library
+@section Block Diagram
+@cindex Block Diagram
+
+This library provides a way of visualizing a prolog program using modules with blocks.
+To use it use: @code{:-use_module(library(block_diagram))}.
+@table @code
+@item make_diagram(+inputfilename, +ouputfilename)
+@findex make_diagram/2
+@snindex make_diagram/2
+@cnindex make_diagram/2
+
+This will crawl the files following the use_module, ensure_loaded directives withing the inputfilename.
+The result will be a file in dot format.
+You can make a pdf at the shell by asking @code{dot -Tpdf filename > output.pdf}.
+
+@item make_diagram(+inputfilename, +ouputfilename, +predicate, +depth, +extension)
+@findex make_diagram/2
+@snindex make_diagram/2
+@cnindex make_diagram/2
+
+The same as @code{make_diagram/2} but you can define how many of the imported/exporeted predicates will be shown with predicate, and how deep the crawler is allowed to go with depth. The extension is used if the file use module directives do not include a file extension.
+
+@end table
+
 
 @node SWI-Prolog, SWI-Prolog Global Variables, Library, Top
 @cindex SWI-Prolog
@@ -12884,6 +12986,7 @@ Extensions to Traditional Prolog
 * Attributed Variables:: Using attributed Variables
 * CLPR:: The CLP(R) System
 * Logtalk:: The Logtalk Object-Oriented system
+* MYDDAS:: The MYDDAS Database Interface package
 * Threads:: Thread Library
 * Parallelism:: Running in Or-Parallel
 * Tabling:: Storing Intermediate Solutions of programs 
@@ -12936,7 +13039,8 @@ The argument to @code{block/1} is a condition on a goal or a conjunction
 of conditions, with each element separated by commas. Each condition is
 of the form @code{predname(@var{C1},...,@var{CN})}, where @var{N} is the
 arity of the goal, and each @var{CI} is of the form @code{-}, if the
-argument must suspend until the variable is bound, or @code{?}, otherwise.
+argument must suspend until the first such variable is bound, or
+@code{?}, otherwise.
 
 @item wait/1
 The argument to @code{wait/1} is a predicate descriptor or a conjunction
@@ -13287,6 +13391,16 @@ defined.
 @cnindex copy_term_nat/2
 As @code{copy_term/2}.  Attributes however, are @emph{not} copied but replaced
 by fresh variables.
+
+@item term_variables(?@var{Term}, -@var{Variables})
+@findex  term_variables/2
+@syindex term_variables/2
+@cnindex term_variables/2
+
+Unify @var{Variables} with the list of all variables of term
+@var{Term}.  The variables occur in the order of their first
+appearance when traversing the term depth-first, left-to-right.
+
 @end table
 
 @node Old Style Attribute Declarations, , New Style Attribute Declarations, Attributed Variables
@@ -13697,7 +13811,7 @@ attributes from other known solvers/modules via the module prefix in
 
 @include chr.tex
 
-@node Logtalk, Threads, CHR, Extensions
+@node Logtalk, MYDDAS, CHR, Extensions
 @chapter Logtalk
 @cindex Logtalk
 
@@ -13707,7 +13821,757 @@ systems or by using the @code{Logtalk - YAP} shortcut in the Logtalk
 program group in the Start Menu on Windows systems. For more information 
 please see the URL @url{http://logtalk.org/}.
 
-@node Threads, Parallelism, Logtalk, Extensions
+@node MYDDAS, Threads, Logtalk, Extensions
+@chapter MYDDAS
+@cindex MYDDAS
+
+The MYDDAS database project was developed within a FCT project aiming at
+the development of a highly efficient deductive database system, based
+on the coupling of the MySQL relational database system with the Yap
+Prolog system. MYDDAS was later expanded to support the ODBC interface.
+
+@menu
+Subnodes of MYDDAS
+* Requirements and Installation Guide:: 
+* MYDDAS Architecture:: 
+* Loading MYDDAS:: 
+* Connecting to and disconnecting from a Database Server:: 
+* Accessing a Relation:: 
+* View Level Interface :: 
+* Accessing Tables in Data Sources Using SQL:: 
+* Insertion of Rows:: 
+* Types of Attributes:: 
+* Number of Fields:: 
+* Describing a Relation:: 
+* Enumerating Relations:: 
+* The MYDDAS MySQL Top Level:: 
+* Other MYDDAS Properties:: 
+@end menu
+
+@node Requirements and Installation Guide, MYDDAS Architecture, , MYDDAS
+@section Requirements and Installation Guide
+
+Next, we describe how to usen of the YAP with the MYDDAS System.  The
+use of this system is entirely depend of the MySQL development libraries
+or the ODBC development libraries. At least one of the this development
+libraries must be installed on the computer system, otherwise MYDDAS
+will not compile. The MySQL development libraries from MySQL 3.23 an
+above are know to work. We recommend the usage of MySQL versusODBC,
+but it is possible to have both options installed
+
+At the same time, without any problem. The MYDDAS system automatically
+controls the two options. Currently, MYDDAS is know to compile without
+problems in Linux. The usage of this system on Windows has not been
+tested yet.  MYDDAS must be enabled at configure time. This can be done
+with the following options: 
+
+@table @code
+
+@item --enable-myddas
+ This option will detect which development libraries are installed on the computer system, MySQL, ODBC or both, and will compile the Yap system with the support for which libraries it detects;
+@item  --enable-myddas-stats
+This option is only available in MySQL. It includes code to get
+statistics from the MYDDAS system;
+@item  --enable-top-level
+This option is only available in MySQL.  It enables the option to interact with the MySQL server in
+two different ways. As if we were on the MySQL Client Shell, and as if
+we were using Datalog. 
+@end table
+
+@node MYDDAS Architecture, Loading MYDDAS, Requirements and Installation Guide, MYDDAS
+@section MYDDAS Architecture
+
+The system includes four main blocks that are put together through the
+MYDDAS interface: the Yap Prolog compiler, the MySQL database system, an
+ODBC layer and a Prolog to SQL compiler. Current effort is put on the
+MySQL interface rather than on the ODBC interface. If you want to use
+the full power of the MYDDAS interface we recommend you to use a MySQL
+database. Other databases, such as Oracle, PostGres or Microsoft SQL
+Server, can be interfaced through the ODBC layer, but with limited
+performance and features support.  
+
+The main structure of the MYDDAS interface is simple. Prolog queries
+involving database goals are translated to SQL using the Prolog to SQL
+compiler; then the SQL expression is sent to the database system, which
+returns the set of tuples satisfying the query; and finally those tuples
+are made available to the Prolog engine as terms. For recursive queries
+involving database goals, the YapTab tabling engine provides the
+necessary support for an efficient evaluation of such queries.
+
+An important aspect of the MYDDAS interface is that for the programmer
+the use of predicates which are defined in database relations is
+completely transparent. An example of this transparent support is the
+Prolog cut operator, which has exactly the same behaviour from
+predicates defined in the Prolog program source code, or from predicates
+defined in database as relations.
+
+@node Loading MYDDAS, Connecting to and disconnecting from a Database Server, MYDDAS Architecture, MYDDAS 
+@section Loading MYDDAS
+
+Begin by starting YAP and loading the library
+@code{use_module(library(myddas))}.  This library already includes the
+Prolog to SQL Compiler described in [2] and [1]. In MYDDAS this compiler
+has been extended to support further constructs which allow a more
+efficient SQL translation.  
+
+@node Connecting to and disconnecting from a Database Server, Accessing a Relation, Loading MYDDAS, MYDDAS
+@section Connecting to and disconnecting from a Database Server
+
+
+@table @code
+@item db open(+,+,+,+,+). 
+@findex db_open/5
+@snindex db_open/5
+@cnindex db_open/5
+
+@item db open(+,+,+,+). 
+@findex db_open/4
+@snindex db_open/4
+@cnindex db_open/4
+
+@item db close(+). 
+@findex db_close/1
+@snindex db_close/1
+@cnindex db_close/1
+
+@item db_close.
+
+@end table 
+
+  Assuming the MySQL server is running and we have an account, we can
+login to MySQL by invoking @code{db_open/5} as one of the following:
+@example
+?- db_open(mysql,Connection,Host/Database,User,Password). 
+?- db_open(mysql,Connection,Host/Database/Port,User,Password).
+?- db_open(mysql,Connection,Host/Database/UnixSocket,User,Password). 
+?- db_open(mysql,Connection,Host/Database/Port/UnixSocket,User,Password).
+
+@end example
+If the login is successful, there will be a response of @code{yes}. For
+instance:
+ @example
+?- db_open(mysql,con1,localhost/guest_db,guest,'').
+@end example
+uses the MySQL native interface, selected by the first argument, to open
+a connection identified by the @code{con1} atom, to an instance of a
+MySQL server running on host @code{localhost}, using database guest @code{db}
+and user @code{guest} with empty @code{password}.  To disconnect from the @code{con1}
+connection we use: 
+@example
+?- db_close(con1).
+@end example
+ Alternatively, we can use @code{db_open/4} and @code{db_close/0,} without an argument
+to identify the connection. In this case the default connection is used,
+with atom @code{myddas}. Thus using 
+@example
+?- db_open(mysql,localhost/guest_db,guest,''). 
+?- db_close.  
+@end example
+or
+@example
+?- db_open(mysql,myddas,localhost/guest_db,guest,''). 
+?- db_close(myddas). 
+@end example
+is exactly the same.
+
+MYDDAS also supports ODBC. To connect to a database using an ODBC driver
+you must have configured on your system a ODBC DSN. If so, the @code{db_open/4}
+and @code{db_open/5} have the following mode:
+@example
+ ?- db_open(odbc,Connection,ODBC_DSN,User,Password). 
+ ?- db_open(odbc,ODBC_DSN,User,Password).
+@end example
+
+For instance, if you do @code{db_open(odbc,odbc_dsn,guest,'')}. it will connect
+to a database, through ODBC, using the definitions on the @code{odbc_dsn} DSN
+configured on the system. The user will be the user @code{guest} with no
+password.
+
+@node Accessing a Relation, View Level Interface , Connecting to and disconnecting from a Database Server, MYDDAS 
+@section Accessing a Relation
+
+@table @code
+@item db_import(+Conn,+RelationName,+PredName). 
+@findex db_import/3
+@snindex db_import/3
+@cnindex db_import/3
+
+@item db_import(+RelationName,+PredName).  
+@findex db_import/2
+@snindex db_import/2
+@cnindex db_import/2
+@end table
+
+Assuming you have access permission for the relation you wish to import,
+you can use @code{db_import/3} or @code{db_import/2} as:
+@example
+?- db_import(Conn,RelationName,PredName).
+?- db_import(RelationName,PredName).
+@end example
+ where @var{RelationName}, is the name of
+relation we wish to access, @var{PredName} is the name of the predicate we
+wish to use to access the relation from YAP. @var{Conn}, is the connection
+identifier, which again can be dropped so that the default myddas connection
+is used. For instance, if we want to access the relation phonebook,
+using the predicate @code{phonebook/3} we write: 
+@example
+?- db_import(con1,phonebook,phonebook). 
+yes
+?- phonebook(Letter,Name,Number).
+Letter = 'D',
+Name = 'John Doe',
+Number = 123456789 ? 
+yes
+@end example
+Backtracking can then be used to retrieve the next row
+of the relation phonebook.  Records with particular field values may be
+selected in the same way as in Prolog. (In particular, no mode
+specification for database predicates is required). For instance: 
+@example
+?- phonebook(Letter,'John Doe',Letter). 
+Letter = 'D', 
+Number = 123456789 ?
+yes
+@end example
+generates the query @example
+SELECT A.Letter , 'John Doe' , A.Number 
+FROM 'phonebook' A 
+WHERE A.Name = 'John Doe';
+@end example
+
+@node View Level Interface, Accessing Tables in Data Sources Using SQL, Accessing a Relation, MYDDAS
+@section View Level Interface
+
+@table @code
+@item db view(+,+,+).
+@findex db_view/3
+@snindex db_view/3
+@cnindex db_view/3
+
+@item db view(+,+).
+@findex db_view/2
+@snindex db_view/2
+@cnindex db_view/2
+@end table
+If we import a database relation, such as an edge relation representing the edges of a directed graph, through
+@example
+?- db_import('Edge',edge). 
+yes
+@end example
+and we then write a query to retrieve all the direct cycles in the
+graph, such as
+@example
+?- edge(A,B), edge(B,A). 
+A = 10, 
+B = 20 ?
+@end example
+this is clearly inefficient [3], because of relation-level
+access. Relation-level access means that a separate SQL query will be
+generated for every goal in the body of the clause. For the second
+@code{edge/2} goal, a SQL query is generated using the variable bindings that
+result from the first @code{edge/2} goal execution. If the second
+@code{edge/2} goal
+fails, or if alternative solutions are demanded, backtracking access the
+next tuple for the first @code{edge/2} goal and another SQL query will be
+generated for the second @code{edge/2} goal. The generation of this large
+number of queries and the communication overhead with the database
+system for each of them, makes the relation-level approach inefficient.
+To solve this problem the view level interface can be used for the
+definition of rules whose bodies includes only imported database
+predicates.  One can use the view level interface through the predicates
+@code{db_view/3} and @code{db_view/2}:
+@example
+?- db_view(Conn,PredName(Arg_1,...,Arg_n),DbGoal).  
+?- db_view(PredName(Arg_1,...,Arg_n),DbGoal).
+@end example
+ All arguments are standard Prolog terms. @var{Arg1} through @var{Argn}
+define the attributes to be retrieved from the database, while
+@var{DbGoal} defines the selection restrictions and join
+conditions. @var{Conn} is the connection identifier, which again can be
+dropped. Calling predicate @code{PredName/n} will retrieve database
+tuples using a single SQL query generated for the @var{DbGoal}.  We next show
+an example of a view definition for the direct cycles discussed
+above. Assuming the declaration: 
+@example
+?- db_import('Edge',edge). 
+yes
+@end example
+we
+write:@example
+?- db_view(direct_cycle(A,B),(edge(A,B), edge(B,A))). 
+yes 
+?- direct_cycle(A,B)). 
+A = 10, 
+B = 20 ?  
+@end example
+This call generates the SQL
+statement: @example
+SELECT A.attr1 , A.attr2
+FROM Edge A , Edge B 
+WHERE B.attr1 = A.attr2 AND B.attr2 = A.attr1;
+@end example
+
+Backtracking, as in relational level interface, can be used to retrieve the next row of the view.
+The view interface also supports aggregate function predicates such as
+@code{sum}, @code{avg}, @code{count}, @code{min} and @code{max}. For
+instance:
+@example
+?- db_view(count(X),(X is count(B, B^edge(10,B)))).
+@end example
+generates the query :
+@example
+SELECT COUNT(A.attr2) 
+FROM Edge A WHERE A.attr1 = 10;
+@end example
+
+To know how to use db @code{view/3}, please refer to Draxler's Prolog to
+SQL Compiler Manual. 
+
+@node Accessing Tables in Data Sources Using SQL, Insertion of Rows, View Level Interface , MYDDAS 
+@section Accessing Tables in Data Sources Using SQL 
+
+@table @code
+@item db_sql(+,+,?). 
+@findex db_sql/3
+@snindex db_sql/3
+@cnindex db_sql/3
+
+@item db_sql(+,?).
+@findex db_sql/2
+@snindex db_sql/2
+@cnindex db_sql/2
+@end table
+
+It is also possible to explicitly send a SQL query to the database server using
+@example
+?- db_sql(Conn,SQL,List).
+?- db_sql(SQL,List).
+@end example
+where @var{SQL} is an arbitrary SQL expression, and @var{List} is a list
+holding the first tuple of result set returned by the server. The result
+set can also be navigated through backtracking.
+
+Example:
+@example
+?- db_sql('SELECT * FROM phonebook',LA).
+LA = ['D','John Doe',123456789] ?
+@end example
+
+@node  Insertion of Rows, Types of Attributes, Accessing Tables in Data Sources Using SQL, MYDDAS 
+@section Insertion of Rows 
+
+@table @code
+@item db_assert(+,+). 
+@findex db_assert/2
+@snindex db_assert/2
+@cnindex db_assert/2
+
+@item db_assert(+).
+@findex db_assert/1
+@snindex db_assert/1
+@cnindex db_assert/1
+
+@end table
+
+Assuming you have imported the related base table using
+ @code{db_import/2} or @code{db_import/3}, you can insert to that table
+ by using @code{db_assert/2} predicate any given fact.
+@example
+?- db_assert(Conn,Fact).
+?- db_assert(Fact).
+@end example
+The second argument must be declared with all of its arguments bound to
+constants. For example assuming @code{helloWorld} is imported through
+@code{db_import/2}:
+@example
+?- db_import('Hello World',helloWorld).
+yes
+?- db_assert(helloWorld('A' ,'Ana',31)). 
+yes
+@end example
+This, would generate the following query 
+@example
+INSERT INTO helloWorld
+VALUES ('A','Ana',3)
+@end example
+which would insert into the helloWorld, the following row:
+@code{A,Ana,31}. If we want to insert @code{NULL}  values into the
+relation, we call @code{db_assert/2} with a uninstantiated variable in
+the data base imported predicate. For example, the following query on
+the YAP-prolog system:
+
+@example
+?- db_assert(helloWorld('A',NULL,31)).
+yes
+@end example
+
+Would insert the row: @code{A,null value,31} into the relation
+@code{Hello World}, assuming that the second row allows null values.
+
+@table @code
+@item db insert(+,+,+). 
+@findex db_insert/3
+@snindex db_insert/3
+@cnindex db_insert/3
+
+@item db insert(+,+).  
+@findex db_insert/2
+@snindex db_insert/2
+@cnindex db_insert/2
+@end table
+ 
+This predicate would create a new database predicate, which will insert
+any given tuple into the database.
+@example
+?- db_insert(Conn,RelationName,PredName).
+?- db_insert(RelationName,PredName).
+@end example
+This would create a new predicate with name @var{PredName}, that will
+insert tuples into the relation @var{RelationName}. is the connection
+identifier. For example, if we wanted to insert the new tuple
+@code{('A',null,31)} into the relation @code{Hello World}, we do: 
+@example
+?- db_insert('Hello World',helloWorldInsert). 
+yes
+?- helloWorldInsert('A',NULL,31).
+yes
+@end example
+
+@node  Types of Attributes, Number of Fields, Insertion of Rows, MYDDAS 
+@section Types of Attributes
+
+
+@table @code
+@item db_get_attributes_types(+,+,?).
+@findex db_get_attributes_types/3
+@snindex db_get_attributes_types/3
+@cnindex db_get_attributes_types/3
+
+@item db_get_attributes_types(+,?). 
+@findex db_get_attributes_types/2
+@snindex db_get_attributes_types/2
+@cnindex db_get_attributes_types/2
+
+@end table
+ 
+The prototype for this predicate is the following: 
+@example
+?- db_get_attributes_types(Conn,RelationName,ListOfFields).
+?- db_get_attributes_types(RelationName,ListOfFields). 
+@end example
+
+You can use the
+predicate @code{db_get_attributes types/2} or @code{db_get_attributes_types/3}, to
+know what are the names and attributes types of the fields of a given
+relation. For example: 
+@example
+?- db_get_attributes_types(myddas,'Hello World',LA).
+LA = ['Number',integer,'Name',string,'Letter',string] ? 
+yes
+@end example
+where @t{Hello World} is the name of the relation and @t{myddas} is the
+connection identifier. 
+
+@node  Number of Fields, Describing a Relation, Types of Attributes, MYDDAS 
+@section Number of Fields
+
+@table @code
+@item db_number_of_fields(+,?).
+@findex db_number_of_fields/2
+@snindex db_number_of_fields/2
+@cnindex db_number_of_fields/2
+
+@item db_number_of_fields(+,+,?).
+@findex db_number_of_fields/3
+@snindex db_number_of_fields/3
+@cnindex db_number_of_fields/3
+@end table
+ 
+The prototype for this
+predicate is the following:
+@example
+ ?- db_number_of_fields(Conn,RelationName,Arity).
+ ?- db_number_of_fields(RelationName,Arity).  
+@end example
+You can use the predicate @code{db_number_of_fields/2} or
+@code{db_number_of_fields/3} to know what is the arity of a given
+relation. Example: 
+@example
+?- db_number_of_fields(myddas,'Hello World',Arity). 
+Arity = 3 ? 
+yes 
+@end example
+where @code{Hello World} is the name of the
+relation and @code{myddas} is the connection identifier.
+
+@node Describing a Relation, Enumerating Relations, Number of Fields, MYDDAS
+@section Describing a Relation
+
+@table @code
+@item db_datalog_describe(+,+).
+@findex db_datalog_describe/2
+@snindex db_datalog_describe/2
+@cnindex db_datalog_describe/2
+
+@item db_datalog_describe(+).
+@findex db_datalog_describe/1
+@snindex db_datalog_describe/1
+@cnindex db_datalog_describe/1
+@end table
+ 
+
+The db @code{datalog_describe/2} predicate does not really returns any
+value. It simply prints to the screen the result of the MySQL describe
+command, the same way as @code{DESCRIBE} in the MySQL prompt would.
+@example
+?- db_datalog_describe(myddas,'Hello World'). 
++----------+----------+------+-----+---------+-------+ 
+|   Field  |  Type    | Null | Key | Default | Extra |
++----------+----------+------+-----+---------+-------+
++  Number  | int(11)  | YES  |     |   NULL  |       |
++  Name    | char(10) | YES  |     |   NULL  |       |
++  Letter  | char(1)  | YES  |     |   NULL  |       |
++----------+----------+------+-----+---------+-------+
+yes
+@end example
+
+@table @code
+@item db_describe(+,+).
+@findex db_describe/2
+@snindex db_describe/2
+@cnindex db_describe/2
+
+@item db_describe(+).
+@findex db_describe/1
+@snindex db_describe/1
+@cnindex db_describe/1
+
+@end table
+ 
+The @code{db_describe/3} predicate does the same action as
+@code{db_datalog_describe/2} predicate but with one major
+difference. The results are returned by backtracking. For example, the
+last query:
+@example
+ ?- db_describe(myddas,'Hello World',Term). 
+Term = tableInfo('Number',int(11),'YES','',null(0),'') ? ;
+Term = tableInfo('Name',char(10),'YES','',null(1),'' ? ; 
+Term = tableInfo('Letter',char(1),'YES','',null(2),'') ? ;
+no
+@end example
+
+@node Enumerating Relations, The MYDDAS MySQL Top Level, Describing a Relation, MYDDAS
+@section Enumeration Relations
+
+@table @code
+@item db_datalog_show_tables(+).
+@item db_datalog_show_tables
+@end table
+ 
+
+If we need to know what relations exists in a given MySQL Schema, we can use
+the @code{db_datalog_show_tables/1} predicate. As @t{db_datalog_describe/2},
+it does not returns any value, but instead prints to the screen the result of the
+@code{SHOW TABLES} command, the same way as it would be in the MySQL prompt. 
+@example
+?- db_datalog_show_tables(myddas).
++-----------------+
+| Tables_in_guest |
++-----------------+
+|   Hello World   |
++-----------------+ 
+yes
+@end example
+
+@table @code
+@item db_show_tables(+, ?).
+@findex db_show_tables/2
+@snindex db_show_tables/2
+@cnindex db_show_tables/2
+
+@item db_show_tables(?)
+@findex db_show_tables/1
+@snindex db_show_tables/1
+@cnindex db_show_tables/1
+
+@end table
+ 
+The @code{db_show_tables/2} predicate does the same action as
+@code{db_show_tables/1} predicate but with one major difference. The
+results are returned by backtracking. For example, given the last query:
+@example
+?- db_show_tables(myddas,Table).
+Table = table('Hello World') ? ;
+no
+@end example
+
+@node The MYDDAS MySQL Top Level, Other MYDDAS Properties, Enumerating Relations, MYDDAS
+@section The MYDDAS MySQL Top Level
+
+
+@table @code
+@item db_top_level(+,+,+,+,+). 
+@findex db_top_level/5
+@snindex db_top_level/5
+@cnindex db_top_level/5
+
+@item db_top_level(+,+,+,+).
+@findex db_top_level/4
+@snindex db_top_level/4
+@cnindex db_top_level/4
+
+@end table
+ 
+Through MYDDAS is also possible to access the MySQL Database Server, in
+the same wthe mysql client. In this mode, is possible to query the
+SQL server by just using the standard SQL language. This mode is exactly the same as 
+different from the standard mysql client. We can use this
+mode, by invoking the db top level/5. as one of the following:
+@example
+?- db_top_level(mysql,Connection,Host/Database,User,Password). 
+?- db_top_level(mysql,Connection,Host/Database/Port,User,Password). 
+?- db_top_level(mysql,Connection,Host/Database/UnixSocket,User,Password). 
+?- db_top_level(mysql,Connection,Host/Database/Port/UnixSocket,User,Password).
+@end example
+
+Usage is similar as the one described for the @code{db_open/5} predicate
+discussed above. If the login is successful, automatically the prompt of
+the mysql client will be used.  For example:
+@example
+ ?- db_top_level(mysql,con1,localhost/guest_db,guest,''). 
+@end  example
+opens a
+connection identified by the @code{con1} atom, to an instance of a MySQL server
+running on host @code{localhost}, using database guest @code{db} and user @code{guest} with
+empty password. After this is possible to use MYDDAS as the mysql
+client.
+@example
+  ?- db_top_level(mysql,con1,localhost/guest_db,guest,''). 
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Welcome to the MySQL monitor.
+Commands end with ; or \g.
+
+Your MySQL connection id is 4468 to server version: 4.0.20
+Type 'help;' or '\h' for help.
+Type '\c' to clear the buffer. 
+mysql> exit
+Bye 
+yes
+?- 
+@end  example
+
+@node Other MYDDAS Properties, , The MYDDAS MySQL Top Level , MYDDAS 
+@section Other MYDDAS Properties 
+
+
+@table @code
+@item db_verbose(+). 
+@item db_top_level(+,+,+,+).
+@end table
+ 
+When we ask a question to YAP, using a predicate asserted by
+@code{db_import/3}, or by @code{db_view/3}, this will generate a SQL
+@code{QUERY}. If we want to see that query, we must to this at a given
+point in our session on YAP.
+@example
+?- db_verbose(1).
+yes 
+?- 
+@end example
+If we want to
+disable this feature, we must call the @code{db_verbose/1} predicate with the value 0.
+
+@table @code
+@item db_module(?). 
+@findex db_module/1
+@snindex db_module/1
+@cnindex db_module/1
+
+@end table
+
+When we create a new database predicate, by using @code{db_import/3},
+@code{db_view/3} or @code{db_insert/3}, that predicate will be asserted
+by default on the @code{user} module. If we want to change this value, we can
+use the @code{db_module/1} predicate to do so.
+@example
+?- db_module(lists).
+yes
+?-
+@end example
+By executing this predicate, all of the predicates asserted by the
+predicates enumerated earlier will created in the lists module.
+If we want to put back the value on default, we can manually put the
+value user. Example: 
+@example
+?- db_module(user).
+yes
+?-
+@end example
+
+We can also see in what module the predicates are being asserted by doing:
+@example
+?- db_module(X). 
+X=user
+yes
+ ?-
+@end example
+
+@table @code
+@item db_my_result_set(?).
+@findex db_my_result_set/1
+@snindex db_my_result_set/1
+@cnindex db_my_result_set/1
+
+@end table
+
+
+The MySQL C API permits two modes for transferring the data generated by
+a query to the client, in our case YAP. The first mode, and the default
+mode used by the MYDDAS-MySQL, is to store the result. This mode copies all the
+information generated to the client side.@example
+?- db_my_result_set(X).
+X=store_result
+yes
+@end example
+
+
+The other mode that we can use is use result. This one uses the result
+set created directly from the server. If we want to use this mode, he
+simply do
+@example
+ ?- db_my_result_set(use_result). 
+yes
+@end example
+After this command, all
+of the database predicates will use use result by default. We can change
+this by doing again @code{db_my_result_set(store_result)}.  
+
+@table @code
+@item db_my_sql_mode(+Conn,?SQL_Mode).
+@findex db_my_sql_mode/2
+@snindex db_my_sql_mode/2
+@cnindex db_my_sql_mode/2
+
+@item db_my_sql_mode(?SQL_Mode).
+@findex db_my_sql_mode/1
+@snindex db_my_sql_mode/1
+@cnindex db_my_sql_mode/1
+
+@end table
+
+The MySQL server allows the user to change the SQL mode. This can be
+very useful for debugging proposes. For example, if we want MySQL server
+not to ignore the INSERT statement warnings and instead of taking
+action, report an error, we could use the following SQL mode.
+@example
+  ?-db_my_sql_mode(traditional). yes
+@end example
+You can see the available SQL Modes at the MySQL homepage at
+@url{http://www.mysql.org}.
+
+@node Threads, Parallelism, MYDDAS, Extensions
 @chapter Threads
 
 YAP implements a SWI-Prolog compatible multithreading
@@ -14963,12 +15827,11 @@ loop(Env) :-
 
 @section Profiling
 
-The indexation mechanism restricts the set of clauses to be tried in a 
-procedure by using information about the status of a selected argument of 
-the goal (in YAP, as in most compilers, the first argument). 
-This argument 
-is then used as a key, selecting a restricted set of a clauses from all the 
-clauses forming the procedure.
+The indexation mechanism restricts the set of clauses to be tried in a
+procedure by using information about the status of the instantiated
+arguments of the goal.  These arguments are then used as a key,
+selecting a restricted set of a clauses from all the clauses forming the
+procedure.
 
 As an example, the two clauses for concatenate:
 
@@ -15229,6 +16092,7 @@ The rest of this appendix describes exhaustively how to interface C to YAP.
 * Utility Functions:: From character arrays to Lists of codes and back
 * Calling YAP From C:: From C to YAP to C to YAP 
 * Module Manipulation in C:: Create and Test Modules from within C
+* Miscellaneous C-Functions:: Other Helpful Interface Functions
 * Writing C:: Writing Predicates in C
 * Loading Objects:: Loading Object Files
 * Save&Rest:: Saving and Restoring
@@ -15850,6 +16714,7 @@ a solution was found.
 Notice that you cannot create new slots if an YAP_EnterGoal goal is open.
 
 @item  @code{YAP_Bool} YAP_RetryGoal(@code{YAP_dogoalinfo *} @var{infop})
+
 @findex YAP_RetryGoal (C-Interface function)
 Backtrack to a query created by @code{YAP_EnterGoal}. The query is
 given by the handle @var{infop}. Returns whether a new solution could
@@ -15897,7 +16762,7 @@ finding the first solution to the goal, but you can call
 Notice that during execution, garbage collection or stack shifting may
 have moved the terms 
 
-@node Module Manipulation in C, Writing C, Calling YAP From C, C-Interface
+@node Module Manipulation in C, Miscellaneous C-Functions, Calling YAP From C, C-Interface
 @section Module Manipulation in C
 
 YAP allows one to create a new module from C-code. To create the new
@@ -15921,7 +16786,41 @@ possible by using:
 Notice that this function returns a term, and not an atom. You can
 @code{YAP_AtomOfTerm} to extract the corresponding Prolog atom.
 
-@node Writing C, Loading Objects, Module Manipulation in C, C-Interface
+@node Miscellaneous C-Functions, Writing C, Module Manipulation in C, C-Interface
+@section Miscellaneous C Functions
+
+@table @code
+@item  @code{void} YAP_Throw(@code{YAP_Term exception})
+@item  @code{void} YAP_AsyncThrow(@code{YAP_Term exception})
+@findex YAP_Throw (C-Interface function)
+@findex YAP_AsyncThrow (C-Interface function)
+
+Throw an exception with term  @var{exception}, just like if you called
+@code{throw/2}. The function @t{YAP_AsyncThrow} is supposed to be used
+from interrupt handlers.
+@c See also @code{at_halt/1}.
+
+@item  @code{int} YAP_SetYAPFlag(@code{yap_flag_t flag, int value})
+@findex YAP_SetYAPFlag (C-Interface function)
+
+This function allows setting some YAP flags from @code{C} .Currently,
+only two boolean flags are accepted: @code{YAPC_ENABLE_GC} and
+@code{YAPC_ENABLE_AGC}.  The first enables/disables the standard garbage
+collector, the second does the same for the atom garbage collector.`
+
+@item  @code{int} YAP_HaltRegisterHook(@code{YAP_halt_hook f, void *closure})
+@findex YAP_HaltRegisterHook (C-Interface function)
+
+Register the function @var{f} to be called if YAP is halted. The
+function is called with two arguments: the exit code of the process (@code{0}
+if this cannot be determined on your operating system) and the closure
+argument @var{closure}. 
+@c See also @code{at_halt/1}.
+
+@end table
+
+
+@node Writing C, Loading Objects, Miscellaneous C-Functions, C-Interface
 @section Writing predicates in C
 
 We will distinguish two kinds of predicates:

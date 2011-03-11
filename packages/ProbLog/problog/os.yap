@@ -2,79 +2,78 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-%  $Date: 2009-06-17 22:22:00 +0200 (Mi, 17 Jun 2009) $
-%  $Revision: 1550 $
+%  $Date: 2010-12-02 15:20:15 +0100 (Thu, 02 Dec 2010) $
+%  $Revision: 5043 $
 %
 %  This file is part of ProbLog
 %  http://dtai.cs.kuleuven.be/problog
 %
-%  Copyright 2009 Katholieke Universiteit Leuven
+%  ProbLog was developed at Katholieke Universiteit Leuven
 %
-%  Authors: Luc De Raedt, Bernd Gutmann, Angelika Kimmig,
-%           Vitor Santos Costa
+%  Copyright 2008, 2009, 2010
+%  Katholieke Universiteit Leuven
 %
-%                                                                     
 %  Main authors of this file:
-%  Bernd Gutmann
+%  Theofrastos Mantadelis, Bernd Gutmann
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % Artistic License 2.0
-% 
+%
 % Copyright (c) 2000-2006, The Perl Foundation.
-% 
+%
 % Everyone is permitted to copy and distribute verbatim copies of this
 % license document, but changing it is not allowed.  Preamble
-% 
+%
 % This license establishes the terms under which a given free software
 % Package may be copied, modified, distributed, and/or
 % redistributed. The intent is that the Copyright Holder maintains some
 % artistic control over the development of that Package while still
 % keeping the Package available as open source and free software.
-% 
+%
 % You are always permitted to make arrangements wholly outside of this
 % license directly with the Copyright Holder of a given Package. If the
 % terms of this license do not permit the full use that you propose to
 % make of the Package, you should contact the Copyright Holder and seek
 % a different licensing arrangement.  Definitions
-% 
+%
 % "Copyright Holder" means the individual(s) or organization(s) named in
 % the copyright notice for the entire Package.
-% 
+%
 % "Contributor" means any party that has contributed code or other
 % material to the Package, in accordance with the Copyright Holder's
 % procedures.
-% 
+%
 % "You" and "your" means any person who would like to copy, distribute,
 % or modify the Package.
-% 
+%
 % "Package" means the collection of files distributed by the Copyright
 % Holder, and derivatives of that collection and/or of those files. A
 % given Package may consist of either the Standard Version, or a
 % Modified Version.
-% 
+%
 % "Distribute" means providing a copy of the Package or making it
 % accessible to anyone else, or in the case of a company or
 % organization, to others outside of your company or organization.
-% 
+%
 % "Distributor Fee" means any fee that you charge for Distributing this
 % Package or providing support for this Package to another party. It
 % does not mean licensing fees.
-% 
+%
 % "Standard Version" refers to the Package if it has not been modified,
 % or has been modified only in ways explicitly requested by the
 % Copyright Holder.
-% 
+%
 % "Modified Version" means the Package, if it has been changed, and such
 % changes were not explicitly requested by the Copyright Holder.
-% 
+%
 % "Original License" means this Artistic License as Distributed with the
 % Standard Version of the Package, in its current version or as it may
 % be modified by The Perl Foundation in the future.
-% 
+%
 % "Source" form means the source code, documentation source, and
 % configuration files for the Package.
-% 
+%
 % "Compiled" form means the compiled bytecode, object code, binary, or
 % any other form resulting from mechanical transformation or translation
 % of the Source form.
@@ -82,34 +81,34 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % Permission for Use and Modification Without Distribution
-% 
+%
 % (1) You are permitted to use the Standard Version and create and use
 % Modified Versions for any purpose without restriction, provided that
 % you do not Distribute the Modified Version.
 %
 % Permissions for Redistribution of the Standard Version
-% 
+%
 % (2) You may Distribute verbatim copies of the Source form of the
 % Standard Version of this Package in any medium without restriction,
 % either gratis or for a Distributor Fee, provided that you duplicate
 % all of the original copyright notices and associated disclaimers. At
 % your discretion, such verbatim copies may or may not include a
 % Compiled form of the Package.
-% 
+%
 % (3) You may apply any bug fixes, portability changes, and other
 % modifications made available from the Copyright Holder. The resulting
 % Package will still be considered the Standard Version, and as such
 % will be subject to the Original License.
 %
 % Distribution of Modified Versions of the Package as Source
-% 
+%
 % (4) You may Distribute your Modified Version as Source (either gratis
 % or for a Distributor Fee, and with or without a Compiled form of the
 % Modified Version) provided that you clearly document how it differs
 % from the Standard Version, including, but not limited to, documenting
 % any non-standard features, executables, or modules, and provided that
 % you do at least ONE of the following:
-% 
+%
 % (a) make the Modified Version available to the Copyright Holder of the
 % Standard Version, under the Original License, so that the Copyright
 % Holder may include your modifications in the Standard Version.  (b)
@@ -128,7 +127,7 @@
 %
 % Distribution of Compiled Forms of the Standard Version or
 % Modified Versions without the Source
-% 
+%
 % (5) You may Distribute Compiled forms of the Standard Version without
 % the Source, provided that you include complete instructions on how to
 % get the Source of the Standard Version. Such instructions must be
@@ -139,13 +138,13 @@
 % within thirty days after you become aware that the instructions are
 % invalid, then you do not forfeit any of your rights under this
 % license.
-% 
+%
 % (6) You may Distribute a Modified Version in Compiled form without the
 % Source, provided that you comply with Section 4 with respect to the
 % Source of the Modified Version.
 %
 % Aggregating or Linking the Package
-% 
+%
 % (7) You may aggregate the Package (either the Standard Version or
 % Modified Version) with other packages and Distribute the resulting
 % aggregation provided that you do not charge a licensing fee for the
@@ -153,7 +152,7 @@
 % components in the aggregation are permitted. The terms of this license
 % apply to the use and Distribution of the Standard or Modified Versions
 % as included in the aggregation.
-% 
+%
 % (8) You are permitted to link Modified and Standard Versions with
 % other works, to embed the Package in a larger work of your own, or to
 % build stand-alone binary or bytecode versions of applications that
@@ -161,7 +160,7 @@
 % provided the result does not expose a direct interface to the Package.
 %
 % Items That are Not Considered Part of a Modified Version
-% 
+%
 % (9) Works (including, but not limited to, modules and scripts) that
 % merely extend or make use of the Package, do not, by themselves, cause
 % the Package to be a Modified Version. In addition, such works are not
@@ -169,21 +168,21 @@
 % terms of this license.
 %
 % General Provisions
-% 
+%
 % (10) Any use, modification, and distribution of the Standard or
 % Modified Versions is governed by this Artistic License. By using,
 % modifying or distributing the Package, you accept this license. Do not
 % use, modify, or distribute the Package, if you do not accept this
 % license.
-% 
+%
 % (11) If your Modified Version has been derived from a Modified Version
 % made by someone other than you, you are nevertheless required to
 % ensure that your Modified Version complies with the requirements of
 % this license.
-% 
+%
 % (12) This license does not grant you the right to use any trademark,
 % service mark, tradename, or logo of the Copyright Holder.
-% 
+%
 % (13) This license includes the non-exclusive, worldwide,
 % free-of-charge patent license to make, have made, use, offer to sell,
 % sell, import and otherwise transfer the Package with respect to any
@@ -193,7 +192,7 @@
 % that the Package constitutes direct or contributory patent
 % infringement, then this Artistic License to you shall terminate on the
 % date that such litigation is filed.
-% 
+%
 % (14) Disclaimer of Warranty: THE PACKAGE IS PROVIDED BY THE COPYRIGHT
 % HOLDER AND CONTRIBUTORS "AS IS' AND WITHOUT ANY EXPRESS OR IMPLIED
 % WARRANTIES. THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
@@ -205,312 +204,174 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%%%%%%%%
+% Collected OS depended instructions
+%%%%%%%%
+:- module(os, [set_problog_path/1,
+	       problog_path/1,
+	       convert_filename_to_working_path/2,
+	       convert_filename_to_problog_path/2,
+	       concat_path_with_filename/3,
+	       concat_path_with_filename2/3,
+	       split_path_file/3,
+	       check_existance/1,
+	       calc_md5/2]).
 
-:- module(logger,[logger_define_variable/2,
-	          logger_define_variables/2,
-	          logger_set_filename/1,
-		  logger_set_delimiter/1,
-		  logger_set_variable/2,
-		  logger_set_variable_again/2,
-		  logger_get_variable/2,
-		  logger_start_timer/1,
-		  logger_stop_timer/1,
-		  logger_write_data/0,
-		  logger_write_header/0]).
 
-:- use_module(library(system),[datime/1,mktime/2]).
-:- use_module(library(lists),[append/3,member/2]).
+% load library modules
+:- use_module(library(system), [exec/3, file_exists/1,wait/2]).
+:- use_module(library(lists), [memberchk/2]).
 
-:- yap_flag(unknown,error).
-:- style_check(single_var).
+% load our own modules
+:- use_module(gflags, _, [flag_get/2]).
 
-:- bb_put(logger_filename,'out.dat').
-:- bb_put(logger_delimiter,';').
-:- bb_put(logger_variables,[]).
+:- dynamic(problog_path/1).
+:- dynamic(problog_working_path/1).
 
 
 %========================================================================
-%= Defines a new variable, possible types are: int, float and time
 %=
-%= +Name, +Type
+%=
+%=
 %========================================================================
 
-logger_define_variable(Name,int) :-
+set_problog_path(Path):-
+	retractall(problog_path(_)),
+	assertz(problog_path(Path)).
+
+%========================================================================
+%=
+%=
+%=
+%========================================================================
+
+convert_filename_to_working_path(File_Name, Path):-
+	flag_get(dir, Dir),
+	concat_path_with_filename(Dir, File_Name, Path).
+
+convert_filename_to_problog_path(File_Name, Path):-
+	problog_path(Dir),
+	concat_path_with_filename(Dir, File_Name, Path).
+
+
+%========================================================================
+%=
+%=
+%=
+%========================================================================
+
+concat_path_with_filename(Path, File_Name, Result):-
+	nonvar(File_Name),
+	nonvar(Path),
+  
+				% make sure, that there is no path delimiter at the end
+	prolog_file_name(Path,Path_Absolute),
+
+	path_seperator(Path_Seperator),
+	atomic_concat([Path_Absolute, Path_Seperator, File_Name], Result).
+
+concat_path_with_filename2(Path, File_Name, Result):-
+	nonvar(File_Name),
+	nonvar(Path),
+	path_seperator(Path_Seperator),
+	(atomic_concat(Path_Absolute, Path_Seperator, Path) ; Path_Absolute = Path),
+	atomic_concat([Path_Absolute, Path_Seperator, File_Name], Result).
+
+
+%========================================================================
+%= Calculate the MD5 checksum of +Filename by calling md5sum
+%= in case m5sum is not installed, try md5, otherwise fail
+%= +Filename, -MD5
+%========================================================================
+
+calc_md5(Filename,MD5):-
+	catch(calc_md5_intern(Filename,'md5sum',MD5),_,fail),
+	!.
+calc_md5(Filename,MD5):-
+	catch(calc_md5_intern(Filename,'md5',MD5),_,fail),
+	!.
+calc_md5(Filename,MD5):-
+	throw(md5error(calc_md5(Filename,MD5))).
+
+calc_md5_intern(Filename,Command,MD5) :-
+	( file_exists(Filename) -> true ; throw(md5_file(Filename)) ),
+
+	atomic_concat([Command,' "',Filename,'"'],Call),
+
+	% execute the md5 command
+	exec(Call,[null,pipe(S),null],PID),
+	bb_put(calc_md5_temp,End-End),  % use difference list
+	bb_put(calc_md5_temp2,0),
+
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	(	% read 32 Bytes from stdout of process
+		repeat,
+		get_code(S,C),
+
+		(
+		 C== -1
+		->
+		 (
+		  close(S),
+		  throw(md5error('premature end of output stream, please check os.yap calc_md5/2'))
+		 );
+		 true
+		),
+
+		bb_get(calc_md5_temp,List-[C|NewEnd]),
+		bb_put(calc_md5_temp,List-NewEnd),
+		bb_get(calc_md5_temp2,OldLength),
+		NewLength is OldLength+1,
+		bb_put(calc_md5_temp2,NewLength),
+		NewLength=32
+	),
+	%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	!,
-	is_variable_already_defined(Name),
-	bb_delete(logger_variables,OldVariables),
-	append(OldVariables,[(Name,int)],NewVariables),
-	bb_put(logger_variables,NewVariables),
-	atom_concat(logger_data_,Name,Key),
-	bb_put(Key,null).
-logger_define_variable(Name,float) :-
-	!,
-	is_variable_already_defined(Name),
-	bb_delete(logger_variables,OldVariables),
-	append(OldVariables,[(Name,float)],NewVariables),
-	bb_put(logger_variables,NewVariables),
-	atom_concat(logger_data_,Name,Key),
-	bb_put(Key,null).
-logger_define_variable(Name,time) :-
-	!,
-	is_variable_already_defined(Name),
-	bb_delete(logger_variables,OldVariables),
-	append(OldVariables,[(Name,time)],NewVariables),
-	bb_put(logger_variables,NewVariables),
-	atom_concat(logger_data_,Name,Key),
-	atom_concat(logger_start_time_,Name,Key2),
-	bb_put(Key,null),
-	bb_put(Key2,null).
-logger_define_variable(Name,Unknown) :-
-	is_variable_already_defined(Name),
-	write('logger_define_variable, unknown type '),
-	write(Unknown),
-	write(' for variable '),
-	write(Name),
-	nl,
-	fail.
-
-is_variable_already_defined(Name) :-
-	bb_get(logger_variables,Variables),
-	member((Name,_),Variables),!,
-	write('logger_define_variable, Variable '),
-	write(Name),
-	write(' is already defined!\n'),
-	fail;
-	true.
-
-%========================================================================
-%= 
-%=
-%= +ListOfNames, +Type
-%========================================================================
-
-logger_define_variables([],_).
-logger_define_variables([H|T],Type) :-
-	logger_define_variable(H,Type),
-	logger_define_variables(T,Type).
-
-%========================================================================
-%= Set the filename, to which the output should be appended
-%=
-%= +Name
-%========================================================================
-
-logger_set_filename(Name) :-
-	bb_put(logger_filename,Name).
-
-%========================================================================
-%= Set the delimiter for the fields
-%= 
-%= +Delimiter
-%========================================================================
-
-logger_set_delimiter(Delimiter) :-
-	bb_put(logger_delimiter,Delimiter).
-%========================================================================
-%= Set the value of the variable name. If the value is already set or
-%= if the variable does not exists, an error will be displayed and the
-%= Prolog will be halted. 
-%=
-%= +Name, +Value
-%========================================================================
-
-logger_set_variable(Name,Value) :-
-	atom_concat(logger_data_,Name,Key),
-	(
-	    bb_get(Key,null)
-	->
-	    (
-		bb_put(Key,Value)
-	    );(
-	         bb_get(Key,_)
-	      ->
-	         (
-		     write('logger_set_variable, Variable '),
-		     write(Name),
-		     write(' is already set'),
-		     nl,
-		     fail
-		 ) ; (
-		     write('logger_set_variable, unknown variable '),
-		     write(Name),
-		     nl,
-		     fail
-		     )
-		 )	 
-	),!.
-
-%========================================================================
-%= Set the value of the variable name. If the value is already set or
-%= the old value is overwritten. If the variable does not exists, an
-%= error will be displayed and the Prolog will be halted. 
-%=
-%= +Name, +Value
-%========================================================================
-
-logger_set_variable_again(Name,Value) :-
-	atom_concat(logger_data_,Name,Key),
-	(
-	    bb_get(Key,_)
-	->
-	    (
-		bb_put(Key,Value)
-	    );(
-	         write('logger_set_variable, unknown variable '),
-                 write(Name),
-     		 nl,
-		 fail
-               )
-	),!.
-
-
-logger_variable_is_set(Name) :-
-	atom_concat(logger_data_,Name,Key),
-	bb_get(Key,X),
-	X \= null.
-
-%========================================================================
-%= Get the value of the variable name. If the value is not yet set or
-%= if the variable does not exists, an error will be displayed and the
-%= Prolog will be halted. 
-%=
-%= +Name, +Value
-%========================================================================
-
-logger_get_variable(Name,Value) :-
-	atom_concat(logger_data_,Name,Key),
-	(
-	    bb_get(Key,null)
-	->
-	    (
-		write('logger_get_variable, Variable '),
-		write(Name),
-		write(' is not yet set'),
-		nl,
-		fail
-	    );(
-	         bb_get(Key,Value)
-	         ; 
-		  (
-		      write('logger_set_variable, unknown variable '),
-		      write(Name),
-		      nl,
-		      fail
-		   )	 
-	)
-        ),!.
-%========================================================================
-%= 
-%= 
-%= +Name
-%========================================================================
-
-logger_start_timer(Name) :-
-	atom_concat(logger_start_time_,Name,Key),
-	(
-	    bb_get(Key,null)
-	->
-	    (
-		statistics(walltime,[StartTime,_]),
-		bb_put(Key,StartTime)
-	    );(
-	        bb_get(Key,_)
-	    ->
-	       (
-		   write('logger_start_timer, timer '),
-		   write(Name),
-		   write(' is already started'),
-		   nl,
-		   fail
-	       );(
-	           write('logger_start_timer, timer '),
-		   write(Name),
-		   write(' is not defined'),
-		   nl,
-		   fail
-	         )
-	      )
-	  ),!.
 	
+	close(S),
+	wait(PID,_Status),
+	bb_delete(calc_md5_temp, FinalList-[]),
+	bb_delete(calc_md5_temp2,_),
+	atom_codes(MD5,FinalList).
 
-logger_stop_timer(Name) :-
-	atom_concat(logger_start_time_,Name,Key),
-
-	bb_delete(Key,StartTime),
-	statistics(walltime,[StopTime,_]),
-
-	bb_put(Key,null),
-
-	Duration is StopTime-StartTime,
-
-	(
-	    logger_variable_is_set(Name)
-        ->
-	    (
-		logger_get_variable(Name,OldDuration),
-		NewDuration is Duration+OldDuration,
-	        logger_set_variable_again(Name,NewDuration)
-	    ); logger_set_variable(Name,Duration)
-	),!.
 
 %========================================================================
-%= write a new line to the log file, which contains all the
-%= values of the variables. afterwards, reset all variables to null.
-%= 
+%=
+%=
+%=
 %========================================================================
 
-logger_write_data :-
-	bb_get(logger_filename,FName),
-	bb_get(logger_variables,Variables),
-	open(FName,'append',Handle),
-	logger_write_data_intern(Variables,Handle),
-	close(Handle),
+path_seperator('\\'):-
+   yap_flag(windows, true), !.
+path_seperator('/').
 
-	% reset variables
-	findall(_,(member((Name,_),Variables),atom_concat(logger_data_,Name,Key),bb_put(Key,null)),_),
-	findall(_,(member((Name,time),Variables),atom_concat(logger_start_time_,Name,Key2),bb_put(Key2,null)),_).
-	
-logger_write_data_intern([],_).
-logger_write_data_intern([(Name,_Type)],Handle) :-
-	variablevalue_with_nullcheck(Name,Value),
-	write(Handle,Value),
-	write(Handle,'\n').
-logger_write_data_intern([(Name,_Type),Next|T],Handle) :-
-	variablevalue_with_nullcheck(Name,Value),
-	bb_get(logger_delimiter,D),
-	write(Handle,Value),
-	write(Handle,D),
-	logger_write_data_intern([Next|T],Handle).
 
-variablevalue_with_nullcheck(Name,Result) :-
-	atom_concat(logger_data_,Name,Key),
-	bb_get(Key,Value),
-	(
-	    Value=null
-	-> 
-	    Result = '' ; 
-	    Result=Value
-	).
 %========================================================================
 %= 
 %= 
 %= 
 %========================================================================
 
-logger_write_header :-
-	bb_get(logger_filename,FName),
-	bb_get(logger_variables,Variables),
-	open(FName,'append',Handle),
-	write(Handle,'# '),
-	logger_write_header_intern(Variables,Handle),
-	write(Handle,'\n'),
-	close(Handle).
-	
-logger_write_header_intern([],_).
-logger_write_header_intern([(Name,_Type)],Handle) :-
-	write(Handle,Name).
-logger_write_header_intern([(Name,_Type),Next|T],Handle) :-
-	bb_get(logger_delimiter,D),
-	write(Handle,Name),
-	write(Handle,D),
-	logger_write_header_intern([Next|T],Handle).
+split_path_file(PathFile, Path, File):-
+	path_seperator(PathSeperator),
+	name(PathSeperator, [PathSeperatorName]),
+
+	atomic_concat(Path, File, PathFile),
+	name(File, FileName),
+	\+ memberchk(PathSeperatorName, FileName),
+	!.
+
+%========================================================================
+%= 
+%= 
+%= 
+%========================================================================
+
+
+check_existance(FileName):-
+	convert_filename_to_problog_path(FileName, Path),
+	catch(file_exists(Path), _, fail).
+check_existance(FileName):-
+	problog_path(PD),
+	write(user_error, 'WARNING: Can not find file: '), write(user_error, FileName),
+	write(user_error, ', please place file in problog path: '), write(user_error, PD), nl(user_error).

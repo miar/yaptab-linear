@@ -84,6 +84,7 @@
   AtomEOFBeforeEOT = AtomAdjust(AtomEOFBeforeEOT);
   AtomEQ = AtomAdjust(AtomEQ);
   AtomEmptyAtom = AtomAdjust(AtomEmptyAtom);
+  AtomEncoding = AtomAdjust(AtomEncoding);
   AtomEndOfStream = AtomAdjust(AtomEndOfStream);
   AtomEof = AtomAdjust(AtomEof);
   AtomEq = AtomAdjust(AtomEq);
@@ -264,6 +265,7 @@
   AtomSpy = AtomAdjust(AtomSpy);
   AtomStack = AtomAdjust(AtomStack);
   AtomStackFree = AtomAdjust(AtomStackFree);
+  AtomStartupSavedState = AtomAdjust(AtomStartupSavedState);
   AtomStaticClause = AtomAdjust(AtomStaticClause);
   AtomStaticProcedure = AtomAdjust(AtomStaticProcedure);
   AtomStream = AtomAdjust(AtomStream);

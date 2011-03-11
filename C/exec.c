@@ -971,6 +971,8 @@ exec_absmi(int top)
 	ASP = (CELL *)PROTECT_FROZEN_B(B);
 	Yap_StartSlots();
 	LOCK(SignalLock);
+	/* forget any signals active, we're reborne */
+	ActiveSignals = 0;
 	CreepFlag = CalculateStackGap();
 	Yap_PrologMode = UserMode;
 	UNLOCK(SignalLock);
@@ -1000,8 +1002,14 @@ exec_absmi(int top)
     Yap_PrologMode = UserMode;
   }
   Yap_CloseSlots();
+  YENV = ASP;
+  YENV[E_CB] = Unsigned (B);
   out = Yap_absmi(0);
   Yap_StartSlots();
+  /* make sure we don't leave a FAIL signal hanging around */ 
+  ActiveSignals &= ~YAP_FAIL_SIGNAL;
+  if (!ActiveSignals)
+    CreepFlag = CalculateStackGap();
   return out;
 }
 
@@ -1034,11 +1042,6 @@ init_stack(int arity, CELL *pt, int top, choiceptr saved_b)
   }
   B = (choiceptr)ASP;
   B--;
-#ifdef TABLING
-  if (top && GLOBAL_root_dep_fr) {
-    DepFr_cons_cp(GLOBAL_root_dep_fr) = B;
-  }
-#endif /* TABLING */
   B->cp_h     = H;
   B->cp_tr    = TR;
   B->cp_cp    = CP;
@@ -1053,9 +1056,9 @@ init_stack(int arity, CELL *pt, int top, choiceptr saved_b)
 #if defined(YAPOR) || defined(THREADS)
   WPP = NULL;
 #endif
-  YENV[E_CB] = Unsigned (B);
-  CP = YESCODE;
+  /* start with some slots so that we can use them */
   Yap_StartSlots();
+  CP = YESCODE;
 }
 
 static Term
@@ -1510,6 +1513,10 @@ JumpToEnv(Term t) {
 	EX = BallTerm;
 	BallTerm = NULL;
 	P = (yamop *)FAILCODE;
+	/* make sure failure will be seen at next port */
+	if (Yap_PrologMode & AsyncIntMode) {
+	  Yap_signal(YAP_FAIL_SIGNAL);
+	}
 	HB = B->cp_h;
 	return TRUE;
       }
@@ -1551,6 +1558,9 @@ JumpToEnv(Term t) {
   /* B->cp_h = H; */
   /* I could backtrack here, but it is easier to leave the unwinding
      to the emulator */
+  if (Yap_PrologMode & AsyncIntMode) {
+    Yap_signal(YAP_FAIL_SIGNAL);
+  }
   P = (yamop *)FAILCODE;
   HB = B->cp_h;
   /* try to recover space */
@@ -1631,6 +1641,7 @@ Yap_InitYaamRegs(void)
   EX = NULL;
   init_stack(0, NULL, TRUE, NULL);
   /* the first real choice-point will also have AP=FAIL */ 
+  /* always have an empty slots for people to use */
   CurSlot = 0;
   GlobalArena = TermNil;
   h0var = MkVarTerm();

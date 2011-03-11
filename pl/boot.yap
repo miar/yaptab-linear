@@ -88,6 +88,8 @@ true :- true.
 	  )
 	),
 	'$db_clean_queues'(0),
+% this must be executed from C-code.
+%	'$startup_saved_state',
 	'$startup_reconsult',
 	'$startup_goals',
 	'$set_input'(user_input),'$set_output'(user),
@@ -160,12 +162,6 @@ true :- true.
 	'$clean_up_dead_clauses',
 	fail.
 '$enter_top_level' :-
-	recorded('$restore_goal',G,R),
-	erase(R),
-	prompt(_,'   | '),
-	'$system_catch'('$do_yes_no'((G->true),user),user,Error,user:'$Error'(Error)),
-	fail.
-'$enter_top_level' :-
 	'$nb_getval'('$break',BreakLevel,fail),
 	 '$debug_on'(DBON),
 	(
@@ -194,6 +190,7 @@ true :- true.
 	'$read_vars'(user_input,Command,_,Pos,Varnames),
 	nb_setval('$spy_gn',1),
 		% stop at spy-points if debugging is on.
+
 	nb_setval('$debug_run',off),
 	nb_setval('$debug_jump',off),
 	prompt(_,'   |: '),
@@ -201,11 +198,37 @@ true :- true.
 	'$sync_mmapped_arrays',
 	set_value('$live','$false').
 
-'$startup_goals' :-
-	get_value('$extend_file_search_path',P), P \= [],
-	set_value('$extend_file_search_path',[]),
-	'$extend_file_search_path'(P),
+%
+% first, recover what we need from the saved state...
+%
+'$startup_saved_state' :-
+	% -p option must be processed after initializing the system
+	'$init_path_extensions',
 	fail.
+% use if we come from a save_program and we have SWI's shlib
+'$startup_saved_state' :-
+	recorded('$reload_foreign_libraries',G,R),
+	erase(R),
+	shlib:reload_foreign_libraries,
+	fail.
+% use if we come from a save_program and we have a goal to execute
+'$startup_saved_state' :-
+	recorded('$restore_goal',G,R),
+	erase(R),
+	prompt(_,'   | '),
+	'$system_catch'('$do_yes_no'((G->true),user),user,Error,user:'$Error'(Error)),
+	fail.
+'$startup_saved_state'.
+
+% then recover program.
+'$startup_reconsult' :-
+	get_value('$consult_on_boot',X), X \= [], !,
+	set_value('$consult_on_boot',[]),
+	'$do_startup_reconsult'(X).
+'$startup_reconsult'.
+
+
+% then we can execute the programs.
 '$startup_goals' :-
 	recorded('$startup_goal',G,_),
 	'$current_module'(Module),
@@ -243,12 +266,6 @@ true :- true.
 	'$myddas_import_all',
 	fail.
 '$startup_goals'.
-
-'$startup_reconsult' :-
-	get_value('$consult_on_boot',X), X \= [], !,
-	set_value('$consult_on_boot',[]),
-	'$do_startup_reconsult'(X).
-'$startup_reconsult'.
 
  %
  % MYDDAS: Import all the tables from one database
@@ -443,8 +460,13 @@ true :- true.
 	 '$$compile'(G1, G0, N, HeadMod).
 
  '$prepare_term'(G, V, Pos, G0, G1, BodyMod, SourceMod, Source) :-
-	 ( get_value('$syntaxcheckflag',on) ->
-		 '$check_term'(Source, V, Pos, BodyMod) ; true ),
+	 (
+	     get_value('$syntaxcheckflag',on)
+          ->
+	     '$check_term'(Source, V, Pos, BodyMod)
+	 ;
+	     true 
+	 ),
 	 '$precompile_term'(G, G0, G1, BodyMod, SourceMod).
 
  % process an input clause
@@ -492,7 +514,7 @@ true :- true.
 	X == '$', !,
 	( recorded('$reconsulting',_,R) -> erase(R) ).
 
-'$prompt_alternatives_on'(groundness).
+'$prompt_alternatives_on'(determinism).
 
 /* Executing a query */
 
@@ -513,7 +535,8 @@ true :- true.
  % end of YAPOR
 
 '$query'(G,[]) :-
-	 '$prompt_alternatives_on'(groundness), !,
+	 '$prompt_alternatives_on'(OPT),
+	 ( OPT = groundness ; OPT = determinism), !,
 	 '$yes_no'(G,(?-)).
 '$query'(G,V) :-
 	 (
@@ -950,6 +973,10 @@ not(G) :-    \+ '$execute'(G).
 
 % Called by the abstract machine, if no clauses exist for a predicate
 '$undefp'([M|G]) :-
+	'$find_goal_definition'(M, G, NM, NG),
+	'$execute0'(NG, NM).
+
+'$find_goal_definition'(M, G, NM, NG) :-
 	% make sure we do not loop on undefined predicates
         % for undefined_predicates.
 	'$enter_undefp',
@@ -958,20 +985,19 @@ not(G) :-    \+ '$execute'(G).
 	->
 	 '$exit_undefp'
 	;
-	 once('$find_undefp_handler'(G,M,Goal,NM))
+	 once('$find_undefp_handler'(G, M, Goal, NM))
 	),
 	!,
 	Goal \= fail,
-	'$complete_goal'(M, Goal, NM, G).
+	'$complete_goal'(M, Goal, NM, G, NG).
 
-'$complete_goal'(M, G, CurMod, G0) :-
+'$complete_goal'(M, G, CurMod, G0, NG) :-
 	  (
 	   '$is_metapredicate'(G,CurMod)
 	  ->
-	   '$meta_expansion'(G, CurMod, M, M, NG,[]) ->
-	   '$execute0'(NG, CurMod)
+	   '$meta_expansion'(G, CurMod, M, M, NG,[])
 	  ;
-	   '$execute0'(G, CurMod)
+	   NG = G
 	  ).
 
 '$find_undefp_handler'(G,M,NG,user) :-
@@ -1047,6 +1073,8 @@ break :-
 	get_value('$lf_verbose',OldSilent),
 	set_value('$lf_verbose',silent),
 	bootstrap(F),
+	% -p option must be processed after initializing the system
+	'$init_path_extensions',
 	set_value('$lf_verbose', OldSilent).
 
 bootstrap(F) :-
@@ -1080,6 +1108,14 @@ bootstrap(F) :-
 
 
 
+
+'$init_path_extensions' :-
+	get_value('$extend_file_search_path',P), !,
+	P \= [],
+	set_value('$extend_file_search_path',[]),
+	'$extend_file_search_path'(P).
+'$init_path_extensions'.
+ 
 '$loop'(Stream,Status) :-
 	'$change_alias_to_stream'('$loop_stream',Stream),
 	repeat,

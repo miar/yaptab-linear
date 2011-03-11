@@ -1,15 +1,15 @@
 #%define _unpackaged_files_terminate_build 0
 #%undefine __check_files
 
-Name: Yap
+Name: yap
 Summary: Prolog Compiler
-Version: 6.0.4
+Version: 6.2.0
 Packager: Vitor Santos Costa <vsc@dcc.fc.up.pt>
 Release: 1
 Source: http://www.dcc.fc.up.pt/~vsc/Yap/%{name}-%{version}.tar.gz
-License: Perl Artistic License
+License: Perl Artistic License, LGPL
 Provides: yap
-Requires: readline
+Requires: readline, odbc, gmp, cudd
 Group: Development/Languages
 URL: http://www.dcc.fc.up.pt/~vsc/Yap
 Prefix: /usr
@@ -36,6 +36,8 @@ rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
 mkdir -p $RPM_BUILD_ROOT/usr/share/info
 make DESTDIR=$RPM_BUILD_ROOT install_info
+mkdir -p $RPM_BUILD_ROOT/usr/share/doc/Yap
+make DESTDIR=$RPM_BUILD_ROOT install_docs
 
 %post
 /sbin/install-info  --quiet /usr/share/info/yap.info --section "Programming Languages" /usr/share/info/dir
@@ -54,6 +56,9 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/file.list.%{name}
 %defattr(-,root,root,-)
 %doc README*
 %doc INSTALL
+%doc changes-6.0.html
+%doc changes-5.1.html
+%doc changes-5.0.html
 %doc changes4.3.html
 %doc docs/yap.tex
 /usr/bin/yap
@@ -63,6 +68,7 @@ rm -rf $RPM_BUILD_ROOT $RPM_BUILD_DIR/file.list.%{name}
 /usr/share/Yap/
 /usr/share/info/yap.info*
 /usr/share/info/pillow_doc.info*
+/usr/share/doc/Yap
 
 %changelog
 

@@ -57,7 +57,7 @@ p_load_foreign(void)
     t = TailOfTerm(t);
     new = (StringList) Yap_AllocCodeSpace(sizeof(StringListItem));
     new->next = ofiles;
-    new->s = RepAtom(AtomOfTerm(t1))->StrOfAE;
+    new->name = AtomOfTerm(t1);
     ofiles = new;
   }
 
@@ -69,7 +69,7 @@ p_load_foreign(void)
     t = TailOfTerm(t);
     new = (StringList) Yap_AllocCodeSpace(sizeof(StringListItem));
     new->next = libs;
-    new->s = RepAtom(AtomOfTerm(t1))->StrOfAE;
+    new->name = AtomOfTerm(t1);
     libs = new;
   }
 
@@ -111,10 +111,10 @@ p_load_foreign(void)
 
 static Int
 p_open_shared_object(void) {
-  StringList ofiles = NULL;
   Term t = Deref(ARG1);
   Term tflags = Deref(ARG2);
-  void *ptr;
+  char *s;
+  void *handle;
 
   if (IsVarTerm(t)) {
     Yap_Error(INSTANTIATION_ERROR,t,"open_shared_object/3");
@@ -129,97 +129,83 @@ p_open_shared_object(void) {
     Yap_Error(INSTANTIATION_ERROR,tflags,"open_shared_object/3");
     return FALSE;
   } 
-  if (!IsIntTerm(tflags)) {
+  if (!IsIntegerTerm(tflags)) {
     Yap_Error(TYPE_ERROR_INTEGER,tflags,"open_shared_object/3");
     return FALSE;
   }
   
-  ofiles = (StringList) Yap_AllocCodeSpace(sizeof(StringListItem));
-  ofiles->next = ofiles;
-  ofiles->s = RepAtom(AtomOfTerm(t))->StrOfAE;
-  if ((ptr = Yap_LoadForeignFile(ofiles->s, IntOfTerm(tflags)))==NULL) {
-      return FALSE;
+  s = RepAtom(AtomOfTerm(t))->StrOfAE;
+  if ((handle = Yap_LoadForeignFile(s, IntegerOfTerm(tflags)))==NULL) {
+    return FALSE;
   } else {
-    ForeignObj *f_code = (ForeignObj *)Yap_AllocCodeSpace(sizeof(ForeignObj));
-    ofiles->handle = ptr;
-
-    f_code->objs = ofiles;
-    f_code->libs = NULL;
-    f_code->f = NULL;
-    f_code->next = ForeignCodeLoaded;
-    f_code->module = CurrentModule;
-    ForeignCodeLoaded = f_code;
-
-    return Yap_unify(MkIntegerTerm((Int)f_code),ARG3);
+    return Yap_unify(MkIntegerTerm((Int)handle),ARG3);
   }
 }
 
 static Int
 p_close_shared_object(void) {
   Term t = Deref(ARG1);
-  ForeignObj *f, *f0 = NULL, *fi = ForeignCodeLoaded;
   void *handle;
 
   if (IsVarTerm(t)) {
-    Yap_Error(INSTANTIATION_ERROR,t,"open_shared_object/3");
+    Yap_Error(INSTANTIATION_ERROR,t,"close_shared_object/1");
     return FALSE;
   } 
   if (!IsIntegerTerm(t)) {
-    Yap_Error(TYPE_ERROR_INTEGER,t,"open_shared_object/3");
+    Yap_Error(TYPE_ERROR_INTEGER,t,"close_shared_object/1");
     return FALSE;
   }
-  f = (ForeignObj *)IntegerOfTerm(t);
+  handle = (char *)IntegerOfTerm(t);
  
-  while (fi != f && fi) {
-    f0 = fi;
-    fi = f->next;
-  }
-  if (!fi)
-    return FALSE;
-  if (f0) {
-    f0->next = f->next;
-  } else {
-    ForeignCodeLoaded->next = f->next;
-  }
-  handle = f->objs->handle;
-  Yap_FreeCodeSpace((ADDR)f->objs);
-  Yap_FreeCodeSpace((ADDR)f);
-  return Yap_CloseForeignFile(f->f);
+  return Yap_CloseForeignFile(handle);
 }
 
 static Int
 p_call_shared_object_function(void) {
   Term t = Deref(ARG1);
   Term tfunc = Deref(ARG2);
-  ForeignObj *f, *f0 = NULL, *fi = ForeignCodeLoaded;
+  Term tmod;
   void *handle;
+  Term OldCurrentModule = CurrentModule;
+  Int res;
 
+  tmod = CurrentModule;
+ restart:
   if (IsVarTerm(t)) {
-    Yap_Error(INSTANTIATION_ERROR,t,"open_shared_object/3");
+    Yap_Error(INSTANTIATION_ERROR,t,"call_shared_object_function/2");
     return FALSE;
-  } 
-  if (!IsIntegerTerm(t)) {
-    Yap_Error(TYPE_ERROR_INTEGER,t,"open_shared_object/3");
+  } else if (IsApplTerm(t)) {
+    Functor    fun = FunctorOfTerm(t);
+    if (fun == FunctorModule) {
+      tmod = ArgOfTerm(1, t);
+      if (IsVarTerm(tmod) ) {
+	Yap_Error(INSTANTIATION_ERROR,t,"call_shared_object_function/2");
+	return FALSE;
+      }
+      if (!IsAtomTerm(tmod) ) {
+	Yap_Error(TYPE_ERROR_ATOM,ARG1,"call_shared_object_function/2");
+	return FALSE;
+      }
+      t = ArgOfTerm(2, t);
+      goto restart;
+    }
+  } else if (!IsIntegerTerm(t)) {
+    Yap_Error(TYPE_ERROR_INTEGER,t,"call_shared_object_function/2");
     return FALSE;
   }
-  f = (ForeignObj *)IntegerOfTerm(t);
+  handle = (void *)IntegerOfTerm(t);
   if (IsVarTerm(tfunc)) {
-    Yap_Error(INSTANTIATION_ERROR,t,"open_shared_object/3");
+    Yap_Error(INSTANTIATION_ERROR,t,"call_shared_object_function/2");
     return FALSE;
   } 
   if (!IsAtomTerm(tfunc)) {
-    Yap_Error(TYPE_ERROR_ATOM,t,"open_shared_object/3");
+    Yap_Error(TYPE_ERROR_ATOM,t,"call_shared_object_function/2/3");
     return FALSE;
   }
- 
-  while (fi != f && fi) {
-    f0 = fi;
-    fi = f->next;
-  }
-  if (!fi)
-    return FALSE;
-  handle = f->objs->handle;
-  return Yap_CallForeignFile(handle, RepAtom(AtomOfTerm(tfunc))->StrOfAE);
+  CurrentModule = tmod;
+  res = Yap_CallForeignFile(handle, RepAtom(AtomOfTerm(tfunc))->StrOfAE);
+  CurrentModule = OldCurrentModule;
+  return res;
 }
 
 static Int
@@ -256,12 +242,14 @@ Yap_ReOpenLoadForeign(void)
 {
   ForeignObj *f_code = ForeignCodeLoaded;
   Term OldModule = CurrentModule;
-  YapInitProc InitProc = NULL;
 
   while (f_code != NULL) {
+    YapInitProc InitProc = NULL;
+
     CurrentModule = f_code->module;
     if(Yap_ReLoadForeign(f_code->objs,f_code->libs,f_code->f,&InitProc)==LOAD_SUCCEEDED) {
-      (*InitProc)();
+      if (InitProc)
+	(*InitProc)();
     }
     f_code = f_code->next;
   }

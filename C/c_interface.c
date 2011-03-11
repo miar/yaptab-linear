@@ -480,6 +480,7 @@ X_API int     STD_PROTO(YAP_RecoverSlots,(int));
 X_API Int     STD_PROTO(YAP_ArgsToSlots,(int));
 X_API void    STD_PROTO(YAP_SlotsToArgs,(int, Int));
 X_API void    STD_PROTO(YAP_Throw,(Term));
+X_API void    STD_PROTO(YAP_AsyncThrow,(Term));
 X_API void    STD_PROTO(YAP_Halt,(int));
 X_API Term   *STD_PROTO(YAP_TopOfLocalStack,(void));
 X_API void   *STD_PROTO(YAP_Predicate,(Atom,UInt,Term));
@@ -505,6 +506,7 @@ X_API Term     STD_PROTO(YAP_TermNil,(void));
 X_API int      STD_PROTO(YAP_AtomGetHold,(Atom));
 X_API int      STD_PROTO(YAP_AtomReleaseHold,(Atom));
 X_API Agc_hook STD_PROTO(YAP_AGCRegisterHook,(Agc_hook));
+X_API int      STD_PROTO(YAP_HaltRegisterHook,(HaltHookFunc, void *));
 X_API char    *STD_PROTO(YAP_cwd,(void));
 X_API Term     STD_PROTO(YAP_OpenList,(int));
 X_API Term     STD_PROTO(YAP_ExtendList,(Term, Term));
@@ -519,6 +521,7 @@ X_API int      STD_PROTO(YAP_Erase,(void *));
 X_API int      STD_PROTO(YAP_Variant,(Term, Term));
 X_API int      STD_PROTO(YAP_ExactlyEqual,(Term, Term));
 X_API Int      STD_PROTO(YAP_TermHash,(Term, Int, Int, int));
+X_API int      STD_PROTO(YAP_SetYAPFlag,(yap_flag_t, int));
 
 static int (*do_getf)(void);
 
@@ -705,7 +708,7 @@ YAP_MkBlobTerm(unsigned int sz)
   }
   I = AbsAppl(H);
   H[0] = (CELL)FunctorBigInt;
-  H[1] = BIG_INT;
+  H[1] = ARRAY_INT;
   dst = (MP_INT *)(H+2);
   dst->_mp_size = 0L;
   dst->_mp_alloc = sz;
@@ -1160,6 +1163,8 @@ typedef Int (*CPredicate5)(Int,Int,Int,Int,Int);
 typedef Int (*CPredicate6)(Int,Int,Int,Int,Int,Int);
 typedef Int (*CPredicate7)(Int,Int,Int,Int,Int,Int,Int);
 typedef Int (*CPredicate8)(Int,Int,Int,Int,Int,Int,Int,Int);
+typedef Int (*CPredicate9)(Int,Int,Int,Int,Int,Int,Int,Int,Int);
+typedef Int (*CPredicate10)(Int,Int,Int,Int,Int,Int,Int,Int,Int,Int);
 typedef Int (*CPredicateV)(Int,Int,struct foreign_context *);
 
 static Int
@@ -1239,6 +1244,33 @@ execute_cargs(PredEntry *pe, CPredicate exec_code)
 		      Yap_InitSlot(Deref(ARG7)),
 		      Yap_InitSlot(Deref(ARG8))));
     }
+  case 9:
+    {
+      CPredicate9 code9 = (CPredicate9)exec_code;
+      return ((code9)(Yap_InitSlot(Deref(ARG1)),
+		      Yap_InitSlot(Deref(ARG2)),
+		      Yap_InitSlot(Deref(ARG3)),
+		      Yap_InitSlot(Deref(ARG4)),
+		      Yap_InitSlot(Deref(ARG5)),
+		      Yap_InitSlot(Deref(ARG6)),
+		      Yap_InitSlot(Deref(ARG7)),
+		      Yap_InitSlot(Deref(ARG8)),
+		      Yap_InitSlot(Deref(ARG9))));
+    }
+  case 10:
+    {
+      CPredicate10 code10 = (CPredicate10)exec_code;
+      return ((code10)(Yap_InitSlot(Deref(ARG1)),
+		      Yap_InitSlot(Deref(ARG2)),
+		      Yap_InitSlot(Deref(ARG3)),
+		      Yap_InitSlot(Deref(ARG4)),
+		      Yap_InitSlot(Deref(ARG5)),
+		      Yap_InitSlot(Deref(ARG6)),
+		      Yap_InitSlot(Deref(ARG7)),
+		      Yap_InitSlot(Deref(ARG8)),
+		      Yap_InitSlot(Deref(ARG9)),
+		      Yap_InitSlot(Deref(ARG10))));
+    }
   default:
     return(FALSE);
   }
@@ -1253,6 +1285,8 @@ typedef Int (*CBPredicate5)(Int,Int,Int,Int,Int,struct foreign_context *);
 typedef Int (*CBPredicate6)(Int,Int,Int,Int,Int,Int,struct foreign_context *);
 typedef Int (*CBPredicate7)(Int,Int,Int,Int,Int,Int,Int,struct foreign_context *);
 typedef Int (*CBPredicate8)(Int,Int,Int,Int,Int,Int,Int,Int,struct foreign_context *);
+typedef Int (*CBPredicate9)(Int,Int,Int,Int,Int,Int,Int,Int,Int,struct foreign_context *);
+typedef Int (*CBPredicate10)(Int,Int,Int,Int,Int,Int,Int,Int,Int,Int,struct foreign_context *);
 
 static Int
 execute_cargs_back(PredEntry *pe, CPredicate exec_code, struct foreign_context *ctx)
@@ -1338,6 +1372,35 @@ execute_cargs_back(PredEntry *pe, CPredicate exec_code, struct foreign_context *
 		      Yap_InitSlot(Deref(ARG8)),
 		      ctx));
     }
+  case 9:
+    {
+      CBPredicate9 code9 = (CBPredicate9)exec_code;
+      return ((code9)(Yap_InitSlot(Deref(ARG1)),
+		      Yap_InitSlot(Deref(ARG2)),
+		      Yap_InitSlot(Deref(ARG3)),
+		      Yap_InitSlot(Deref(ARG4)),
+		      Yap_InitSlot(Deref(ARG5)),
+		      Yap_InitSlot(Deref(ARG6)),
+		      Yap_InitSlot(Deref(ARG7)),
+		      Yap_InitSlot(Deref(ARG8)),
+		      Yap_InitSlot(Deref(ARG9)),
+		      ctx));
+    }
+  case 10:
+    {
+      CBPredicate10 code10 = (CBPredicate10)exec_code;
+      return ((code10)(Yap_InitSlot(Deref(ARG1)),
+		      Yap_InitSlot(Deref(ARG2)),
+		      Yap_InitSlot(Deref(ARG3)),
+		      Yap_InitSlot(Deref(ARG4)),
+		      Yap_InitSlot(Deref(ARG5)),
+		      Yap_InitSlot(Deref(ARG6)),
+		      Yap_InitSlot(Deref(ARG7)),
+		      Yap_InitSlot(Deref(ARG8)),
+		      Yap_InitSlot(Deref(ARG9)),
+		      Yap_InitSlot(Deref(ARG10)),
+		      ctx));
+    }
   default:
     return(FALSE);
   }
@@ -1350,8 +1413,13 @@ YAP_Execute(PredEntry *pe, CPredicate exec_code)
   if (pe->PredFlags & SWIEnvPredFlag) {
     CPredicateV codev = (CPredicateV)exec_code;
     struct foreign_context ctx;
+    UInt i;
+    Int sl = 0;
     ctx.engine = NULL;
-    return ((codev)((&ARG1)-LCL0,0,&ctx));
+    for (i=pe->ArityOfPE; i > 0; i--) {
+      sl = Yap_InitSlot(XREGS[i]);
+    }
+    return ((codev)(sl,0,&ctx));
   }
   if (pe->PredFlags & CArgsPredFlag) {
     Int out =  execute_cargs(pe, exec_code);
@@ -1373,7 +1441,7 @@ YAP_ExecuteFirst(PredEntry *pe, CPredicate exec_code)
     Int val;
     CPredicateV codev = (CPredicateV)exec_code;
     struct foreign_context *ctx = (struct foreign_context *)(&EXTRA_CBACK_ARG(pe->ArityOfPE,1));
-    
+
     ctx->control = FRG_FIRST_CALL;
     ctx->engine = NULL; //(PL_local_data *)Yap_regp;
     ctx->context = NULL;
@@ -1991,7 +2059,6 @@ YAP_RestartGoal(void)
 {
   int out;
   BACKUP_MACHINE_REGS();
-
   if (Yap_AllowRestart) {
     P = (yamop *)FAILCODE;
     do_putcf = myputc;
@@ -2502,7 +2569,7 @@ YAP_Init(YAP_init_args *yap_init)
     Yap_init_local();
 #ifdef YAPOR
     if (worker_id != 0) {
-#if SBA
+#if SBA||ENV_COPY
       /*
 	In the SBA we cannot just happily inherit registers
 	from the other workers
@@ -2584,6 +2651,11 @@ YAP_Init(YAP_init_args *yap_init)
     else
       Yap_AttsSize = 2048*sizeof(CELL);
     if (restore_result == DO_ONLY_CODE) {
+      /* first, initialise the saved state */
+      Term t_goal = MkAtomTerm(AtomStartupSavedState);
+      YAP_RunGoalOnce(t_goal);
+      Yap_InitYaamRegs();
+      /* reset stacks */
       return YAP_BOOT_FROM_SAVED_CODE;
     } else {
       return YAP_BOOT_FROM_SAVED_STACKS;
@@ -2615,6 +2687,8 @@ YAP_Init(YAP_init_args *yap_init)
       fgoal = Yap_MkFunctor(Yap_LookupAtom("module"), 1);
       goal = Yap_MkApplTerm(fgoal, 1, as);
       YAP_RunGoalOnce(goal);
+      /* reset stacks */
+      Yap_InitYaamRegs();
     }
     Yap_PutValue(Yap_FullLookupAtom("$live"), MkAtomTerm (Yap_FullLookupAtom("$true")));
   }
@@ -2768,6 +2842,16 @@ YAP_Throw(Term t)
 {
   BACKUP_MACHINE_REGS();
   Yap_JumpToEnv(t);
+  RECOVER_MACHINE_REGS();
+}
+
+X_API void
+YAP_AsyncThrow(Term t)
+{
+  BACKUP_MACHINE_REGS();
+  Yap_PrologMode |= AsyncIntMode;
+  Yap_JumpToEnv(t);
+  Yap_PrologMode &= ~AsyncIntMode;
   RECOVER_MACHINE_REGS();
 }
 
@@ -2956,6 +3040,12 @@ YAP_AGCRegisterHook(Agc_hook hook)
   return old;
 } 
 
+X_API int
+YAP_HaltRegisterHook(HaltHookFunc hook, void * closure)
+{
+  return Yap_HaltRegisterHook(hook, closure);
+} 
+
 X_API char *
 YAP_cwd(void)
 {
@@ -3062,20 +3152,77 @@ YAP_FileDescriptorFromStream(Term t)
 X_API void *
 YAP_Record(Term t)
 {
- 
-  return (void *)Yap_StoreTermInDB(Deref(t), 0);
+  DBTerm *dbterm;
+  DBRecordList *dbt;
+
+  dbterm = Yap_StoreTermInDB(Deref(t), 0);
+  if (dbterm == NULL)
+    return NULL;
+  dbt = (struct record_list *)Yap_AllocCodeSpace(sizeof(struct record_list));
+  while (dbt == NULL) {
+    if (!Yap_growheap(FALSE, sizeof(struct record_list), NULL)) {
+      /* be a good neighbor */
+      Yap_FreeCodeSpace((void *)dbterm);
+      Yap_Error(OUT_OF_HEAP_ERROR, TermNil, "using YAP_Record");
+      return NULL;
+    }
+  }
+  if (Yap_Records) {
+    Yap_Records->prev_rec = dbt;
+  }
+  dbt->next_rec = Yap_Records;
+  dbt->prev_rec = NULL;
+  dbt->dbrecord = dbterm;
+  Yap_Records = dbt;
+  return dbt;
 }
 
 X_API Term
 YAP_Recorded(void *handle)
 {
-  return Yap_FetchTermFromDB((DBTerm *)handle);
+  Term t;
+  DBTerm *dbterm = ((DBRecordList *)handle)->dbrecord;
+
+  BACKUP_MACHINE_REGS();
+  do {
+    Yap_Error_TYPE = YAP_NO_ERROR;
+    t = Yap_FetchTermFromDB(dbterm);
+    if (Yap_Error_TYPE == YAP_NO_ERROR) {
+      RECOVER_MACHINE_REGS();
+      return t;
+    } else if (Yap_Error_TYPE == OUT_OF_ATTVARS_ERROR) {
+      Yap_Error_TYPE = YAP_NO_ERROR;
+      if (!Yap_growglobal(NULL)) {
+	Yap_Error(OUT_OF_ATTVARS_ERROR, TermNil, Yap_ErrorMessage);
+	RECOVER_MACHINE_REGS();
+	return FALSE;
+      }
+    } else {
+      Yap_Error_TYPE = YAP_NO_ERROR;
+      if (!Yap_growstack(dbterm->NOfCells*CellSize)) {
+	Yap_Error(OUT_OF_STACK_ERROR, TermNil, Yap_ErrorMessage);
+	RECOVER_MACHINE_REGS();
+	return FALSE;
+      }
+    }
+  } while (t == (CELL)0);
+  RECOVER_MACHINE_REGS();
+  return t;
 }
 
 X_API int
 YAP_Erase(void *handle)
 {
-  Yap_ReleaseTermFromDB((DBTerm *)handle);
+  DBRecordList *dbr = (DBRecordList *)handle;
+  Yap_ReleaseTermFromDB(dbr->dbrecord);
+  if (dbr->next_rec) 
+    dbr->next_rec->prev_rec = dbr->prev_rec;
+  if (dbr->prev_rec) 
+    dbr->next_rec->prev_rec = dbr->next_rec;
+  else if (Yap_Records == dbr) {
+    Yap_Records = dbr->next_rec;
+  }
+  Yap_FreeCodeSpace(handle);
   return 1;
 }
 
@@ -3096,6 +3243,30 @@ YAP_SlotsToArgs(int n, Int slot)
   CELL *ptr0 = LCL0+slot, *ptr1=&ARG1;
   while (n--) {
     *ptr1++ = *ptr0++;
+  }
+}
+
+
+X_API int
+YAP_SetYAPFlag(yap_flag_t flag, int val)
+{
+  switch (flag) {
+  case YAPC_ENABLE_GC:
+    if (val) {
+      Yap_PutValue(AtomGc, MkAtomTerm(AtomTrue));
+    } else {
+      Yap_PutValue(AtomGc, TermNil);
+    }
+    return TRUE;
+  case YAPC_ENABLE_AGC:
+    if (val) {
+      AGcThreshold = 10000;
+    } else {
+      AGcThreshold = 0;
+    }
+    return TRUE;
+  default:
+    return FALSE;
   }
 }
 

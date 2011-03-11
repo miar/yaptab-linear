@@ -95,6 +95,9 @@
 #define TotGcRecovered WL->tot_gc_recovered
 #define LastGcTime WL->last_gc_time
 #define LastSSTime WL->last_ss_time
+#if LOW_LEVEL_TRACER
+#define Yap_total_choicepoints WL->total_cps
+#endif
 
 #if defined(YAPOR) || defined(THREADS)
 #define SignalLock WL->signal_lock
@@ -187,6 +190,8 @@
 #define SWIWidePutc Yap_global->swi_wputc
 #define SWIClose Yap_global->swi_close
 #define SWIFlush Yap_global->swi_flush
+#define SWIGetStream Yap_global->swi_get_stream_f
+#define SWIGetStreamPosition Yap_global->swi_get_stream_position_f
 
 #define Yap_AllowLocalExpansion Yap_global->allow_local_expansion
 #define Yap_AllowGlobalExpansion Yap_global->allow_global_expansion
@@ -216,4 +221,6 @@
 #define Yap_InitialisedFromPL Yap_global->initialised_from_pl
 #define Yap_PL_Argc Yap_global->pl_argc
 #define Yap_PL_Argv Yap_global->pl_argv
+
+#define Yap_HaltHooks Yap_global->yap_halt_hook
 

@@ -3,10 +3,12 @@
 *    SimpleCUDD library (www.cs.kuleuven.be/~theo/tools/simplecudd.html)       *
 *  SimpleCUDD was developed at Katholieke Universiteit Leuven(www.kuleuven.be) *
 *                                                                              *
-*  Copyright Katholieke Universiteit Leuven 2008                               *
+*  Copyright Katholieke Universiteit Leuven 2008, 2009, 2010                   *
 *                                                                              *
 *  Author: Theofrastos Mantadelis                                              *
 *  File: general.h                                                             *
+*  $Date:: 2010-10-06 13:20:59 +0200 (Wed, 06 Oct 2010)                      $ *
+*  $Revision:: 4880                                                          $ *
 *                                                                              *
 ********************************************************************************
 *                                                                              *
@@ -188,12 +190,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <limits.h>
 
 #define IsNumberDigit(c)       ('0' <= c && c <= '9')
 #define IsSignDigit(c)         (c == '+' || c == '-')
 #define isOperator(x)          (x == '+' || x == '*' || x == '#' || x == '=')
 #define freadline(fd)          freadstr(fd, "\n");
 
+int getRealNumber(char *c, double *number);
+int getIntNumber(char *c, int *number);
+inline int getPosNumber(char *c, int *number);
 int IsRealNumber(char *c);
 int IsPosNumber(const char *c);
 int IsNumber(const char *c);

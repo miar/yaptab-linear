@@ -90,7 +90,7 @@
 #undef  USE_THREADED_CODE
 #endif
 #define inline __inline
-#define YAP_VERSION "YAP-6.0.7"
+#define YAP_VERSION "YAP-6.2.0"
 
 #define BIN_DIR "c:\\Yap\\bin"
 #define LIB_DIR "c:\\Yap\\lib\\Yap"
@@ -257,7 +257,7 @@ extern char Yap_Option[20];
 #endif
 
 #if !defined(IN_SECOND_QUADRANT)
-#if __linux__ || __FreeBSD__ || __NetBSD__ || mips || __APPLE__
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(mips) || defined(__APPLE__) || defined(__DragonFly__)
 #if defined(YAPOR) && defined(__alpha)
 
 #define MMAP_ADDR 0x40000000
@@ -267,6 +267,8 @@ extern char Yap_Option[20];
 // this address is high enough that it is likely not to confuse Apple's malloc debugger; lowest possible is 0x100200000
 #define MMAP_ADDR 0x200000000
 #elif defined(__APPLE__) && !__LP64__
+#define MMAP_ADDR 0x20000000
+#elif defined(__powerpc__)
 #define MMAP_ADDR 0x20000000
 #else
 #define MMAP_ADDR 0x10000000
@@ -351,7 +353,7 @@ typedef CELL Term;
 
 #if !defined(YAPOR) && !defined(THREADS)
 #include <nolocks.h>
-#elif USE_PTHREAD_LOCKING || defined(__APPLE__) || defined(__CYGWIN__)
+#elif USE_PTHREAD_LOCKING || defined(__CYGWIN__)
 
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 600
@@ -361,7 +363,7 @@ typedef CELL Term;
 typedef pthread_mutex_t lockvar;
 typedef pthread_rwlock_t rwlock_t;
 
-#elif defined(i386)
+#elif defined(i386)|| defined(__x86_64__)
 typedef volatile int lockvar;
 #include <locks_x86.h>
 #elif defined(sparc) || defined(__sparc)
@@ -423,10 +425,10 @@ typedef pthread_rwlock_t rwlock_t;
 #ifdef __alpha
 #include <locks_alpha_funcs.h>
 #endif
-#ifdef YAPOR
-#define MAX_AGENTS MAX_WORKERS
-#elif defined(THREADS)
+#if defined(THREADS)
 #define MAX_AGENTS MAX_THREADS
+#elif defined(YAPOR)
+#define MAX_AGENTS MAX_WORKERS
 #endif
 #endif
 
@@ -471,6 +473,7 @@ typedef enum
   DOMAIN_ERROR_SHIFT_COUNT_OVERFLOW,
   DOMAIN_ERROR_SOURCE_SINK,
   DOMAIN_ERROR_STREAM,
+  DOMAIN_ERROR_STREAM_ENCODING,
   DOMAIN_ERROR_STREAM_OR_ALIAS,
   DOMAIN_ERROR_STREAM_POSITION,
   DOMAIN_ERROR_TIMEOUT_SPEC,
@@ -614,7 +617,8 @@ typedef enum
   YAP_DELAY_CREEP_SIGNAL = 0x10000,	/* received a creep but should not do it */
   YAP_AGC_SIGNAL = 0x20000,	/* call atom garbage collector asap */
   YAP_PIPE_SIGNAL = 0x40000,	/* call atom garbage collector asap */
-  YAP_VTALARM_SIGNAL = 0x80000	/* received SIGVTALARM */
+  YAP_VTALARM_SIGNAL = 0x80000,	/* received SIGVTALARM */
+  YAP_FAIL_SIGNAL = 0x100000	/* P = FAILCODE */
 } yap_signals;
 
 #define NUMBER_OF_YAP_FLAGS  LAST_FLAG
@@ -683,7 +687,7 @@ typedef enum
 	if you place things in the lower addresses (power to the libc people).
 */
 
-#if (defined(_AIX) || (defined(__APPLE__) && !defined(__LP64__)) || defined(_WIN32) || defined(sparc) || defined(__sparc) || defined(mips) || defined(__FreeBSD__) || defined(_POWER) || defined(__POWERPC__) || defined(__linux__) || defined(IN_SECOND_QUADRANT) || defined(__CYGWIN__)) || defined(__NetBSD__)
+#if (defined(_AIX) || (defined(__APPLE__) && !defined(__LP64__)) || defined(_WIN32) || defined(sparc) || defined(__sparc) || defined(mips) || defined(__FreeBSD__) || defined(_POWER) || defined(__POWERPC__) || defined(__linux__) || defined(IN_SECOND_QUADRANT) || defined(__CYGWIN__)) || defined(__NetBSD__) || defined(__DragonFly__)
 #define USE_LOW32_TAGS 1
 #endif
 
@@ -1180,6 +1184,7 @@ typedef enum
   UserCCallMode = 0x4000,	/* In User C-call Code */
   MallocMode = 0x8000,		/* Doing malloc, realloc, free */
   SystemMode = 0x10000,		/* in system mode */
+  AsyncIntMode = 0x20000	/* YAP has just been interrupted from the outside */
 } prolog_exec_mode;
 
 extern Int Yap_PrologMode;

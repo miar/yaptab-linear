@@ -3,10 +3,12 @@
 *    SimpleCUDD library (www.cs.kuleuven.be/~theo/tools/simplecudd.html)       *
 *  SimpleCUDD was developed at Katholieke Universiteit Leuven(www.kuleuven.be) *
 *                                                                              *
-*  Copyright Katholieke Universiteit Leuven 2008                               *
+*  Copyright Katholieke Universiteit Leuven 2008, 2009, 2010                   *
 *                                                                              *
 *  Author: Theofrastos Mantadelis                                              *
 *  File: simplecudd.c                                                          *
+*  $Date:: 2010-12-17 12:21:58 +0100 (Fri, 17 Dec 2010)                      $ *
+*  $Revision:: 5159                                                          $ *
 *                                                                              *
 ********************************************************************************
 *                                                                              *
@@ -203,6 +205,16 @@ DdManager* simpleBDDinit(int varcnt) {
   return temp;
 }
 
+DdManager* simpleBDDinitNoReOrder(int varcnt) {
+  DdManager *temp;
+  temp = Cudd_Init(varcnt, 0, CUDD_UNIQUE_SLOTS, CUDD_CACHE_SLOTS, 0);
+  Cudd_AutodynDisable(temp);//  Cudd_AutodynEnable(temp, CUDD_REORDER_NONE);
+  Cudd_SetMaxCacheHard(temp, 1024*1024*1024);
+  Cudd_SetLooseUpTo(temp, 1024*1024*512);
+  if (_debug) Cudd_EnableReorderingReporting(temp);
+  return temp;
+}
+
 /* BDD tree travesrsing */
 
 DdNode* HighNodeOf(DdManager *manager, DdNode *node) {
@@ -305,6 +317,7 @@ bddfileheader ReadFileHeader(char *filename) {
       case BDDFILE_SCRIPT:
         switch (temp.version) {
           case 1:
+          case 2:
             fscanf(temp.inputfile, "%i\n", &temp.varcnt);
             fscanf(temp.inputfile, "%i\n", &temp.varstart);
             fscanf(temp.inputfile, "%i\n", &temp.intercnt);
@@ -367,6 +380,10 @@ int simpleNamedBDDtoDot(DdManager *manager, namedvars varmap, DdNode *bdd, char 
   DdNode *f[1];
   int ret;
   FILE *fd;
+  // Reordering until getting the optimal bdd //
+/*  Cudd_AutodynDisable(manager);
+  Cudd_ReduceHeap(manager, CUDD_REORDER_SIFT_CONVERGE, 1);*/
+  // better before making an ADD //
   f[0] = Cudd_BddToAdd(manager, bdd);
   fd = fopen(filename, "w");
   if (fd == NULL) {
@@ -583,16 +600,15 @@ void ExpandNodes(hisqueue *Nodes, int index, int nodenum) {
   Nodes[index].cnt = nodenum + 1;
 }
 
-int LoadVariableData(namedvars varmap, char *filename) {
+char** GetVariableOrder(char *filename, int varcnt) {
   FILE *data;
-  char *dataread, buf, *varname, *dynvalue;
-  double dvalue = 0.0;
-  int icur = 0, maxbufsize = 10, hasvar = 0, index = -1, idat = 0, ivalue = 0;
-  dynvalue = NULL;
+  char *dataread, buf, **varname;
+  int icur = 0, maxbufsize = 10, index = -1;
   if ((data = fopen(filename, "r")) == NULL) {
     perror(filename);
-    return -1;
+    return NULL;
   }
+  varname = (char **) malloc(sizeof(char *) * varcnt);
   dataread = (char *) malloc(sizeof(char) * maxbufsize);
   while(!feof(data)) {
     fread(&buf, 1, 1, data);
@@ -601,9 +617,56 @@ int LoadVariableData(namedvars varmap, char *filename) {
       icur = 0;
       buf = ' ';
       if (dataread[0] == '@') {
+        index++;
+        varname[index] = (char *) malloc(sizeof(char) * strlen(dataread));
+        strcpy(varname[index], dataread + 1);
+      }
+    } else {
+      dataread[icur] = buf;
+      icur++;
+      if (icur == _maxbufsize) {
+        fprintf(stderr, "Error: Maximum buffer size(%i) exceeded.\n", _maxbufsize);
+        fclose(data);
+        free(varname);
+        free(dataread);
+        return NULL;
+      }
+      while (icur > maxbufsize - 1) {
+        maxbufsize *= 2;
+        dataread = (char *) realloc(dataread, sizeof(char) * maxbufsize);
+      }
+    }
+  }
+  fclose(data);
+  free(dataread);
+  for(icur=index+1; icur < varcnt; icur++)
+    varname[icur] = NULL;
+  return varname;
+}
+
+int LoadVariableData(namedvars varmap, char *filename) {
+  FILE *data;
+  char *dataread, buf, *varname, *dynvalue;
+  double dvalue = 0.0;
+  int icur = 0, maxbufsize = 10, hasvar = 0, index = -1, idat = 0, ivalue = 0;
+  dynvalue = NULL; varname = NULL;
+  if ((data = fopen(filename, "r")) == NULL) {
+    perror(filename);
+    return -1;
+  }
+  dataread = (char *) malloc(sizeof(char) * maxbufsize);
+  while(!feof(data)) {
+    fread(&buf, 1, 1, data);
+    if ((buf == '\n') && icur == 0) {
+      // ignore empty lines
+    } else if (buf == '\n') {
+      dataread[icur] = '\0';
+      icur = 0;
+      buf = ' ';
+      if (dataread[0] == '@') {
         if (hasvar) {
           for (index = 0; index < varmap.varcnt; index++) {
-            if (patternmatch(varname, varmap.vars[index])) {
+            if ((varmap.vars[index] != NULL) && (patternmatch(varname, varmap.vars[index]))) {
               varmap.loaded[index] = 1;
               varmap.dvalue[index] = dvalue;
               varmap.ivalue[index] = ivalue;
@@ -633,8 +696,7 @@ int LoadVariableData(namedvars varmap, char *filename) {
         if (hasvar >= 0) {
           switch(idat) {
             case 0:
-              if (IsRealNumber(dataread)) dvalue = atof(dataread);
-              else {
+              if (!getRealNumber(dataread, &dvalue)) {
                 fprintf(stderr, "Error at file: %s. Variable: %s can't have non real value: %s.\n", filename, varname, dataread);
                 fclose(data);
                 free(varname);
@@ -644,8 +706,7 @@ int LoadVariableData(namedvars varmap, char *filename) {
               idat++;
               break;
             case 1:
-              if (IsNumber(dataread)) ivalue = atoi(dataread);
-              else {
+              if (!getIntNumber(dataread, &ivalue)) {
                 fprintf(stderr, "Error at file: %s. Variable: %s can't have non integer value: %s.\n", filename, varname, dataread);
                 fclose(data);
                 free(varname);
@@ -679,7 +740,7 @@ int LoadVariableData(namedvars varmap, char *filename) {
   }
   if (hasvar) {
     for (index = 0; index < varmap.varcnt; index++) {
-      if (patternmatch(varname, varmap.vars[index])) {
+      if ((varmap.vars[index] != NULL) && (patternmatch(varname, varmap.vars[index]))) {
         varmap.loaded[index] = 1;
         varmap.dvalue[index] = dvalue;
         varmap.ivalue[index] = ivalue;
@@ -879,12 +940,56 @@ int all_loaded(namedvars varmap, int disp) {
   return res;
 }
 
+int ImposeOrder(DdManager *manager, const namedvars varmap, char **map) {
+  int order[varmap.varcnt], i, mappos, index = -1, ivar;
+  for (i = 0; i < varmap.varcnt; i++) {
+    if (map[i] != NULL) {
+      order[i] = GetNamedVarIndex(varmap, map[i]);
+      index = i;
+    } else {
+      order[i] = -1;
+    }
+  }
+  index++;
+  for (i = 0; i < varmap.varcnt; i++) {
+    ivar = Cudd_ReadPerm(manager, i);
+    mappos = get_var_pos_in_map(map, varmap.vars[ivar], varmap.varcnt);
+    if (mappos == -1) {
+      order[index] = ivar;
+      index++;
+    }
+  }
+  if (index != varmap.varcnt)
+    fprintf(stderr, "Warning possible error in: Impose Order...\n");
+  return Cudd_ShuffleHeap(manager, order);
+}
+
+int get_var_pos_in_map(char **map, const char *var, int varcnt) {
+  int i;
+  for (i = 0; i < varcnt; i++) {
+    if (map[i] == NULL) return -1;
+    if (strcmp(map[i], var) == 0) return i;
+  }
+  return -1;
+}
+
 /* Parser */
 
 DdNode* FileGenerateBDD(DdManager *manager, namedvars varmap, bddfileheader fileheader) {
+  return (FileGenerateBDDForest(manager, varmap, fileheader))[0];
+}
+
+// void unreference(DdManager *manager, DdNode ** intermediates, int count){
+// //	int i;
+// //	for(i = 0;i<count;i++){
+// //		if(intermediates[i] != NULL) Cudd_RecursiveDeref(manager,intermediates[i]);
+// //	}
+// }
+
+DdNode** FileGenerateBDDForest(DdManager *manager, namedvars varmap, bddfileheader fileheader) {
   int icomment, maxlinesize, icur, iline, curinter, iequal;
-  DdNode *Line, **inter;
-  char buf, *inputline, *filename;
+  DdNode *Line, **inter, **result;
+  char buf, *inputline, *filename, *subl;
   bddfileheader interfileheader;
   // Initialization of intermediate steps
   inter = (DdNode **) malloc(sizeof(DdNode *) * fileheader.intercnt);
@@ -921,28 +1026,75 @@ DdNode* FileGenerateBDD(DdManager *manager, namedvars varmap, bddfileheader file
         }
         curinter = getInterBDD(inputline);
         if (curinter == -1) {
-          if (inputline[0] == 'L' && IsPosNumber(inputline + 1)) {
-            curinter = atoi(inputline + 1) - 1;
-            if (curinter > -1 && curinter < fileheader.intercnt && inter[curinter] != NULL) {
-              if (_debug) fprintf(stderr, "Returned: %s\n", inputline);
-              fclose(fileheader.inputfile);
-              Line = inter[curinter];
-              free(inter);
-              free(inputline);
-              return Line;
+          if (fileheader.version < 2) {
+            if (inputline[0] == 'L' && IsPosNumber(inputline + 1)) {
+              curinter = atoi(inputline + 1) - 1;
+              if (curinter > -1 && curinter < fileheader.intercnt && inter[curinter] != NULL) {
+                if (_debug) fprintf(stderr, "Returned: %s\n", inputline);
+                fclose(fileheader.inputfile);
+                result = (DdNode **) malloc(sizeof(DdNode *) * 1);
+                result[0] = inter[curinter];
+                Cudd_Ref(result[0]);
+                //unreference(manager, inter, fileheader.intercnt);
+                free(inter);
+                free(inputline);
+                return result;
+              } else {
+                fprintf(stderr, "Error at line: %i. Return result asked doesn't exist.\n", iline);
+                fclose(fileheader.inputfile);
+                free(inter);
+                free(inputline);
+                return NULL;
+              }
             } else {
-              fprintf(stderr, "Error at line: %i. Return result asked doesn't exist.\n", iline);
+              fprintf(stderr, "Error at line: %i. Invalid intermediate result format.\n", iline);
               fclose(fileheader.inputfile);
               free(inter);
               free(inputline);
               return NULL;
             }
           } else {
-            fprintf(stderr, "Error at line: %i. Invalid intermediate result format.\n", iline);
+            // Support for forest
+            result = (DdNode **) malloc(sizeof(DdNode *) * 10);
+            maxlinesize = 10;
+            iline = -1;
+            for (subl = strtok(inputline, ","); subl != NULL; subl = strtok(NULL, ",")) {
+              if (subl[0] == 'L' && IsPosNumber(subl + 1)) {
+                curinter = atoi(subl + 1) - 1;
+                if (curinter > -1 && curinter < fileheader.intercnt && inter[curinter] != NULL) {
+                  iline++;
+                  if (iline >= (maxlinesize - 1)) {
+                    maxlinesize *= 2;
+                    result = (DdNode **) realloc(result, sizeof(DdNode *) * maxlinesize);
+                  }
+                  Cudd_Ref(inter[curinter]);
+                  result[iline] = inter[curinter];
+                } else {
+                  fprintf(stderr, "Error at line: %i. Return result asked(%s) doesn't exist.\n", iline, subl);
+                  fclose(fileheader.inputfile);
+                  free(inter);
+                  free(inputline);
+                  free(subl);
+                  return NULL;
+                }
+              } else {
+                fprintf(stderr, "Error at line: %i. Invalid intermediate result format.\n", iline);
+                fclose(fileheader.inputfile);
+                free(inter);
+                free(inputline);
+                free(subl);
+                return NULL;
+              }
+            }
+            if (_debug) fprintf(stderr, "Returned: %s\n", inputline);
             fclose(fileheader.inputfile);
+            //unreference(manager, inter, fileheader.intercnt);
             free(inter);
             free(inputline);
-            return NULL;
+            free(subl);
+            iline++;
+            result[iline] = NULL;
+            return result;
           }
         } else if (curinter > -1 && curinter < fileheader.intercnt && inter[curinter] == NULL) {
           if (_debug) fprintf(stderr, "%i %s\n", curinter, inputline);
@@ -1050,7 +1202,7 @@ DdNode* LineParser(DdManager *manager, namedvars varmap, DdNode **inter, int max
   int istart, iend, ilength, i, symbol, ivar, inegvar, inegoper, iconst;
   long startAt, endAt;
   double secs;
-  DdNode *bdd;
+  DdNode *bdd;//, *temp;
   char *term, curoper;
   bdd = HIGH(manager);
   Cudd_Ref(bdd);
@@ -1092,6 +1244,10 @@ DdNode* LineParser(DdManager *manager, namedvars varmap, DdNode **inter, int max
         } else {
           iconst = 0;
           ivar = AddNamedVar(varmap, term + inegvar);
+/*          if (ivar == -1) {
+            EnlargeNamedVars(&varmap, varmap.varcnt + 1);
+            ivar = AddNamedVar(varmap, term + inegvar);
+          }*/
           if (ivar == -1) {
             fprintf(stderr, "Line Parser Error at line: %i. More BDD variables than the reserved term: %s.\n", iline, term);
             free(term);
@@ -1532,8 +1688,8 @@ int GetParam(char *inputline, int iParam) {
 
 void onlinetraverse(DdManager *manager, namedvars varmap, hisqueue *HisQueue, DdNode *bdd) {
   char buf, *inputline;
-  int icur, maxlinesize, iline, index, iloop, ivalue, iQsize, i, inQ, iRoot;
-  double dvalue;
+  int icur, maxlinesize, iline, index, iloop, iQsize, i, iRoot; //ivalue,inQ, 
+//  double dvalue;
   DdNode **Q, **Q2, *h_node, *l_node, *curnode;
   hisqueue *his;
   hisnode *hnode;
@@ -1554,34 +1710,55 @@ void onlinetraverse(DdManager *manager, namedvars varmap, hisqueue *HisQueue, Dd
       inputline[icur] = '\0';
       if ((icur > 0) && (inputline[0] == '@') && (inputline[2] == ',' || inputline[2] == '\0')) {
         switch(inputline[1]) {
+          case '?':
+            printf("Available instructions:\n\t@c : current node\n\t@n,[BFS, DFS] : expand and go to next node\n\t@t,[BFS, DFS] : throw and go to next node\n");
+            printf("\t@h : high node of current\n\t@l : low node of current\n\t@v,[variable] : variable values\n\t@r restart traverse from parent node\n\t@e terminates\n");
+            break;
+          case 'r':
+            curnode = bdd;
+            iQsize = 0;
+            iRoot = 1;
+            free(Q);
+            Q = (DdNode **) malloc(sizeof(DdNode *) * iQsize);
+            Q2 = NULL;
+            ReInitHistory(his, varmap.varcnt);
+            break;
           case 'c':
             if (iRoot) {
               iRoot = 0;
-              printf("bdd_temp_value('%s', %i).\n", GetNodeVarNameDisp(manager, varmap, curnode), 1);
+              printf("bdd_temp_value('%s', %i, %p).\n", GetNodeVarNameDisp(manager, varmap, curnode), 1, (void *) curnode);
             } else {
-              printf("bdd_temp_value('%s', %i).\n", GetNodeVarNameDisp(manager, varmap, curnode), iQsize);
+              printf("bdd_temp_value('%s', %i, %p).\n", GetNodeVarNameDisp(manager, varmap, curnode), iQsize, (void *) curnode);
             }
             fflush(stdout);
             break;
           case 'n':
             if (curnode != HIGH(manager) && curnode != LOW(manager) && (hnode = GetNode(his, varmap.varstart, curnode)) == NULL) {
-              //AddNode(his, varmap.varstart, curnode, 0.0, 0, NULL);
               l_node = LowNodeOf(manager, curnode);
               h_node = HighNodeOf(manager, curnode);
-              inQ = 0;
+              iQsize += 2;
+              Q = (DdNode **) realloc(Q, sizeof(DdNode *) * iQsize);
+              Q[iQsize - 2] = l_node;
+              Q[iQsize - 1] = h_node;
+              //AddNode(his, varmap.varstart, curnode, 0.0, 0, NULL);
+/*              inQ = 0;
               for(i = 0; (i < iQsize / 2) && (inQ < 3); i++)
-                inQ = (Q[i] == l_node) || (Q[iQsize - i] == l_node) + 2 * (Q[i] == h_node) || (Q[iQsize - i] == h_node);
-              if (inQ & 1 == 0) inQ = inQ + (GetNode(his, varmap.varstart, l_node) != NULL);
-              if (inQ & 2 == 0) inQ = inQ + 2 * (GetNode(his, varmap.varstart, h_node) != NULL);
-              if (inQ & 1 == 1) inQ = inQ - (l_node == HIGH(manager) || l_node == LOW(manager));
-              if (inQ & 2 == 2) inQ = inQ - 2 * (h_node == HIGH(manager) || h_node == LOW(manager));
-              inQ = 0;
+                inQ = (Q[i] == l_node) || (Q[iQsize - i - 1] == l_node) + 2 * (Q[i] == h_node) || (Q[iQsize - i - 1] == h_node);
+              if ((l_node == HIGH(manager) || l_node == LOW(manager))) {
+                inQ = (inQ & 2);
+              } else {
+                if ((inQ & 1) == 0) inQ = inQ + (GetNode(his, varmap.varstart, l_node) != NULL);
+              }
+              if (h_node == HIGH(manager) || h_node == LOW(manager)) {
+                inQ = (inQ & 1);
+              } else {
+                if ((inQ & 2) == 0) inQ = inQ + 2 * (GetNode(his, varmap.varstart, h_node) != NULL);
+              }*/
+/*              if ((inQ & 1) == 1) inQ = inQ - (l_node == HIGH(manager) || l_node == LOW(manager));
+              if ((inQ & 2) == 2) inQ = inQ - 2 * (h_node == HIGH(manager) || h_node == LOW(manager));*/
+/*              inQ = 0;
               switch(inQ) {
                 case 0:
-                  iQsize += 2;
-                  Q = (DdNode **) realloc(Q, sizeof(DdNode *) * iQsize);
-                  Q[iQsize - 2] = l_node;
-                  Q[iQsize - 1] = h_node;
                   break;
                 case 1:
                   iQsize++;
@@ -1597,8 +1774,32 @@ void onlinetraverse(DdManager *manager, namedvars varmap, hisqueue *HisQueue, Dd
                   break;
                 default:
                   break;
-              }
+              }*/
             }
+            if (inputline[2] == '\0' || strcmp(inputline + 3, "DFS") == 0) {
+              if (iQsize > 0) {
+                iQsize--;
+                curnode = Q[iQsize];
+                Q = (DdNode **) realloc(Q, sizeof(DdNode *) * iQsize);
+              }
+            } else if (strcmp(inputline + 3, "BFS") == 0) {
+              if (iQsize > 0) {
+                iQsize--;
+                curnode = Q[0];
+                Q2 = (DdNode **) malloc(sizeof(DdNode *) * iQsize);
+                for(i = 0; i < iQsize; i++)
+                  Q2[i] = Q[i + 1];
+                free(Q);
+                Q = Q2;
+              }
+            } else {
+              fprintf(stderr, "Error: Could not find method: %s, Correct syntax @n,[DFS, BFS].\n", inputline + 3);
+              free(Q);
+              free(inputline);
+              exit(-1);
+            }
+            break;
+          case 't':
             if (inputline[2] == '\0' || strcmp(inputline + 3, "DFS") == 0) {
               if (iQsize > 0) {
                 iQsize--;

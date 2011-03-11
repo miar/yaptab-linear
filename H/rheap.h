@@ -244,13 +244,18 @@ ConstantTermAdjust (Term t)
 {
   if (IsAtomTerm(t))
     return AtomTermAdjust(t);
-  else if (IsIntTerm(t))
-    return t;
-  else if (IsApplTerm(t))
-    return BlobTermAdjust(t);
-  else if (IsPairTerm(t))
-    return CodeComposedTermAdjust(t);
-  else return t;
+  return t;
+}
+
+static Term
+DBGroundTermAdjust (Term t)
+{
+  /* The term itself is restored by dbtermlist */
+  if (IsPairTerm(t)) {
+    return AbsPair(PtoHeapCellAdjust(RepPair(t)));
+  } else {
+    return AbsAppl(PtoHeapCellAdjust(RepAppl(t)));
+  }
 }
 
 /* Now, everything on its place so you must adjust the pointers */
@@ -279,6 +284,9 @@ static void
 AdjustSwitchTable(op_numbers op, yamop *table, COUNT i)
 {
   CELL *startcode = (CELL *)table;
+  /* in case the table is already gone */
+  if (!table)
+    return;
   switch (op) {
   case _switch_on_func:
     {
@@ -391,7 +399,7 @@ RestoreAtoms(void)
     PtoAtomHashEntryAdjust(Yap_heap_regs->hash_chain);
   HashPtr = HashChain;
   for (i = 0; i < AtomHashTableSize; ++i) {
-    HashPtr->Entry = AtomAdjust(HashPtr->Entry);
+    HashPtr->Entry = NoAGCAtomAdjust(HashPtr->Entry);
     RestoreAtomList(HashPtr->Entry);
     HashPtr++;
   }  
@@ -635,19 +643,23 @@ CleanLUIndex(LogUpdIndex *idx, int recurse)
 static void 
 CleanSIndex(StaticIndex *idx, int recurse)
 {
-  idx->ClPred = PtoPredAdjust(idx->ClPred);
-  if (idx->SiblingIndex) {
-    idx->SiblingIndex = SIndexAdjust(idx->SiblingIndex);
-    if (recurse)
-      CleanSIndex(idx->SiblingIndex, TRUE);
+ beginning:
+  if (!(idx->ClFlags & SwitchTableMask)) {
+    restore_opcodes(idx->ClCode, NULL);
   }
+  idx->ClPred = PtoPredAdjust(idx->ClPred);
   if (idx->ChildIndex) {
     idx->ChildIndex = SIndexAdjust(idx->ChildIndex);
     if (recurse)
       CleanSIndex(idx->ChildIndex, TRUE);
   }
-  if (!(idx->ClFlags & SwitchTableMask)) {
-    restore_opcodes(idx->ClCode, NULL);
+  if (idx->SiblingIndex) {
+    idx->SiblingIndex = SIndexAdjust(idx->SiblingIndex);
+    /* use loop to avoid recursion with very complex indices */
+    if (recurse) {
+      idx =  idx->SiblingIndex;
+      goto beginning;
+    }
   }
 }
 
@@ -662,6 +674,11 @@ RestoreSWIAtoms(void)
     SWI_Functors[j] = FuncAdjust(SWI_Functors[j]);
   }
   RestoreSWIHash();
+}
+
+static void 
+RestoreSWIBlobs(void)
+{
 }
 
 static void
@@ -949,8 +966,7 @@ RestoreForeignCode(void)
     while (objs != NULL) {
       if (objs->next != NULL)
 	objs->next = (StringList)AddrAdjust((ADDR)objs->next);
-      if (objs->s != NULL)
-	objs->s = (char *)AddrAdjust((ADDR)objs->s);
+	objs->name = AtomAdjust(objs->name);
       objs = objs->next;
     }
     if (f_code->libs != NULL)
@@ -959,8 +975,7 @@ RestoreForeignCode(void)
     while (libs != NULL) {
       if (libs->next != NULL)
 	libs->next = (StringList)AddrAdjust((ADDR)libs->next);
-      if (libs->s != NULL)
-	libs->s = (char *)AddrAdjust((ADDR)libs->s);
+      libs->name = AtomAdjust(libs->name);
       libs = libs->next;
     }
     if (f_code->f != NULL)
@@ -968,6 +983,21 @@ RestoreForeignCode(void)
     if (f_code->next != NULL)
       f_code->next = (ForeignObj *)AddrAdjust((ADDR)f_code->next);
     f_code = f_code->next;
+  }
+}
+
+static void
+RestoreYapRecords(void)
+{
+  struct record_list *ptr;
+
+  Yap_Records = DBRecordAdjust(Yap_Records);
+  ptr = Yap_Records;
+  while (ptr) {
+    ptr->next_rec = DBRecordAdjust(ptr->next_rec);
+    ptr->prev_rec = DBRecordAdjust(ptr->prev_rec);
+    ptr->dbrecord = DBTermAdjust(ptr->dbrecord);
+    RestoreDBTerm(ptr->dbrecord, FALSE);
   }
 }
 

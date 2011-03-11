@@ -133,6 +133,7 @@
   Yap_heap_regs->pred_handle_throw = RepPredProp(PredPropByFunc(FunctorHandleThrow,PROLOG_MODULE));
   Yap_heap_regs->pred_is = RepPredProp(PredPropByFunc(FunctorIs,PROLOG_MODULE));
   Yap_heap_regs->pred_safe_call_cleanup = RepPredProp(PredPropByFunc(FunctorSafeCallCleanup,PROLOG_MODULE));
+  Yap_heap_regs->pred_restore_regs = RepPredProp(PredPropByFunc(FunctorRestoreRegs,PROLOG_MODULE));
 #ifdef YAPOR
   Yap_heap_regs->pred_getwork = RepPredProp(PredPropByAtom(AtomGetwork,PROLOG_MODULE));
   Yap_heap_regs->pred_getwork_seq = RepPredProp(PredPropByAtom(AtomGetworkSeq,PROLOG_MODULE));
@@ -168,7 +169,7 @@
   Yap_heap_regs->beam_retry_code->opc = Yap_opcode(_beam_retry_code);
 #endif /* BEAM */
 #ifdef YAPOR
-  Yap_heap_regs->seq_def = TRUE;
+  Yap_heap_regs->seq_def = FALSE;
   InitOtaplInst(GETWORK,_getwork,PredGetwork);
   InitOtaplInst(GETWORK_SEQ,_getwork_seq,PredGetworkSeq);
   Yap_heap_regs->getwork_first_time->opc = Yap_opcode(_getwork_first_time);
@@ -297,6 +298,10 @@
   Yap_heap_regs->foreign_code_top = NULL;
   Yap_heap_regs->foreign_code_max = NULL;
 
+  Yap_heap_regs->yap_records = NULL;
+
   InitSWIAtoms();
 
 
+
+  Yap_heap_regs->swi_blobs = NULL;

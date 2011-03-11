@@ -133,6 +133,7 @@
 #define PredHandleThrow Yap_heap_regs->pred_handle_throw
 #define PredIs Yap_heap_regs->pred_is
 #define PredSafeCallCleanup Yap_heap_regs->pred_safe_call_cleanup
+#define PredRestoreRegs Yap_heap_regs->pred_restore_regs
 #ifdef YAPOR
 #define PredGetwork Yap_heap_regs->pred_getwork
 #define PredGetworkSeq Yap_heap_regs->pred_getwork_seq
@@ -297,6 +298,10 @@
 #define ForeignCodeTop Yap_heap_regs->foreign_code_top
 #define ForeignCodeMax Yap_heap_regs->foreign_code_max
 
+#define Yap_Records Yap_heap_regs->yap_records
+
 #define SWI_Atoms Yap_heap_regs->swi_atoms
 #define SWI_Functors Yap_heap_regs->swi_functors
 #define SWI_ReverseHash Yap_heap_regs->swi_reverse_hash
+
+#define SWI_Blobs Yap_heap_regs->swi_blobs

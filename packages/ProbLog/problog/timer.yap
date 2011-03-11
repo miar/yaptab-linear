@@ -2,16 +2,16 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-%  $Date: 2009-07-31 14:57:09 +0200 (Fri, 31 Jul 2009) $
-%  $Revision: 1826 $
+%  $Date: 2010-12-02 15:20:15 +0100 (Thu, 02 Dec 2010) $
+%  $Revision: 5043 $
 %
 %  This file is part of ProbLog
 %  http://dtai.cs.kuleuven.be/problog
 %
 %  ProbLog was developed at Katholieke Universiteit Leuven
 %                                                            
-%  Copyright 2009
-%  Angelika Kimmig, Vitor Santos Costa, Bernd Gutmann
+%  Copyright 2008, 2009, 2010
+%  Katholieke Universiteit Leuven
 %                                                              
 %  Main authors of this file:
 %  Bernd Gutmann
@@ -204,295 +204,89 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-:- module(flags_learning, [set_learning_flag/2,
-	learning_flag/2,
-	learning_flags/0]).
 
-:- style_check(all).
+:- module(timer,[timer_start/1,    % +ID
+		 timer_stop/2,     % +ID,-Duration
+		 timer_pause/1,    % +ID
+		 timer_pause/2,    % +ID,-Duration
+		 timer_resume/1,   % +ID
+		 timer_elapsed/2,  % +ID, -Duration
+		 timer_reset/1]).  % +ID
 :- yap_flag(unknown,error).
+:- style_check(single_var).
 
-:- use_module(logger).
-:- use_module('../problog/flags').
-:- use_module('../problog/print').
-
-:- ensure_loaded(library(system)).
-
-:- dynamic init_method/5.
-:- dynamic rebuild_bdds/1.
-:- dynamic reuse_initialized_bdds/1.
-:- dynamic learning_rate/1.
-:- dynamic probability_initializer/3.
-:- dynamic check_duplicate_bdds/1.
-:- dynamic output_directory/1.
-:- dynamic query_directory/1.
-:- dynamic log_frequency/1.
-:- dynamic alpha/1.
-:- dynamic sigmoid_slope/1.
-:- dynamic line_search/1.
-:- dynamic line_search_tolerance/1.
-:- dynamic line_search_tau/1.
-:- dynamic line_search_never_stop/1.
-:- dynamic line_search_interval/2.
-:- dynamic verbosity_level/1.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% global parameters that can be set using set_learning_flag/2
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-learning_flag(Flag,Option) :-
-	get_learning_flag(Flag,Option).
-
-get_learning_flag(init_method,(Query,Probability,BDDFile,ProbFile,Call)) :-
-	init_method(Query,Probability,BDDFile,ProbFile,Call).
-
-get_learning_flag(rebuild_bdds,Iteration) :-
-	rebuild_bdds(Iteration).
-
-get_learning_flag(reuse_initialized_bdds,Flag) :-
-	reuse_initialized_bdds(Flag).
-
-get_learning_flag(learning_rate,R) :-
-	learning_rate(R).
-
-get_learning_flag(probability_initializer,(FactID,Probability,Query)) :-
-	probability_initializer(FactID,Probability,Query).
-
-get_learning_flag(check_duplicate_bdds,Flag) :-
-	check_duplicate_bdds(Flag).
-
-get_learning_flag(output_directory,Directory) :-
-	output_directory(Directory).
-
-get_learning_flag(query_directory,Directory) :-
-	query_directory(Directory).
-
-get_learning_flag(log_frequency,Frequency) :-
-	log_frequency(Frequency).
-
-get_learning_flag(alpha,Alpha) :-
-	alpha(Alpha).
-
-get_learning_flag(sigmoid_slope,Slope) :-
-	sigmoid_slope(Slope).
-
-get_learning_flag(line_search,Flag) :-
-	line_search(Flag).
-
-get_learning_flag(line_search_tolerance,Tolerance) :-
-	line_search_tolerance(Tolerance).
-
-get_learning_flag(line_search_interval,(L,R)) :-
-	line_search_interval(L,R).
-
-get_learning_flag(line_search_tau,Tau) :-
-	line_search_tau(Tau).
-
-get_learning_flag(line_search_never_stop,Flag) :-
-	line_search_never_stop(Flag).
-
-get_learning_flag(verbosity_level,Number) :-
-	verbosity_level(Number).
+:- dynamic(timer/2).
+:- dynamic(timer_paused/2).
 
 
-
-
-set_learning_flag(init_method,(Query,Probability,BDDFile,ProbFile,Call)) :-
-	retractall(init_method(_,_,_,_,_)),
-	assert(init_method(Query,Probability,BDDFile,ProbFile,Call)).
-
-
-set_learning_flag(rebuild_bdds,Frequency) :-
-	integer(Frequency),
-	Frequency>=0,
-	retractall(rebuild_bdds(_)),
-	assert(rebuild_bdds(Frequency)).
-
-
-set_learning_flag(reuse_initialized_bdds,Flag) :-
-	(Flag==true;Flag==false),
-	!,
-	retractall(reuse_initialized_bdds(_)),
-	assert(reuse_initialized_bdds(Flag)).
-
-set_learning_flag(learning_rate,V) :-
-	(V=examples -> true;(number(V),V>=0)),
-	!,
-	retractall(learning_rate(_)),
-	assert(learning_rate(V)).
-
-set_learning_flag(probability_initializer,(FactID,Probability,Query)) :-
-	var(FactID),
-	var(Probability),
-	callable(Query),
-	retractall(probability_initializer(_,_,_)),
-	assert(probability_initializer(FactID,Probability,Query)).
-
-set_learning_flag(check_duplicate_bdds,Flag) :-
-	(Flag==true;Flag==false),
-	!,
-	retractall(check_duplicate_bdds(_)),
-	assert(check_duplicate_bdds(Flag)).
-
-set_learning_flag(output_directory,Directory) :-
+timer_start(Name) :-
 	(
-	    file_exists(Directory)
+	 timer(Name,_)
 	->
-	    file_property(Directory,type(directory));
-	    make_directory(Directory)
-	),
+	 throw(timer_already_started(timer_start(Name)));
 
-	absolute_file_name(Directory,Path),
-	atomic_concat([Path,'/'],PathSlash),
-	atomic_concat([Path,'/log.dat'],Log_File),
-		
-	retractall(output_directory(_)),
-	assert(output_directory(PathSlash)),
-	logger_set_filename(Log_File),
-	set_problog_flag(dir,Directory).
-
-set_learning_flag(query_directory,Directory) :-
-	(
-	    file_exists(Directory)
-	->
-	    file_property(Directory,type(directory));
-	    make_directory(Directory)
-	),
-	absolute_file_name(Directory,Path),
-	atomic_concat([Path,'/'],PathSlash),
-	retractall(query_directory(_)),
-	assert(query_directory(PathSlash)).
-
-set_learning_flag(log_frequency,Frequency) :-
-	integer(Frequency),
-	Frequency>=0,
-	retractall(log_frequency(_)),
-	assert(log_frequency(Frequency)).
-
-set_learning_flag(alpha,Alpha) :-
-	(number(Alpha);Alpha==auto),
-	!,
-	retractall(alpha(_)),
-	assert(alpha(Alpha)).
-set_learning_flag(sigmoid_slope,Slope) :-
-	number(Slope),
-	Slope>0,
-	retractall(sigmoid_slope(_)),
-	assert(sigmoid_slope(Slope)).
-
-
-set_learning_flag(line_search,Flag) :-
-	(Flag==true;Flag==false),
-	!,
-	retractall(line_search(_)),
-	assert(line_search(Flag)).
-set_learning_flag(line_search_tolerance,Number) :-
-	number(Number),
-	Number>0,
-	retractall(line_search_tolerance(_)),
-	assert(line_search_tolerance(Number)).
-set_learning_flag(line_search_interval,(L,R)) :-
-	number(L),
-	number(R),
-	L<R,
-	retractall(line_search_interval(_,_)),
-	assert(line_search_interval(L,R)).
-set_learning_flag(line_search_tau,Number) :-
-	number(Number),
-	Number>0,
-	retractall(line_search_tau(_)),
-	assert(line_search_tau(Number)).
-set_learning_flag(line_search_never_stop,Flag) :-
-	(Flag==true;Flag==false),
-	!,
-	retractall(line_search_nerver_stop(_)),
-	assert(line_search_never_stop(Flag)).
-
-set_learning_flag(verbosity_level,Level) :-
-	integer(Level),
-	retractall(verbosity_level(_)),
-	assert(verbosity_level(Level)),
-	(
-	 Level<4
-	->
-	 set_problog_flag(verbose,false);
-	 set_problog_flag(verbose,true)
+	 statistics(walltime,[StartTime,_]),
+	 assertz(timer(Name,StartTime))
 	).
-	
 
+timer_start_forced(Name) :-
+	retractall(timer(Name,_)),
+	statistics(walltime,[StartTime,_]),
+	assertz(timer(Name,StartTime)).
 
-%%%%%%%%%%%%%%%%%%%%%%%%
-% show values
-%%%%%%%%%%%%%%%%%%%%%%%%
+timer_stop(Name,Duration) :-
+	(
+	 retract(timer(Name,StartTime))
+	->
+	 statistics(walltime,[StopTime,_]),
+	 Duration is StopTime-StartTime;
 
-skolemize(T1,T2):-
-	copy_term(T1,T2),
-	numbervars(T2,0,_).
+	 throw(timer_not_started(timer_stop(Name,Duration)))
+	).
 
-learning_flags :-
-	format('~n',[]),
-	print_sep_line,
-	format('learning flags: use set_learning_flag(Flag,Option) to change, learning_flag(Flag,Option) to view~n',[]),
-	print_sep_line,
-	print_param(description,value,flag,option),
-	print_sep_line,
+timer_pause(Name) :-
+  (
+   retract(timer(Name,StartTime))
+  ->
+   statistics(walltime,[StopTime,_]),
+   Duration is StopTime-StartTime,
+   assertz(timer_paused(Name,Duration));
 
-	learning_flag(output_directory,Output_Directory),
-	print_long_param('Where to store results',Output_Directory,'output_directory','path'),
+   throw(timer_not_started(timer_pause(Name)))
+  ).
 
-	learning_flag(query_directory,Query_Directory),
-	print_long_param('Where to store BDD files',Query_Directory,'query_directory','path'),
+timer_pause(Name, Duration) :-
+  (
+   retract(timer(Name,StartTime))
+  ->
+   statistics(walltime,[StopTime,_]),
+   Duration is StopTime-StartTime,
+   assertz(timer_paused(Name,Duration));
 
-	learning_flag(verbosity_level,Verbosity_Level),
-	print_param('How much output shall be given (0=nothing,5=all)',Verbosity_Level,'verbosity_level','0,1,..,5'),
+   throw(timer_not_started(timer_pause(Name)))
+  ).
 
-	print_sep_line,
+timer_resume(Name):-
+	(
+	 retract(timer_paused(Name,Duration))
+	->
+	 statistics(walltime,[ResumeTime,_]),
+	 CorrectedStartTime is ResumeTime-Duration,
+	 assertz(timer(Name,CorrectedStartTime));
+	 
+	 throw(timer_not_paused(timer_resume(Name)))
+	).
 
-	learning_flag(reuse_initialized_bdds,Reuse_Initialized_Bdds),
-	print_param('Reuse BDDs from previous runs',Reuse_Initialized_Bdds,'reuse_initialized_bdds','true/false'),
+timer_elapsed(Name,Duration) :-
+	(
+	 timer(Name,StartTime)
+	->
+	 statistics(walltime,[StopTime,_]),
+	 Duration is StopTime-StartTime;
 
-	learning_flag(rebuild_bdds,Rebuild_BDDs),
-	print_param('Rebuild BDDs every nth iteration (0=never)',Rebuild_BDDs,'rebuild_bdds','Integer>=0'),
-	learning_flag(check_duplicate_bdds,Check_Duplicate_BDDs),
-	print_param('Store intermediate results in hash table',Check_Duplicate_BDDs,'check_duplicate_bdds','true/false'),
+	 throw(timer_not_started(timer_elapsed(Name,Duration)))
+	).
 
-	learning_flag(init_method,Init_Method),
-	skolemize(Init_Method,Init_Method_SK),
-	print_long_param('ProbLog predicate to search proofs',Init_Method_SK,'init_method','(+Query,-P,+BDDFile,+ProbFile,+Call)'),
-
-	learning_flag(probability_initializer,Prob_Initializer),
-	skolemize(Prob_Initializer,Prob_Initializer_SK),
-	print_long_param('Predicate to initialize probabilities',Prob_Initializer_SK,'probability_initializer','(+FactID,-P,+Call)'),
-
-	print_sep_line,
-
-
-	learning_flag(log_frequency,Log_Frequency),
-	print_param('log results every nth iteration',Log_Frequency,'log_frequency','integer>0'),
-
-	learning_flag(alpha,Alpha),
-	print_param('weight of negative examples (auto=n_p/n_n)',Alpha,'alpha','number or "auto"'),
-
-	learning_flag(sigmoid_slope,Slope),
-	print_param('slope of sigmoid function',Slope,'slope','number>0'),
-
-	print_sep_line,
-
-	
-	learning_flag(learning_rate,Learning_Rate),
-	print_param('Default Learning rate (If line_search=false)',Learning_Rate,'learning_rate','0<Number or "examples"'),
-	learning_flag(line_search,Line_Search),
-	print_param('Use line search to estimate learning rate',Line_Search,'line_search','true/false'),
-	learning_flag(line_search_tau,Line_Search_Tau),
-	print_param('Tau value for line search',Line_Search_Tau,'line_search_tau','0<Number<1'),
-	learning_flag(line_search_tolerance,Line_Search_Tolerance),
-	print_param('Tolerance value for line search',Line_Search_Tolerance,'line_search_tolerance','0<Number'),
-	learning_flag(line_search_interval,Line_Search_Interval),
-	print_param('Interval for line search',Line_Search_Interval,'line_search_interval','(a,b) an interval with 0<=a<b'),
-	learning_flag(line_search_never_stop,Line_Search_Never_Stop),
-	print_param('Make tiny step if line search returns 0',Line_Search_Never_Stop,'line_search_never_stop','true/false'),
-	
-	print_sep_line,
-	
-	format('~n',[]),
-	flush_output.
-
+timer_reset(Name) :-
+	retractall(timer(Name,_)),
+	retractall(timer_paused(Name,_)).

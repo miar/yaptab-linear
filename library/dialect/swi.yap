@@ -6,7 +6,6 @@
 :- module(system, [concat_atom/2,
 		   concat_atom/3,
 		   setenv/2,
-		   prolog_to_os_filename/2,
 		   is_absolute_file_name/1,
 		   read_clause/1,
 		   string/1,
@@ -190,7 +189,10 @@ goal_expansion(open_null_stream(A), system:swi_open_null_stream(A)) :- swi_io.
 					/* SWI specific */
 goal_expansion(is_stream(A), system:swi_is_stream(A)) :- swi_io.
 goal_expansion(set_stream(A,B),system:swi_set_stream(A,B)) :- swi_io.
-goal_expansion(with_output_to(A,B),system:swi_with_output_to(A,B)) :- swi_io.
+% careful: with_output_to/2 requires setting user_output, and this
+% confuses emulation.
+goal_expansion(with_output_to(A,B),system:swi_with_output_to(A,NB)) :- swi_io,
+	expand_goal(B, NB).
 goal_expansion(set_prolog_IO(A,B,C), system:swi_set_prolog_IO(A,B,C)) :- swi_io.
 goal_expansion(protocol(A), system:swi_protocol(A)) :- swi_io.
 goal_expansion(protocola(A), system:swi_protocola(A)) :- swi_io.
@@ -224,9 +226,26 @@ goal_expansion(rename_file(A,B),system:swi_rename_file(A,B)) :- swi_io.
 goal_expansion(is_absolute_file_name(A), is_absolute_file_name(A)) :- swi_io.
 goal_expansion(file_base_name(A,B),system:swi_file_base_name(A,B)) :- swi_io.
 goal_expansion(file_directory_name(A,B),system:swi_file_directory_name(A,B)) :- swi_io.
-goal_expansion(prolog_to_os_filename(A,B),system:swi_prolog_to_os_filename(A,B)) :- swi_io.
 goal_expansion('$mark_executable'(A), system:'swi_is_absolute_file_name'(A)) :- swi_io.
 goal_expansion('$absolute_file_name'(A,B),system:'swi_$absolute_file_name'(A,B)) :- swi_io.
+goal_expansion(nl(A),system:swi_nl(A)) :- swi_io.
+goal_expansion(nl,system:swi_nl) :- swi_io.
+goal_expansion(write(A),write_term(user_output,A,[swi(true)])) :- swi_io.
+goal_expansion(write(S,A),write_term(S,A,[swi(true)])) :- swi_io.
+goal_expansion(writeq(A),write_term(user_output,A,[swi(true),quoted(true)])) :- swi_io.
+goal_expansion(writeq(S,A),write_term(S,A,[swi(true),quoted(true)])) :- swi_io.
+goal_expansion(display(A),write_term(user_output,A,[swi(true),ignore_ops(true)])) :- swi_io.
+goal_expansion(display(S,A),write_term(S,A,[swi(true),ignore_ops(true),quoted(true)])) :- swi_io.
+goal_expansion(write_canonical(A),write_term(user_output,A,[swi(true),ignore_ops(true),quoted(true)])) :- swi_io.
+goal_expansion(write_canonical(S,A),write_term(S,A,[swi(true),ignore_ops(true)])) :- swi_io.
+goal_expansion(print(A),write_term(user_output,A,[swi(true),portray(true),numbervars(true)])) :- swi_io.
+goal_expansion(print(S,A),write_term(S,A,[swi(true),portray(true),numbervars(true)])) :- swi_io.
+goal_expansion(write_term(A,Opts),write_term(user_output,A,Opts,[swi(true)|Opts])) :- swi_io.
+goal_expansion(write_term(S,A,Opts),write_term(S,A,[swi(true)|Opts])) :- swi_io, \+ member(swi(_), Opts).
+goal_expansion(format(A),system:swi_format(user_output,A,[])) :- swi_io.
+goal_expansion(format(A,Args),system:swi_format(user_output,A,Args)) :- swi_io.
+goal_expansion(format(S,A,Args),system:swi_format(S,A,Args)) :- swi_io.
+goal_expansion(writeln(A),system:swi_format(user_output,'~w~n',[A])) :- swi_io.
 
 
 % make sure we also use 
@@ -280,8 +299,6 @@ concat_atom(List, New) :-
 
 
 setenv(X,Y) :- unix(putenv(X,Y)).
-
-prolog_to_os_filename(X,X).
 
 is_absolute_file_name(X) :-
 	absolute_file_name(X,X).

@@ -166,6 +166,8 @@
 #define AtomEQ Yap_heap_regs->AtomEQ_
   Atom AtomEmptyAtom_;
 #define AtomEmptyAtom Yap_heap_regs->AtomEmptyAtom_
+  Atom AtomEncoding_;
+#define AtomEncoding Yap_heap_regs->AtomEncoding_
   Atom AtomEndOfStream_;
 #define AtomEndOfStream Yap_heap_regs->AtomEndOfStream_
   Atom AtomEof_;
@@ -526,6 +528,8 @@
 #define AtomStack Yap_heap_regs->AtomStack_
   Atom AtomStackFree_;
 #define AtomStackFree Yap_heap_regs->AtomStackFree_
+  Atom AtomStartupSavedState_;
+#define AtomStartupSavedState Yap_heap_regs->AtomStartupSavedState_
   Atom AtomStaticClause_;
 #define AtomStaticClause Yap_heap_regs->AtomStaticClause_
   Atom AtomStaticProcedure_;

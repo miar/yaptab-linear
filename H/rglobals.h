@@ -95,6 +95,9 @@ static void RestoreWorker(int wid) {
 
 
 
+#if LOW_LEVEL_TRACER
+
+#endif
 
 #if defined(YAPOR) || defined(THREADS)
   REINIT_LOCK(FOREIGN_WL(wid)->signal_lock);
@@ -198,6 +201,8 @@ static void RestoreGlobal(void) {
 
 
 
+
+
 #if HAVE_LIBREADLINE
 
 
@@ -211,6 +216,8 @@ static void RestoreGlobal(void) {
 
 
 #endif
+
+
 
 
 

@@ -84,6 +84,7 @@
   AtomEOFBeforeEOT = Yap_LookupAtom("end_of_file_found_before_end_of_term");
   AtomEQ = Yap_LookupAtom("=");
   AtomEmptyAtom = Yap_LookupAtom("");
+  AtomEncoding = Yap_LookupAtom("encoding");
   AtomEndOfStream = Yap_LookupAtom("$end_of_stream");
   AtomEof = Yap_LookupAtom("end_of_file");
   AtomEq = Yap_LookupAtom("=");
@@ -160,7 +161,7 @@
   AtomMfClause = Yap_FullLookupAtom("$mf_clause");
   AtomMinus = Yap_LookupAtom("-");
   AtomModify = Yap_LookupAtom("modify");
-  AtomMultiFile = Yap_FullLookupAtom("$multi_file");
+  AtomMultiFile = Yap_FullLookupAtom("$mf");
   AtomMutable = Yap_LookupAtom("mutable");
   AtomMutableVariable = Yap_FullLookupAtom("$mutable_variable");
   AtomMyddasDB = Yap_FullLookupAtom("$myddas_db");
@@ -264,6 +265,7 @@
   AtomSpy = Yap_FullLookupAtom("$spy");
   AtomStack = Yap_LookupAtom("stack");
   AtomStackFree = Yap_LookupAtom("stackfree");
+  AtomStartupSavedState = Yap_FullLookupAtom("$startup_saved_state");
   AtomStaticClause = Yap_FullLookupAtom("$static_clause");
   AtomStaticProcedure = Yap_LookupAtom("static_procedure");
   AtomStream = Yap_FullLookupAtom("$stream");

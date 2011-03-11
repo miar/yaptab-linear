@@ -133,6 +133,7 @@
   struct pred_entry  *pred_handle_throw;
   struct pred_entry  *pred_is;
   struct pred_entry  *pred_safe_call_cleanup;
+  struct pred_entry  *pred_restore_regs;
 #ifdef YAPOR
   struct pred_entry  *pred_getwork;
   struct pred_entry  *pred_getwork_seq;
@@ -297,6 +298,10 @@
   ADDR  foreign_code_top;
   ADDR  foreign_code_max;
 
+  struct record_list  *yap_records;
+
   Atom  swi_atoms[N_SWI_ATOMS];
   Functor  swi_functors[N_SWI_FUNCTORS];
   struct swi_reverse_hash  swi_reverse_hash[N_SWI_HASH];
+
+  struct PL_blob_t  *swi_blobs;

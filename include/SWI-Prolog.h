@@ -36,6 +36,9 @@ extern "C" {
 #include	"YapInterface.h"
 #else
 #include	<Yap/config.h>
+#if USE_GMP
+#include <gmp.h>
+#endif
 #include	<Yap/YapInterface.h>
 #endif
 #include	<stdarg.h>
@@ -314,33 +317,6 @@ typedef struct foreign_context *control_t;
 
 /* end from pl-itf.h */
 
-typedef struct PL_blob_t
-{ uintptr_t		magic;		/* PL_BLOB_MAGIC */
-  uintptr_t		flags;		/* PL_BLOB_* */
-  char *		name;		/* name of the type */
-  int			(*release)(atom_t a);
-  int			(*compare)(atom_t a, atom_t b);
-#ifdef SIO_MAGIC
-  int			(*write)(IOSTREAM *s, atom_t a, int flags);
-#else
-  int			(*write)(void *s, atom_t a, int flags);
-#endif
-  void			(*acquire)(atom_t a);
-#ifdef SIO_MAGIC
-  int			(*save)(atom_t a, IOSTREAM *s);
-  atom_t		(*load)(IOSTREAM *s);
-#else
-  int			(*save)(atom_t a, void*);
-  atom_t		(*load)(void *s);
-#endif
-					/* private */
-  void *		reserved[10];	/* for future extension */
-  int			registered;	/* Already registered? */
-  int			rank;		/* Rank for ordering atoms */
-  struct PL_blob_t *    next;		/* next in registered type-chain */
-  atom_t		atom_name;	/* Name as atom */
-} PL_blob_t;
-
 		 /*******************************
 		 *	     CALL-BACK		*
 		 *******************************/
@@ -513,8 +489,8 @@ extern X_API int PL_recorded_external(char *, term_t);
 extern X_API int PL_erase_external(char *);
 extern X_API int PL_action(int,...);
 extern X_API void PL_on_halt(void (*)(int, void *), void *);
-extern X_API void *PL_malloc(int);
-extern X_API void *PL_realloc(void*,int);
+extern X_API void *PL_malloc(size_t);
+extern X_API void *PL_realloc(void*,size_t);
 extern X_API void PL_free(void *);
 extern X_API int  PL_eval_expression_to_int64_ex(term_t t, int64_t *val);
 extern X_API void  PL_cleanup_fork(void);
@@ -523,9 +499,6 @@ extern X_API int PL_get_signum_ex(term_t sig, int *n);
 extern X_API size_t PL_utf8_strlen(const char *s, size_t len);
 
 extern X_API int PL_unify_list_codes(term_t l, const char *chars);
-
-extern X_API int PL_is_blob(term_t t, PL_blob_t **type);
-extern X_API void *PL_blob_data(term_t t, size_t *len, PL_blob_t **type);
 
 #define PL_SIGSYNC	0x00010000	/* call handler synchronously */
 #define PL_SIGNOFRAME	0x00020000	/* Do not create a Prolog frame */
@@ -623,6 +596,63 @@ PL_EXPORT(int)          PL_write_term(IOSTREAM *s,term_t term,int precedence,int
 #endif
 
 
+		 /*******************************
+		 *	       BLOBS		*
+		 *******************************/
+
+#define PL_BLOB_MAGIC_B	0x75293a00	/* Magic to validate a blob-type */
+#define PL_BLOB_VERSION 1		/* Current version */
+#define PL_BLOB_MAGIC	(PL_BLOB_MAGIC_B|PL_BLOB_VERSION)
+
+#define PL_BLOB_UNIQUE	0x01		/* Blob content is unique */
+#define PL_BLOB_TEXT	0x02		/* blob contains text */
+#define PL_BLOB_NOCOPY	0x04		/* do not copy the data */
+#define PL_BLOB_WCHAR	0x08		/* wide character string */
+
+typedef struct PL_blob_t
+{ uintptr_t		magic;		/* PL_BLOB_MAGIC */
+  uintptr_t		flags;		/* PL_BLOB_* */
+  char *		name;		/* name of the type */
+  int			(*release)(atom_t a);
+  int			(*compare)(atom_t a, atom_t b);
+#ifdef SIO_MAGIC
+  int			(*write)(IOSTREAM *s, atom_t a, int flags);
+#else
+  int			(*write)(void *s, atom_t a, int flags);
+#endif
+  void			(*acquire)(atom_t a);
+#ifdef SIO_MAGIC
+  int			(*save)(atom_t a, IOSTREAM *s);
+  atom_t		(*load)(IOSTREAM *s);
+#else
+  int			(*save)(atom_t a, void*);
+  atom_t		(*load)(void *s);
+#endif
+					/* private */
+  void *		reserved[10];	/* for future extension */
+  int			registered;	/* Already registered? */
+  int			rank;		/* Rank for ordering atoms */
+  struct PL_blob_t *    next;		/* next in registered type-chain */
+  atom_t		atom_name;	/* Name as atom */
+} PL_blob_t;
+
+PL_EXPORT(int)		PL_is_blob(term_t t, PL_blob_t **type);
+PL_EXPORT(int)		PL_unify_blob(term_t t, void *blob, size_t len,
+				      PL_blob_t *type);
+PL_EXPORT(int)		PL_put_blob(term_t t, void *blob, size_t len,
+				    PL_blob_t *type);
+PL_EXPORT(int)		PL_get_blob(term_t t, void **blob, size_t *len,
+				    PL_blob_t **type);
+
+PL_EXPORT(void*)	PL_blob_data(atom_t a,
+				     size_t *len,
+				     struct PL_blob_t **type);
+
+PL_EXPORT(void)		PL_register_blob_type(PL_blob_t *type);
+PL_EXPORT(PL_blob_t*)	PL_find_blob_type(const char* name);
+PL_EXPORT(int)		PL_unregister_blob_type(PL_blob_t *type);
+
+
 #if USE_GMP
 
 PL_EXPORT(int)		PL_get_mpz(term_t t, mpz_t mpz);
@@ -671,6 +701,8 @@ typedef struct SWI_IO {
   void *put_w;
   void *flush_s;
   void *close_s;
+  void *get_stream_handle;
+  void *get_stream_position;
 } swi_io_struct;
 
 /*  SWI stream info */

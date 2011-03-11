@@ -461,6 +461,8 @@ void    STD_PROTO(Yap_InitMYDDAS_TopLevelPreds,(void));
 /* yap2swi.c */
 void	STD_PROTO(Yap_swi_install,(void));
 void    STD_PROTO(Yap_InitSWIHash,(void));
+int     STD_PROTO(Yap_get_stream_handle,(Term, int, int, void *));
+Term    STD_PROTO(Yap_get_stream_position,(void *));
 
 /* ypsocks.c */
 void	STD_PROTO(Yap_InitSockets,(void));
