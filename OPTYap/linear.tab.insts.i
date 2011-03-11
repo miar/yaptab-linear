@@ -273,7 +273,7 @@ ENDPBOp();
      }
        
      if (SgFr_new_answer_trie(sg_fr)!=NULL){ 
-       /*first time to load answers from trie */
+       /*first time to load answers from trie */       
        if (SgFr_new_answer_trie(sg_fr) == SgFr_answer_trie(sg_fr)) {	 
 	 // yes answer --> procceed 
 	 remove_branch(sg_fr);
@@ -287,7 +287,7 @@ ENDPBOp();
 	 PREFETCH_OP(PREG);
 	 YENV = ENV;
 	 GONext();
-       }
+       } 
        restore_generator_node(SgFr_arity(sg_fr), ANSWER_RESOLUTION);
        PREG = (yamop *) CPREG;
        PREFETCH_OP(PREG);
@@ -501,7 +501,7 @@ BOp(table_completion, Otapl)
 
     /*if DRE is present then (it is pioneer and not leader) */
 #ifdef LINEAR_TABLING_DRS
-    if (IS_LOCAL_SF(sg_fr)){
+    if (IS_LOCAL_SF(sg_fr)){      
       if(SgFr_cp(sg_fr)!=B->cp_cp){
 	INFO_LINEAR_TABLING("drs- SgFr_cp=%p  B->cp=%p",SgFr_cp(sg_fr),B->cp_cp);
 	SgFr_cp(sg_fr)=B->cp_cp;
