@@ -318,7 +318,7 @@ inline void consume_all_answers_on_trie(tab_ent_ptr tab_ent,ans_node_ptr ans_nod
   store_loader_node(tab_ent, ans_node);		
 #endif
   PREG = (yamop *) CPREG;                             
-  PREFETCH_OP(PREG);                                    
+  PREFETCH_OP(PREG);    
   load_answer(ans_node, YENV);                     
   YENV = ENV;                                
   return;

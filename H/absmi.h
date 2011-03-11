@@ -40,27 +40,27 @@ static char SccsId[] = "%W% %G%";
 #define SHADOW_P       1
 #define SHADOW_Y       1
 #define SHADOW_REGS    1
-#define USE_PREFETCH   1
+//#define USE_PREFETCH   1
 #endif
 
 #ifdef __alpha
 #define SHADOW_P       1
 #define SHADOW_Y       1
 #define SHADOW_REGS    1
-#define USE_PREFETCH   1
+//#define USE_PREFETCH   1
 #endif
 
 #ifdef mips
 #define SHADOW_P       1
 #define SHADOW_Y       1
 #define SHADOW_REGS    1
-#define USE_PREFETCH   1
+//#define USE_PREFETCH   1
 #endif
 
 #if defined(_POWER) || defined(__POWERPC__)
 #define SHADOW_P       1
 #define SHADOW_REGS    1
-#define USE_PREFETCH   1
+//#define USE_PREFETCH   1
 #endif
 
 #ifdef i386
@@ -102,7 +102,7 @@ register struct yami* P1REG asm ("bp"); /* can't use yamop before Yap.h */
 #define S_IN_MEM       1
 #define      Y_IN_MEM  1
 #define     TR_IN_MEM  1
-#define USE_PREFETCH   1
+//#define USE_PREFETCH   1
 #endif /* __x86_64__ */
 
 #else /* other compilers */
@@ -129,7 +129,7 @@ register struct yami* P1REG asm ("bp"); /* can't use yamop before Yap.h */
 #define SHADOW_S       1
 #define SHADOW_CP      1
 #define SHADOW_HB      1
-#define USE_PREFETCH   1
+//#define USE_PREFETCH   1
 #endif
 
 #ifdef _HPUX_SOURCE
@@ -138,7 +138,7 @@ register struct yami* P1REG asm ("bp"); /* can't use yamop before Yap.h */
 #define SHADOW_S       1
 #define SHADOW_CP      1
 #define SHADOW_HB      1
-#define USE_PREFETCH   1
+//#define USE_PREFETCH   1
 #endif
 
 #endif /* __GNUC__ */
