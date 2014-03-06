@@ -397,6 +397,7 @@ BOp(table_completion, Otapl)
    }
    /* check for follower node , not pioneer and state still evaluating */
    if (SgFr_state(sg_fr)==evaluating && SgFr_pioneer(sg_fr)!=B){
+     // if (SgFr_pioneer(sg_fr)!=B){   //alterar para isto
      if (HAS_NEW_ANSWERS(sg_fr)) {
        UNTAG_NEW_ANSWERS(sg_fr);
        TAG_NEW_ANSWERS(LOCAL_top_sg_fr_on_branch);
@@ -440,7 +441,8 @@ BOp(table_completion, Otapl)
 		  LOCAL_max_scc  = SgFr_next_on_scc(LOCAL_max_scc);
 		}
 	      } 
-	    SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr) = next_loop_alt;
+	    SgFr_stop_loop_alt(sg_fr) = SgFr_current_loop_alt(sg_fr) = next_loop_alt; 
+	    //SgFr_current_loop_alt(sg_fr) = next_loop_alt; //alterar para isto
 	    UNTAG_NEW_ANSWERS(sg_fr);
 	  }else{ /* is batched- do not change dymamically the stop alt */
 //#else  /*!LINEAR_TABLING_DSLA --- TO REMOVE*/

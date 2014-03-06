@@ -61,12 +61,12 @@
 //#define LINEAR_TABLING_DSLA 1 /*for debug only- need change on table_completion() */
 
 #define LINEAR_TABLING_DRA 1  
-#define LINEAR_TABLING_DRE 1 
+//#define LINEAR_TABLING_DRE 1 
 #define LINEAR_TABLING_DRS 1
 
 #ifdef LINEAR_TABLING
-#define MAX_LOOP_ALT_BUCKET   10
-#define MAX_LOOP_ANS_BUCKET   1
+#define MAX_LOOP_ALT_BUCKET   10//3
+#define MAX_LOOP_ANS_BUCKET   10 //3
 #endif /*LINEAR_TABLING */
 
 
